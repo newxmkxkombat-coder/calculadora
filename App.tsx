@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 
 // --- TYPE DEFINITIONS ---
@@ -15,6 +16,8 @@ interface CalculationResults {
   myEarnings: number;
   totalExpenses: number;
   amountToSettle: number;
+  fixedCommissionValue: number;
+  perPassengerCommissionValue: number;
 }
 
 interface HistoryEntry {
@@ -27,7 +30,7 @@ interface HistoryEntry {
 const INITIAL_FORM_DATA: FormData = {
   numPassengers: '',
   fareValue: '3.000',
-  fixedCommission: '',
+  fixedCommission: '15',
   commissionPerPassenger: '100',
   route: '9',
   fuelExpenses: '',
@@ -148,25 +151,32 @@ const InputControl: React.FC<InputControlProps> = ({ label, name, value, onChang
     <label htmlFor={name} className="block text-base font-semibold text-gray-300 mb-2 tracking-wide">
       {label}
     </label>
-    <div className="relative">
-      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500">{icon}</div>
-      <input
-        type={isNumericFormatted ? 'text' : 'number'}
-        inputMode={isNumericFormatted ? 'numeric' : 'decimal'}
-        id={name}
-        name={name}
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        className={`w-full bg-gray-800 border border-gray-700 rounded-lg py-3 pl-10 text-white placeholder-gray-500 focus:ring-2 focus:ring-cyan-500 focus:outline-none transition-all duration-200 ${unit ? 'pr-12' : 'pr-4'}`}
-        onFocus={(e) => e.target.select()}
-        min="0"
-        aria-label={label}
-      />
-      {unit && <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-gray-400 text-sm">{unit}</div>}
+    <div className="flex items-center bg-gray-800 border border-gray-700 rounded-lg focus-within:ring-2 focus-within:ring-cyan-500 transition-all duration-200">
+      <div className="pl-3 text-gray-500 pointer-events-none">{icon}</div>
+      <div className="relative flex-grow">
+        <input
+          type={isNumericFormatted ? 'text' : 'number'}
+          inputMode={isNumericFormatted ? 'numeric' : 'decimal'}
+          id={name}
+          name={name}
+          value={value}
+          onChange={onChange}
+          placeholder={placeholder}
+          className={`w-full bg-transparent py-3 pl-3 ${unit ? 'pr-8' : 'pr-3'} text-white placeholder-gray-500 focus:outline-none`}
+          onFocus={(e) => e.target.select()}
+          min="0"
+          aria-label={label}
+        />
+        {unit && (
+          <span className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 pointer-events-none">
+            {unit}
+          </span>
+        )}
+      </div>
     </div>
   </div>
 );
+
 
 interface CheckboxControlGroupProps {
   label: string;
@@ -242,7 +252,7 @@ const ResultDisplay: React.FC<ResultDisplayProps> = ({ label, value }) => {
 // --- MAIN APP COMPONENT ---
 const App: React.FC = () => {
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM_DATA);
-  const [results, setResults] = useState<CalculationResults>({ myEarnings: 0, totalExpenses: 0, amountToSettle: 0 });
+  const [results, setResults] = useState<CalculationResults>({ myEarnings: 0, totalExpenses: 0, amountToSettle: 0, fixedCommissionValue: 0, perPassengerCommissionValue: 0 });
   const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistoryFromLocalStorage());
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -284,6 +294,8 @@ const App: React.FC = () => {
       myEarnings: isNaN(driverEarnings) ? 0 : driverEarnings,
       totalExpenses: isNaN(calculatedTotalExpenses) ? 0 : calculatedTotalExpenses,
       amountToSettle: isNaN(amountToSettle) ? 0 : amountToSettle,
+      fixedCommissionValue: isNaN(fixedCommissionValue) ? 0 : fixedCommissionValue,
+      perPassengerCommissionValue: isNaN(perPassengerCommissionValue) ? 0 : perPassengerCommissionValue,
     });
   }, [formData]);
 
@@ -358,8 +370,17 @@ const App: React.FC = () => {
       acc.totalExpenses += entry.results.totalExpenses;
       acc.totalAmountSettled += entry.results.amountToSettle;
       acc.totalPassengers += parseFloat(parseFormattedNumber(entry.formData.numPassengers)) || 0;
+      acc.totalFixedCommission += entry.results.fixedCommissionValue || 0;
+      acc.totalPerPassengerCommission += entry.results.perPassengerCommissionValue || 0;
       return acc;
-    }, { totalEarnings: 0, totalExpenses: 0, totalAmountSettled: 0, totalPassengers: 0 });
+    }, { 
+        totalEarnings: 0, 
+        totalExpenses: 0, 
+        totalAmountSettled: 0, 
+        totalPassengers: 0,
+        totalFixedCommission: 0,
+        totalPerPassengerCommission: 0,
+    });
   }, [history]);
 
   return (
@@ -379,7 +400,7 @@ const App: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
                 <InputControl label="Número de Pasajeros" name="numPassengers" value={formData.numPassengers} onChange={handleChange} icon={<UsersIcon />} />
                 <InputControl label="Valor del Pasaje" name="fareValue" value={formData.fareValue} onChange={handleChange} icon={<MoneyIcon />} unit="$" isNumericFormatted />
-                <InputControl label="Comisión Fija" name="fixedCommission" value={formData.fixedCommission} onChange={handleChange} icon={<PercentageIcon />} unit="%" placeholder="Escribe Tu Porcentaje" />
+                <InputControl label="Comisión Fija" name="fixedCommission" value={formData.fixedCommission} onChange={handleChange} icon={<PercentageIcon />} unit="%" />
                 <InputControl label="Comisión por Pasajero" name="commissionPerPassenger" value={formData.commissionPerPassenger} onChange={handleChange} icon={<MoneyIcon />} unit="$" isNumericFormatted />
                 <CheckboxControlGroup label="Ruta" name="route" value={formData.route} onChange={handleChange} icon={<RouteIcon />} options={['9', '11', '29', '60']} />
             </div>
@@ -431,6 +452,16 @@ const App: React.FC = () => {
                               <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-cyan-400">
                                   {formatCurrency(historyTotals.totalEarnings)}
                               </p>
+                               <div className="flex justify-center space-x-6 mt-2">
+                                  <div className="text-center">
+                                      <span className="text-lg font-bold text-sky-400">{formatCurrency(historyTotals.totalFixedCommission)}</span>
+                                      <p className="text-xs text-gray-400">15%</p>
+                                  </div>
+                                  <div className="text-center">
+                                      <span className="text-lg font-bold text-teal-400">{formatCurrency(historyTotals.totalPerPassengerCommission)}</span>
+                                      <p className="text-xs text-gray-400">Comisión</p>
+                                  </div>
+                              </div>
                           </div>
                           <div>
                               <p className="text-sm text-gray-400">Gastos Totales</p>
@@ -475,6 +506,10 @@ const App: React.FC = () => {
                                             <div>
                                                 <p className="text-gray-400">Ganancia</p>
                                                 <p className="font-bold text-green-400 text-base">{formatCurrency(entry.results.myEarnings)}</p>
+                                                <div className="flex space-x-4 mt-1">
+                                                    <p className="text-base"><span className="text-gray-400">15%:</span> <span className="font-semibold text-sky-300">{formatCurrency(entry.results.fixedCommissionValue)}</span></p>
+                                                    <p className="text-base"><span className="text-gray-400">Comisión:</span> <span className="font-semibold text-teal-300">{formatCurrency(entry.results.perPassengerCommissionValue)}</span></p>
+                                                </div>
                                             </div>
                                             <div>
                                                 <p className="text-gray-400">Gastos</p>
