@@ -10,6 +10,7 @@ interface FormData {
   route: string;
   fuelExpenses: string;
   variableExpenses: string;
+  administrativeExpenses: string;
 }
 
 interface CalculationResults {
@@ -27,7 +28,7 @@ interface HistoryEntry {
   results: CalculationResults;
 }
 
-const INITIAL_FORM_DATA: FormData = {
+const INITIAL_FORM_DATA: Omit<FormData, 'administrativeExpenses'> = {
   numPassengers: '',
   fareValue: '3.000',
   fixedCommission: '15',
@@ -38,6 +39,9 @@ const INITIAL_FORM_DATA: FormData = {
 };
 
 const PASSENGER_GOAL = 5500;
+const ADMIN_EXPENSE_DAYS_LIMIT = 20;
+const ADMIN_EXPENSE_VALUE = '109.165';
+
 
 const MOTIVATIONAL_PHRASES = [
   "¡Excelente! Cada registro te acerca más a tu meta.",
@@ -129,6 +133,12 @@ const WrenchIcon = () => (
     </svg>
 );
 
+const BriefcaseIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+    </svg>
+);
+
 const SaveIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
@@ -163,14 +173,15 @@ interface InputControlProps {
   icon: React.ReactNode;
   unit?: string;
   isNumericFormatted?: boolean;
+  disabled?: boolean;
 }
 
-const InputControl: React.FC<InputControlProps> = ({ label, name, value, onChange, placeholder = '0', icon, unit, isNumericFormatted = false }) => (
+const InputControl: React.FC<InputControlProps> = ({ label, name, value, onChange, placeholder = '0', icon, unit, isNumericFormatted = false, disabled = false }) => (
   <div className="mb-4">
     <label htmlFor={name} className="block text-base font-semibold text-gray-300 mb-2 tracking-wide">
       {label}
     </label>
-    <div className="flex items-center bg-gray-800 border border-gray-700 rounded-lg focus-within:ring-2 focus-within:ring-cyan-500 transition-all duration-200">
+    <div className={`flex items-center border border-gray-700 rounded-lg transition-all duration-200 ${disabled ? 'bg-gray-700/50' : 'bg-gray-800 focus-within:ring-2 focus-within:ring-cyan-500'}`}>
       <div className="pl-3 text-gray-500 pointer-events-none">{icon}</div>
       <div className="relative flex-grow">
         <input
@@ -181,10 +192,11 @@ const InputControl: React.FC<InputControlProps> = ({ label, name, value, onChang
           value={value}
           onChange={onChange}
           placeholder={placeholder}
-          className={`w-full bg-transparent py-3 pl-3 ${unit ? 'pr-8' : 'pr-3'} text-white placeholder-gray-500 focus:outline-none`}
+          className={`w-full bg-transparent py-3 pl-3 ${unit ? 'pr-8' : 'pr-3'} placeholder-gray-500 focus:outline-none ${disabled ? 'cursor-not-allowed text-gray-400' : 'text-white'}`}
           onFocus={(e) => e.target.select()}
           min="0"
           aria-label={label}
+          disabled={disabled}
         />
         {unit && (
           <span className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 pointer-events-none">
@@ -352,9 +364,18 @@ const Toast: React.FC<ToastProps> = ({ message, show, onClose }) => {
 
 // --- MAIN APP COMPONENT ---
 const App: React.FC = () => {
-  const [formData, setFormData] = useState<FormData>(INITIAL_FORM_DATA);
-  const [results, setResults] = useState<CalculationResults>({ myEarnings: 0, totalExpenses: 0, amountToSettle: 0, fixedCommissionValue: 0, perPassengerCommissionValue: 0 });
   const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistoryFromLocalStorage());
+  
+  const getInitialFormData = useCallback((): FormData => {
+    const isPastAdminLimit = history.length >= ADMIN_EXPENSE_DAYS_LIMIT;
+    return {
+      ...INITIAL_FORM_DATA,
+      administrativeExpenses: isPastAdminLimit ? '0' : ADMIN_EXPENSE_VALUE,
+    };
+  }, [history.length]);
+
+  const [formData, setFormData] = useState<FormData>(getInitialFormData);
+  const [results, setResults] = useState<CalculationResults>({ myEarnings: 0, totalExpenses: 0, amountToSettle: 0, fixedCommissionValue: 0, perPassengerCommissionValue: 0 });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState('');
   const [usedPhrases, setUsedPhrases] = useState<string[]>([]);
@@ -365,7 +386,7 @@ const App: React.FC = () => {
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement> | { target: { name: string; value: string } }) => {
     const { name, value } = e.target;
-    const fieldsToFormat: (keyof FormData)[] = ['fareValue', 'commissionPerPassenger', 'fuelExpenses', 'variableExpenses'];
+    const fieldsToFormat: (keyof FormData)[] = ['fareValue', 'commissionPerPassenger', 'fuelExpenses', 'variableExpenses', 'administrativeExpenses'];
     
     const isFormatted = fieldsToFormat.includes(name as keyof FormData);
     setFormData(prev => ({ ...prev, [name]: isFormatted ? formatNumberWithDots(value) : value }));
@@ -379,18 +400,19 @@ const App: React.FC = () => {
       commissionPerPassenger: parseFloat(parseFormattedNumber(data.commissionPerPassenger)) || 0,
       fuelExpenses: parseFloat(parseFormattedNumber(data.fuelExpenses)) || 0,
       variableExpenses: parseFloat(parseFormattedNumber(data.variableExpenses)) || 0,
+      administrativeExpenses: parseFloat(parseFormattedNumber(data.administrativeExpenses)) || 0,
     };
   }
 
   useEffect(() => {
-    const { numPassengers, fareValue, fixedCommission, commissionPerPassenger, fuelExpenses, variableExpenses } = getRawData(formData);
+    const { numPassengers, fareValue, fixedCommission, commissionPerPassenger, fuelExpenses, variableExpenses, administrativeExpenses } = getRawData(formData);
 
     const totalRevenue = numPassengers * fareValue;
     const fixedCommissionValue = totalRevenue * (fixedCommission / 100);
     const perPassengerCommissionValue = numPassengers * commissionPerPassenger;
     
     const driverEarnings = fixedCommissionValue + perPassengerCommissionValue;
-    const calculatedTotalExpenses = fuelExpenses + variableExpenses;
+    const calculatedTotalExpenses = fuelExpenses + variableExpenses + administrativeExpenses;
     const amountToSettle = totalRevenue - driverEarnings - calculatedTotalExpenses;
 
     setResults({
@@ -418,7 +440,7 @@ const App: React.FC = () => {
   }, [usedPhrases]);
 
   const handleClearForm = () => {
-      setFormData(INITIAL_FORM_DATA);
+      setFormData(getInitialFormData());
       setEditingId(null);
   }
 
@@ -467,6 +489,13 @@ const App: React.FC = () => {
   };
 
   const handleDeleteEntry = (id: string) => {
+    if (editingId) {
+        // If deleting the entry being edited, clear the form as well
+        const entryToDelete = history.find(entry => entry.id === id);
+        if (entryToDelete && entryToDelete.id === editingId) {
+            handleClearForm();
+        }
+    }
     setHistory(prevHistory => prevHistory.filter(entry => entry.id !== id));
   };
   
@@ -476,6 +505,7 @@ const App: React.FC = () => {
     );
     if (isConfirmed) {
       setHistory([]);
+      handleClearForm(); // Also reset the form
     }
   };
 
@@ -497,6 +527,8 @@ const App: React.FC = () => {
         totalPerPassengerCommission: 0,
     });
   }, [history]);
+
+  const isAdministrativeExpenseLocked = history.length < ADMIN_EXPENSE_DAYS_LIMIT;
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-4 sm:p-6 lg:p-8">
@@ -529,6 +561,16 @@ const App: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
                 <InputControl label="Combustible" name="fuelExpenses" value={formData.fuelExpenses} onChange={handleChange} icon={<FuelIcon />} unit="$" isNumericFormatted />
                 <InputControl label="Taller (Lavada,Tencioanda,Engrase,etc.)" name="variableExpenses" value={formData.variableExpenses} onChange={handleChange} icon={<WrenchIcon />} unit="$" isNumericFormatted placeholder="Valor Total" />
+                <InputControl 
+                  label="Gastos Administrativos" 
+                  name="administrativeExpenses" 
+                  value={formData.administrativeExpenses} 
+                  onChange={handleChange} 
+                  icon={<BriefcaseIcon />} 
+                  unit="$" 
+                  isNumericFormatted 
+                  disabled={isAdministrativeExpenseLocked}
+                />
             </div>
             <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
                  <button onClick={handleSaveCalculation} className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 px-6 rounded-lg transition-all duration-300 flex items-center justify-center">
