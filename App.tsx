@@ -14,6 +14,7 @@ interface FormData {
 }
 
 interface CalculationResults {
+  totalRevenue: number;
   myEarnings: number;
   totalExpenses: number;
   amountToSettle: number;
@@ -173,15 +174,14 @@ interface InputControlProps {
   icon: React.ReactNode;
   unit?: string;
   isNumericFormatted?: boolean;
-  disabled?: boolean;
 }
 
-const InputControl: React.FC<InputControlProps> = ({ label, name, value, onChange, placeholder = '0', icon, unit, isNumericFormatted = false, disabled = false }) => (
+const InputControl: React.FC<InputControlProps> = ({ label, name, value, onChange, placeholder = '0', icon, unit, isNumericFormatted = false }) => (
   <div className="mb-4">
     <label htmlFor={name} className="block text-base font-semibold text-gray-300 mb-2 tracking-wide">
       {label}
     </label>
-    <div className={`flex items-center border border-gray-700 rounded-lg transition-all duration-200 ${disabled ? 'bg-gray-700/50' : 'bg-gray-800 focus-within:ring-2 focus-within:ring-cyan-500'}`}>
+    <div className="flex items-center bg-gray-800 border border-gray-700 rounded-lg transition-all duration-200 focus-within:ring-2 focus-within:ring-cyan-500">
       <div className="pl-3 text-gray-500 pointer-events-none">{icon}</div>
       <div className="relative flex-grow">
         <input
@@ -192,11 +192,10 @@ const InputControl: React.FC<InputControlProps> = ({ label, name, value, onChang
           value={value}
           onChange={onChange}
           placeholder={placeholder}
-          className={`w-full bg-transparent py-3 pl-3 ${unit ? 'pr-8' : 'pr-3'} placeholder-gray-500 focus:outline-none ${disabled ? 'cursor-not-allowed text-gray-400' : 'text-white'}`}
+          className="w-full bg-transparent py-3 pl-3 text-white placeholder-gray-500 focus:outline-none"
           onFocus={(e) => e.target.select()}
           min="0"
           aria-label={label}
-          disabled={disabled}
         />
         {unit && (
           <span className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 pointer-events-none">
@@ -266,7 +265,8 @@ interface ResultDisplayProps {
 const ResultDisplay: React.FC<ResultDisplayProps> = ({ label, value }) => {
   const formattedValue = formatCurrency(value);
 
-  const valueColor = label.includes('Sueldo') ? 'from-green-400 to-cyan-400' : 
+  const valueColor = label.includes('Debo Tener') ? 'from-purple-500 to-pink-500' :
+                     label.includes('Sueldo') ? 'from-green-400 to-cyan-400' : 
                      label.includes('Gastos') ? 'from-amber-400 to-red-500' :
                      'from-blue-400 to-purple-400';
 
@@ -375,7 +375,7 @@ const App: React.FC = () => {
   }, [history.length]);
 
   const [formData, setFormData] = useState<FormData>(getInitialFormData);
-  const [results, setResults] = useState<CalculationResults>({ myEarnings: 0, totalExpenses: 0, amountToSettle: 0, fixedCommissionValue: 0, perPassengerCommissionValue: 0 });
+  const [results, setResults] = useState<CalculationResults>({ totalRevenue: 0, myEarnings: 0, totalExpenses: 0, amountToSettle: 0, fixedCommissionValue: 0, perPassengerCommissionValue: 0 });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState('');
   const [usedPhrases, setUsedPhrases] = useState<string[]>([]);
@@ -383,30 +383,6 @@ const App: React.FC = () => {
   useEffect(() => {
     saveHistoryToLocalStorage(history);
   }, [history]);
-
-  // This effect synchronizes the administrativeExpenses field based on history length,
-  // but only when not in editing mode to avoid overwriting user edits on loaded data.
-  useEffect(() => {
-    if (editingId) {
-      // Don't auto-update the form while editing a historical entry.
-      return;
-    }
-
-    const isPastAdminLimit = history.length >= ADMIN_EXPENSE_DAYS_LIMIT;
-
-    if (isPastAdminLimit) {
-      // If we are past the limit, the value should be '0'
-      if (formData.administrativeExpenses !== '0') {
-        setFormData(prev => ({ ...prev, administrativeExpenses: '0' }));
-      }
-    } else {
-      // If we are within the limit, the value should be the fixed expense
-      if (formData.administrativeExpenses !== ADMIN_EXPENSE_VALUE) {
-        setFormData(prev => ({ ...prev, administrativeExpenses: ADMIN_EXPENSE_VALUE }));
-      }
-    }
-  }, [history.length, editingId, formData.administrativeExpenses]);
-
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement> | { target: { name: string; value: string } }) => {
     const { name, value } = e.target;
@@ -440,6 +416,7 @@ const App: React.FC = () => {
     const amountToSettle = totalRevenue - driverEarnings - calculatedTotalExpenses;
 
     setResults({
+      totalRevenue: isNaN(totalRevenue) ? 0 : totalRevenue,
       myEarnings: isNaN(driverEarnings) ? 0 : driverEarnings,
       totalExpenses: isNaN(calculatedTotalExpenses) ? 0 : calculatedTotalExpenses,
       amountToSettle: isNaN(amountToSettle) ? 0 : amountToSettle,
@@ -463,10 +440,10 @@ const App: React.FC = () => {
     setToastMessage(phrase);
   }, [usedPhrases]);
 
-  const handleClearForm = () => {
+  const handleClearForm = useCallback(() => {
       setFormData(getInitialFormData());
       setEditingId(null);
-  }
+  }, [getInitialFormData]);
 
   const handleSaveCalculation = () => {
     const rawData = getRawData(formData);
@@ -487,7 +464,6 @@ const App: React.FC = () => {
             : entry
         )
       );
-      setEditingId(null);
     } else {
       const newEntry: HistoryEntry = {
         id: new Date().toISOString(),
@@ -501,6 +477,7 @@ const App: React.FC = () => {
       setHistory(prevHistory => [newEntry, ...prevHistory]);
     }
     showMotivationalToast();
+    handleClearForm();
   };
   
   const handleLoadEntry = (id: string) => {
@@ -552,8 +529,6 @@ const App: React.FC = () => {
     });
   }, [history]);
 
-  const isAdministrativeExpenseLocked = history.length < ADMIN_EXPENSE_DAYS_LIMIT;
-
   return (
     <div className="min-h-screen bg-gray-900 text-white p-4 sm:p-6 lg:p-8">
       <Toast 
@@ -593,7 +568,6 @@ const App: React.FC = () => {
                   icon={<BriefcaseIcon />} 
                   unit="$" 
                   isNumericFormatted 
-                  disabled={isAdministrativeExpenseLocked}
                 />
             </div>
             <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -610,6 +584,7 @@ const App: React.FC = () => {
           {/* Columna de Resultados */}
           <div className="lg:col-span-2 bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700 flex flex-col justify-center">
             <h2 className="text-2xl font-bold mb-6 text-green-400">Resumen</h2>
+            <ResultDisplay label="Debo Tener" value={results.totalRevenue} />
             <ResultDisplay label="Mi Sueldo" value={results.myEarnings} />
             <ResultDisplay label="Gastos Operativos" value={results.totalExpenses} />
             <ResultDisplay label="Total A Entregar" value={results.amountToSettle} />
