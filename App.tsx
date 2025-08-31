@@ -1,10 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
 
-// --- TYPE DEFINITIONS ---
-interface FormData {
-  numPassengers: string;
-  fareValue: string;
-  fixedCommission: string;
   commissionPerPassenger: string;
   route: string;
   fuelExpenses: string;
@@ -344,7 +338,12 @@ const App: React.FC = () => {
   };
   
   const handleClearAllHistory = () => {
-    setHistory([]);
+    const isConfirmed = window.confirm(
+      "¿Estás seguro de que quieres borrar todo el historial? Esta acción no se puede deshacer."
+    );
+    if (isConfirmed) {
+      setHistory([]);
+    }
   };
 
   const historyTotals = useMemo(() => {
