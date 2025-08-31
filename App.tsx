@@ -17,7 +17,8 @@ interface CalculationResults {
   totalRevenue: number;
   myEarnings: number;
   totalExpenses: number;
-  amountToSettle: number;
+  amountToSettle: number; // In history, this is NET. In main state, it's GROSS.
+  totalDeliveredAmount?: number; // GROSS amount, only for history.
   fixedCommissionValue: number;
   perPassengerCommissionValue: number;
 }
@@ -412,8 +413,18 @@ const App: React.FC = () => {
     const perPassengerCommissionValue = numPassengers * commissionPerPassenger;
     
     const driverEarnings = fixedCommissionValue + perPassengerCommissionValue;
-    const calculatedTotalExpenses = fuelExpenses + variableExpenses + administrativeExpenses;
-    const amountToSettle = totalRevenue - driverEarnings - calculatedTotalExpenses;
+
+    // Separate expenses for clarity
+    const ownerExpenses = fuelExpenses + variableExpenses; // Expenses deducted from the settlement
+    const adminExpenses = administrativeExpenses; // Expenses NOT deducted from the settlement
+
+    // Total expenses for the day ("Gastos Operativos") includes everything.
+    const calculatedTotalExpenses = ownerExpenses + adminExpenses;
+    
+    // Amount to settle with the owner only deducts the owner's expenses.
+    // This is the GROSS amount before deducting administrative expenses.
+    const amountToSettle = totalRevenue - driverEarnings - ownerExpenses;
+
 
     setResults({
       totalRevenue: isNaN(totalRevenue) ? 0 : totalRevenue,
@@ -452,14 +463,23 @@ const App: React.FC = () => {
       return;
     }
 
+    const grossAmountToSettle = results.amountToSettle;
+    const netAmountToSettle = grossAmountToSettle - rawData.administrativeExpenses;
+
+    const resultsForHistory: CalculationResults = {
+      ...results,
+      amountToSettle: netAmountToSettle, // This is "Dinero En Empresa" (net)
+      totalDeliveredAmount: grossAmountToSettle, // This is "Dinero Entregado Total" (gross)
+    };
+
     if (editingId) {
-      setHistory(prevHistory => 
-        prevHistory.map(entry => 
+      setHistory(prevHistory =>
+        prevHistory.map(entry =>
           entry.id === editingId
             ? {
                 ...entry,
                 formData,
-                results,
+                results: resultsForHistory,
               }
             : entry
         )
@@ -472,7 +492,7 @@ const App: React.FC = () => {
           hour: '2-digit', minute: '2-digit'
         }),
         formData,
-        results,
+        results: resultsForHistory,
       };
       setHistory(prevHistory => [newEntry, ...prevHistory]);
     }
@@ -514,7 +534,8 @@ const App: React.FC = () => {
     return history.reduce((acc, entry) => {
       acc.totalEarnings += entry.results.myEarnings;
       acc.totalExpenses += entry.results.totalExpenses;
-      acc.totalAmountSettled += entry.results.amountToSettle;
+      acc.totalAmountSettled += entry.results.amountToSettle; // Net amount
+      acc.totalDeliveredAmount += entry.results.totalDeliveredAmount || 0; // Gross amount
       acc.totalPassengers += parseFloat(parseFormattedNumber(entry.formData.numPassengers)) || 0;
       acc.totalFixedCommission += entry.results.fixedCommissionValue || 0;
       acc.totalPerPassengerCommission += entry.results.perPassengerCommissionValue || 0;
@@ -522,7 +543,8 @@ const App: React.FC = () => {
     }, { 
         totalEarnings: 0, 
         totalExpenses: 0, 
-        totalAmountSettled: 0, 
+        totalAmountSettled: 0,
+        totalDeliveredAmount: 0,
         totalPassengers: 0,
         totalFixedCommission: 0,
         totalPerPassengerCommission: 0,
@@ -610,23 +632,25 @@ const App: React.FC = () => {
                       totalPassengers={historyTotals.totalPassengers} 
                       goal={PASSENGER_GOAL} 
                     />
-                    <div className="p-4 bg-gray-900/50 rounded-lg border border-gray-700">
+                    <div className="p-4 mt-6 bg-gray-900/50 rounded-lg border border-gray-700">
                         <h3 className="text-lg font-bold text-gray-300 mb-3 text-center">Resumen Total del Historial</h3>
-                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-center">
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
                             <div>
+                                <p className="text-sm text-gray-400">Pasajeros Totales</p>
+                                <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-teal-400">
+                                    {historyTotals.totalPassengers.toLocaleString('es-CO')}
+                                </p>
+                            </div>
+                             <div>
                                 <p className="text-sm text-gray-400">Ganancia Total</p>
                                 <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-cyan-400">
                                     {formatCurrency(historyTotals.totalEarnings)}
                                 </p>
-                                 <div className="flex justify-center space-x-6 mt-2">
-                                    <div className="text-center">
-                                        <span className="text-lg font-bold text-sky-400">{formatCurrency(historyTotals.totalFixedCommission)}</span>
-                                        <p className="text-xs text-gray-400">15%</p>
-                                    </div>
-                                    <div className="text-center">
-                                        <span className="text-lg font-bold text-teal-400">{formatCurrency(historyTotals.totalPerPassengerCommission)}</span>
-                                        <p className="text-xs text-gray-400">Comisión</p>
-                                    </div>
+                                 <div className="mt-2 text-center">
+                                    <span className="text-sm font-bold text-sky-400">{formatCurrency(historyTotals.totalFixedCommission)}</span>
+                                    <p className="text-xs text-gray-400">15%</p>
+                                    <span className="text-sm font-bold text-teal-400 mt-1 block">{formatCurrency(historyTotals.totalPerPassengerCommission)}</span>
+                                    <p className="text-xs text-gray-400">Comisión</p>
                                 </div>
                             </div>
                             <div>
@@ -636,15 +660,15 @@ const App: React.FC = () => {
                                 </p>
                             </div>
                             <div>
-                                <p className="text-sm text-gray-400">Total Entregado</p>
-                                <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">
-                                    {formatCurrency(historyTotals.totalAmountSettled)}
+                                <p className="text-sm text-gray-400">Entregado Total</p>
+                                <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-fuchsia-400">
+                                    {formatCurrency(historyTotals.totalDeliveredAmount)}
                                 </p>
                             </div>
-                            <div>
-                                <p className="text-sm text-gray-400">Pasajeros Totales</p>
-                                <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-teal-400">
-                                    {historyTotals.totalPassengers.toLocaleString('es-CO')}
+                             <div>
+                                <p className="text-sm text-gray-400">Dinero En Empresa</p>
+                                <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">
+                                    {formatCurrency(historyTotals.totalAmountSettled)}
                                 </p>
                             </div>
                         </div>
@@ -661,7 +685,7 @@ const App: React.FC = () => {
                                 <div className="flex flex-col sm:flex-row justify-between sm:items-start w-full">
                                     <div className="flex-grow">
                                         <p className="font-semibold text-gray-300 group-hover:text-white mb-3">{entry.timestamp}</p>
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-4 gap-y-2 text-sm">
+                                        <div className="grid grid-cols-2 md:grid-cols-6 gap-x-4 gap-y-3 text-sm">
                                             <div>
                                                 <p className="text-gray-400">Ruta</p>
                                                 <p className="font-bold text-cyan-400 text-base">{entry.formData.route}</p>
@@ -670,12 +694,12 @@ const App: React.FC = () => {
                                                 <p className="text-gray-400">Pasajeros</p>
                                                 <p className="font-bold text-white text-base">{parseFormattedNumber(entry.formData.numPassengers)}</p>
                                             </div>
-                                            <div>
+                                            <div className="col-span-2 md:col-span-1">
                                                 <p className="text-gray-400">Ganancia</p>
                                                 <p className="font-bold text-green-400 text-base">{formatCurrency(entry.results.myEarnings)}</p>
-                                                <div className="flex space-x-4 mt-1">
-                                                    <p className="text-base"><span className="text-gray-400">15%:</span> <span className="font-semibold text-sky-300">{formatCurrency(entry.results.fixedCommissionValue)}</span></p>
-                                                    <p className="text-base"><span className="text-gray-400">Comisión:</span> <span className="font-semibold text-teal-300">{formatCurrency(entry.results.perPassengerCommissionValue)}</span></p>
+                                                <div className="mt-1">
+                                                    <p className="text-xs"><span className="text-gray-400">15%:</span> <span className="font-semibold text-sky-300">{formatCurrency(entry.results.fixedCommissionValue)}</span></p>
+                                                    <p className="text-xs"><span className="text-gray-400">Com:</span> <span className="font-semibold text-teal-300">{formatCurrency(entry.results.perPassengerCommissionValue)}</span></p>
                                                 </div>
                                             </div>
                                             <div>
@@ -683,7 +707,11 @@ const App: React.FC = () => {
                                                 <p className="font-bold text-amber-400 text-base">{formatCurrency(entry.results.totalExpenses)}</p>
                                             </div>
                                             <div>
-                                                <p className="text-gray-400">A Entregar</p>
+                                                <p className="text-gray-400">Entregado Total</p>
+                                                <p className="font-bold text-indigo-400 text-base">{formatCurrency(entry.results.totalDeliveredAmount || 0)}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-gray-400">Dinero En Empresa</p>
                                                 <p className="font-bold text-blue-400 text-base">{formatCurrency(entry.results.amountToSettle)}</p>
                                             </div>
                                         </div>
