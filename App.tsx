@@ -421,9 +421,9 @@ const App: React.FC = () => {
     // Total expenses for the day ("Gastos Operativos") includes everything.
     const calculatedTotalExpenses = ownerExpenses + adminExpenses;
     
-    // Amount to settle with the owner only deducts the owner's expenses.
-    // This is the GROSS amount before deducting administrative expenses.
-    const amountToSettle = totalRevenue - driverEarnings - ownerExpenses;
+    // PER USER REQUEST: For display purposes, the amount to deliver should not yet deduct the fixed commission.
+    // This makes the "Total A Entregar" higher in the summary, and the fixed commission is only applied when saving.
+    const amountToSettle = totalRevenue - perPassengerCommissionValue - ownerExpenses;
 
 
     setResults({
@@ -463,7 +463,11 @@ const App: React.FC = () => {
       return;
     }
 
-    const grossAmountToSettle = results.amountToSettle;
+    // PER USER REQUEST: The fixed commission is applied here when saving.
+    // The value from `results.amountToSettle` is for display only.
+    // We calculate the *actual* gross amount to settle by subtracting the full driver's earnings.
+    const ownerExpenses = rawData.fuelExpenses + rawData.variableExpenses;
+    const grossAmountToSettle = results.totalRevenue - results.myEarnings - ownerExpenses;
     const netAmountToSettle = grossAmountToSettle - rawData.administrativeExpenses;
 
     const resultsForHistory: CalculationResults = {
