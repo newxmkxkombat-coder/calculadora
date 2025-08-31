@@ -384,6 +384,30 @@ const App: React.FC = () => {
     saveHistoryToLocalStorage(history);
   }, [history]);
 
+  // This effect synchronizes the administrativeExpenses field based on history length,
+  // but only when not in editing mode to avoid overwriting user edits on loaded data.
+  useEffect(() => {
+    if (editingId) {
+      // Don't auto-update the form while editing a historical entry.
+      return;
+    }
+
+    const isPastAdminLimit = history.length >= ADMIN_EXPENSE_DAYS_LIMIT;
+
+    if (isPastAdminLimit) {
+      // If we are past the limit, the value should be '0'
+      if (formData.administrativeExpenses !== '0') {
+        setFormData(prev => ({ ...prev, administrativeExpenses: '0' }));
+      }
+    } else {
+      // If we are within the limit, the value should be the fixed expense
+      if (formData.administrativeExpenses !== ADMIN_EXPENSE_VALUE) {
+        setFormData(prev => ({ ...prev, administrativeExpenses: ADMIN_EXPENSE_VALUE }));
+      }
+    }
+  }, [history.length, editingId, formData.administrativeExpenses]);
+
+
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement> | { target: { name: string; value: string } }) => {
     const { name, value } = e.target;
     const fieldsToFormat: (keyof FormData)[] = ['fareValue', 'commissionPerPassenger', 'fuelExpenses', 'variableExpenses', 'administrativeExpenses'];
