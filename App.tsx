@@ -1,4 +1,10 @@
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 
+// --- TYPE DEFINITIONS ---
+interface FormData {
+  numPassengers: string;
+  fareValue: string;
+  fixedCommission: string;
   commissionPerPassenger: string;
   route: string;
   fuelExpenses: string;
