@@ -156,8 +156,14 @@ const BriefcaseIcon = () => (
     </svg>
 );
 
+const BrushIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.664 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.162 1.163-.188 1.743-.14a4.5 4.5 0 004.474-4.474c-.047-.58-.122-1.193-.284-1.743A4.5 4.5 0 0019.5 3.855c-.55.162-1.163.188-1.743.14a4.5 4.5 0 00-4.474 4.474c.047.58.122 1.193.284 1.743z" />
+  </svg>
+);
+
 const SaveIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
     </svg>
 );
@@ -725,15 +731,6 @@ const App: React.FC = () => {
                   isNumericFormatted 
                 />
             </div>
-            <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                 <button onClick={handleSaveCalculation} className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 px-6 rounded-lg transition-all duration-300 flex items-center justify-center">
-                    <SaveIcon />
-                    {editingId ? 'Actualizar Datos' : 'Guardar Datos'}
-                </button>
-                 <button onClick={handleClearForm} className="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg transition-all duration-300">
-                    {editingId ? 'Cancelar Edición' : 'Limpiar Formulario'}
-                </button>
-            </div>
           </div>
 
           {/* Columna de Resultados */}
@@ -904,6 +901,26 @@ const App: React.FC = () => {
                 )}
             </div>
         </section>
+
+        {/* Floating Action Buttons */}
+        <div className="fixed bottom-6 right-6 sm:bottom-8 sm:right-8 z-40 flex flex-col gap-4">
+            <button 
+                onClick={handleSaveCalculation} 
+                className="w-16 h-16 bg-cyan-600 hover:bg-cyan-700 text-white rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ease-in-out hover:scale-110 focus:outline-none focus:ring-4 focus:ring-cyan-500/50"
+                title={editingId ? 'Actualizar Datos' : 'Guardar Datos'}
+                aria-label={editingId ? 'Actualizar Datos' : 'Guardar Datos'}
+            >
+                <SaveIcon />
+            </button>
+            <button 
+                onClick={handleClearForm} 
+                className="w-16 h-16 bg-gray-600 hover:bg-gray-700 text-white rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ease-in-out hover:scale-110 focus:outline-none focus:ring-4 focus:ring-gray-500/50"
+                title={editingId ? 'Cancelar Edición' : 'Limpiar Formulario'}
+                aria-label={editingId ? 'Cancelar Edición' : 'Limpiar Formulario'}
+            >
+                <BrushIcon />
+            </button>
+        </div>
 
       </div>
     </div>
