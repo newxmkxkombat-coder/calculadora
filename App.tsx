@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 
 // --- TYPE DEFINITIONS ---
@@ -66,6 +65,22 @@ const formatCurrency = (value: number) => {
         minimumFractionDigits: 0,
         maximumFractionDigits: 0,
     }).format(value);
+};
+
+const formatTimestamp = (isoString: string): string => {
+  try {
+    const date = new Date(isoString);
+    if (isNaN(date.getTime())) {
+      // If parsing as ISO fails, it might be the old format. Return it as is.
+      return isoString;
+    }
+    return date.toLocaleString('es-CO', {
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit'
+    });
+  } catch (e) {
+    return isoString; // Fallback to original string if anything goes wrong
+  }
 };
 
 const formatNumberWithDots = (value: string): string => {
@@ -165,6 +180,37 @@ const CheckCircleIcon = () => (
   </svg>
 );
 
+const EditIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" />
+    </svg>
+);
+
+const CheckIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+    </svg>
+);
+
+const XIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+    </svg>
+);
+
+const ArrowUpIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+    </svg>
+);
+
+const ArrowDownIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+    </svg>
+);
+
+
 // --- REUSABLE UI COMPONENTS ---
 interface InputControlProps {
   label: string;
@@ -186,8 +232,8 @@ const InputControl: React.FC<InputControlProps> = ({ label, name, value, onChang
       <div className="pl-3 text-gray-500 pointer-events-none">{icon}</div>
       <div className="relative flex-grow">
         <input
-          type={isNumericFormatted ? 'text' : 'number'}
-          inputMode={isNumericFormatted ? 'numeric' : 'decimal'}
+          type="text"
+          inputMode="numeric"
           id={name}
           name={name}
           value={value}
@@ -195,7 +241,6 @@ const InputControl: React.FC<InputControlProps> = ({ label, name, value, onChang
           placeholder={placeholder}
           className="w-full bg-transparent py-3 pl-3 text-white placeholder-gray-500 focus:outline-none"
           onFocus={(e) => e.target.select()}
-          min="0"
           aria-label={label}
         />
         {unit && (
@@ -380,6 +425,8 @@ const App: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState('');
   const [usedPhrases, setUsedPhrases] = useState<string[]>([]);
+  const [editingTimestampId, setEditingTimestampId] = useState<string | null>(null);
+  const [tempTimestamp, setTempTimestamp] = useState<string>('');
 
   useEffect(() => {
     saveHistoryToLocalStorage(history);
@@ -388,9 +435,16 @@ const App: React.FC = () => {
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement> | { target: { name: string; value: string } }) => {
     const { name, value } = e.target;
     const fieldsToFormat: (keyof FormData)[] = ['fareValue', 'commissionPerPassenger', 'fuelExpenses', 'variableExpenses', 'administrativeExpenses'];
+    const numericOnlyFields: (keyof FormData)[] = ['numPassengers', 'fixedCommission'];
+
+    let processedValue = value;
+    if (fieldsToFormat.includes(name as keyof FormData)) {
+      processedValue = formatNumberWithDots(value);
+    } else if (numericOnlyFields.includes(name as keyof FormData)) {
+      processedValue = value.replace(/[^\d]/g, '');
+    }
     
-    const isFormatted = fieldsToFormat.includes(name as keyof FormData);
-    setFormData(prev => ({ ...prev, [name]: isFormatted ? formatNumberWithDots(value) : value }));
+    setFormData(prev => ({ ...prev, [name]: processedValue }));
   }, []);
   
   const getRawData = (data: FormData): Record<string, number> => {
@@ -416,329 +470,3 @@ const App: React.FC = () => {
 
     // Separate expenses for clarity
     const ownerExpenses = fuelExpenses + variableExpenses; // Expenses deducted from the settlement
-    const adminExpenses = administrativeExpenses; // Expenses NOT deducted from the settlement
-
-    // Total expenses for the day ("Gastos Operativos") includes everything.
-    const calculatedTotalExpenses = ownerExpenses + adminExpenses;
-    
-    // PER USER REQUEST: For display purposes, the amount to deliver should not yet deduct the fixed commission.
-    // This makes the "Total A Entregar" higher in the summary, and the fixed commission is only applied when saving.
-    const amountToSettle = totalRevenue - perPassengerCommissionValue - ownerExpenses;
-
-
-    setResults({
-      totalRevenue: isNaN(totalRevenue) ? 0 : totalRevenue,
-      myEarnings: isNaN(driverEarnings) ? 0 : driverEarnings,
-      totalExpenses: isNaN(calculatedTotalExpenses) ? 0 : calculatedTotalExpenses,
-      amountToSettle: isNaN(amountToSettle) ? 0 : amountToSettle,
-      fixedCommissionValue: isNaN(fixedCommissionValue) ? 0 : fixedCommissionValue,
-      perPassengerCommissionValue: isNaN(perPassengerCommissionValue) ? 0 : perPassengerCommissionValue,
-    });
-  }, [formData]);
-
-  const showMotivationalToast = useCallback(() => {
-    let availablePhrases = MOTIVATIONAL_PHRASES.filter(p => !usedPhrases.includes(p));
-
-    if (availablePhrases.length === 0) {
-      setUsedPhrases([]);
-      availablePhrases = MOTIVATIONAL_PHRASES;
-    }
-
-    const randomIndex = Math.floor(Math.random() * availablePhrases.length);
-    const phrase = availablePhrases[randomIndex];
-    
-    setUsedPhrases(prev => [...prev, phrase]);
-    setToastMessage(phrase);
-  }, [usedPhrases]);
-
-  const handleClearForm = useCallback(() => {
-      setFormData(getInitialFormData());
-      setEditingId(null);
-  }, [getInitialFormData]);
-
-  const handleSaveCalculation = () => {
-    const rawData = getRawData(formData);
-    if (rawData.numPassengers === 0) {
-      alert("No se puede guardar un cálculo sin pasajeros.");
-      return;
-    }
-
-    // PER USER REQUEST: The fixed commission is applied here when saving.
-    // The value from `results.amountToSettle` is for display only.
-    // We calculate the *actual* gross amount to settle by subtracting the full driver's earnings.
-    const ownerExpenses = rawData.fuelExpenses + rawData.variableExpenses;
-    const grossAmountToSettle = results.totalRevenue - results.myEarnings - ownerExpenses;
-    const netAmountToSettle = grossAmountToSettle - rawData.administrativeExpenses;
-
-    const resultsForHistory: CalculationResults = {
-      ...results,
-      amountToSettle: netAmountToSettle, // This is "Dinero En Empresa" (net)
-      totalDeliveredAmount: grossAmountToSettle, // This is "Dinero Entregado Total" (gross)
-    };
-
-    if (editingId) {
-      setHistory(prevHistory =>
-        prevHistory.map(entry =>
-          entry.id === editingId
-            ? {
-                ...entry,
-                formData,
-                results: resultsForHistory,
-              }
-            : entry
-        )
-      );
-    } else {
-      const newEntry: HistoryEntry = {
-        id: new Date().toISOString(),
-        timestamp: new Date().toLocaleString('es-CO', {
-          year: 'numeric', month: '2-digit', day: '2-digit',
-          hour: '2-digit', minute: '2-digit'
-        }),
-        formData,
-        results: resultsForHistory,
-      };
-      setHistory(prevHistory => [newEntry, ...prevHistory]);
-    }
-    showMotivationalToast();
-    handleClearForm();
-  };
-  
-  const handleLoadEntry = (id: string) => {
-    const entryToLoad = history.find(entry => entry.id === id);
-    if (entryToLoad) {
-      setFormData(entryToLoad.formData);
-      setEditingId(id);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  };
-
-  const handleDeleteEntry = (id: string) => {
-    if (editingId) {
-        // If deleting the entry being edited, clear the form as well
-        const entryToDelete = history.find(entry => entry.id === id);
-        if (entryToDelete && entryToDelete.id === editingId) {
-            handleClearForm();
-        }
-    }
-    setHistory(prevHistory => prevHistory.filter(entry => entry.id !== id));
-  };
-  
-  const handleClearAllHistory = () => {
-    const isConfirmed = window.confirm(
-      "¿Estás seguro de que quieres borrar todo el historial? Esta acción no se puede deshacer."
-    );
-    if (isConfirmed) {
-      setHistory([]);
-      handleClearForm(); // Also reset the form
-    }
-  };
-
-  const historyTotals = useMemo(() => {
-    return history.reduce((acc, entry) => {
-      acc.totalEarnings += entry.results.myEarnings;
-      acc.totalExpenses += entry.results.totalExpenses;
-      acc.totalAmountSettled += entry.results.amountToSettle; // Net amount
-      acc.totalDeliveredAmount += entry.results.totalDeliveredAmount || 0; // Gross amount
-      acc.totalPassengers += parseFloat(parseFormattedNumber(entry.formData.numPassengers)) || 0;
-      acc.totalFixedCommission += entry.results.fixedCommissionValue || 0;
-      acc.totalPerPassengerCommission += entry.results.perPassengerCommissionValue || 0;
-      return acc;
-    }, { 
-        totalEarnings: 0, 
-        totalExpenses: 0, 
-        totalAmountSettled: 0,
-        totalDeliveredAmount: 0,
-        totalPassengers: 0,
-        totalFixedCommission: 0,
-        totalPerPassengerCommission: 0,
-    });
-  }, [history]);
-
-  return (
-    <div className="min-h-screen bg-gray-900 text-white p-4 sm:p-6 lg:p-8">
-      <Toast 
-        message={toastMessage} 
-        show={!!toastMessage} 
-        onClose={() => setToastMessage('')} 
-      />
-      <div className="max-w-7xl mx-auto">
-        <header className="text-center mb-8">
-          <h1 className="text-4xl sm:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600">
-            Calculadora de Ganancias
-          </h1>
-          <p className="text-gray-400 mt-2 text-lg">Para conductores de bus</p>
-        </header>
-
-        <main className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-          {/* Columna de Entradas */}
-          <div className="lg:col-span-3 bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700">
-            <h2 className="text-2xl font-bold mb-6 text-cyan-400">Datos del Día</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
-                <InputControl label="Número de Pasajeros" name="numPassengers" value={formData.numPassengers} onChange={handleChange} icon={<UsersIcon />} />
-                <InputControl label="Valor del Pasaje" name="fareValue" value={formData.fareValue} onChange={handleChange} icon={<MoneyIcon />} unit="$" isNumericFormatted />
-                <InputControl label="Comisión Fija" name="fixedCommission" value={formData.fixedCommission} onChange={handleChange} icon={<PercentageIcon />} unit="%" />
-                <InputControl label="Comisión por Pasajero" name="commissionPerPassenger" value={formData.commissionPerPassenger} onChange={handleChange} icon={<MoneyIcon />} unit="$" isNumericFormatted />
-                <CheckboxControlGroup label="Ruta" name="route" value={formData.route} onChange={handleChange} icon={<RouteIcon />} options={['9', '11', '29', '60']} />
-            </div>
-            
-            <h2 className="text-2xl font-bold mb-6 mt-8 text-amber-400">Gastos del Día</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
-                <InputControl label="Combustible" name="fuelExpenses" value={formData.fuelExpenses} onChange={handleChange} icon={<FuelIcon />} unit="$" isNumericFormatted />
-                <InputControl label="Taller (Lavada,Tencioanda,Engrase,etc.)" name="variableExpenses" value={formData.variableExpenses} onChange={handleChange} icon={<WrenchIcon />} unit="$" isNumericFormatted placeholder="Valor Total" />
-                <InputControl 
-                  label="Gastos Administrativos" 
-                  name="administrativeExpenses" 
-                  value={formData.administrativeExpenses} 
-                  onChange={handleChange} 
-                  icon={<BriefcaseIcon />} 
-                  unit="$" 
-                  isNumericFormatted 
-                />
-            </div>
-            <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                 <button onClick={handleSaveCalculation} className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 px-6 rounded-lg transition-all duration-300 flex items-center justify-center">
-                    <SaveIcon />
-                    {editingId ? 'Actualizar Datos' : 'Guardar Datos'}
-                </button>
-                 <button onClick={handleClearForm} className="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg transition-all duration-300">
-                    {editingId ? 'Cancelar Edición' : 'Limpiar Formulario'}
-                </button>
-            </div>
-          </div>
-
-          {/* Columna de Resultados */}
-          <div className="lg:col-span-2 bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700 flex flex-col justify-center">
-            <h2 className="text-2xl font-bold mb-6 text-green-400">Resumen</h2>
-            <ResultDisplay label="Debo Tener" value={results.totalRevenue} />
-            <ResultDisplay label="Mi Sueldo" value={results.myEarnings} />
-            <ResultDisplay label="Gastos Operativos" value={results.totalExpenses} />
-            <ResultDisplay label="Total A Entregar" value={results.amountToSettle} />
-          </div>
-        </main>
-        
-        {/* History Section */}
-        <section className="mt-10">
-            <div className="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700">
-                <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-6">
-                    <h2 className="text-2xl font-bold text-cyan-400 mb-4 sm:mb-0">Historial</h2>
-                     {history.length > 0 && (
-                        <button onClick={handleClearAllHistory} className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-all duration-300 flex items-center justify-center text-sm">
-                            <TrashIcon />
-                            <span className="ml-2">Borrar Historial</span>
-                        </button>
-                    )}
-                </div>
-
-                {history.length > 0 && (
-                  <>
-                    <PassengerGoalProgress 
-                      totalPassengers={historyTotals.totalPassengers} 
-                      goal={PASSENGER_GOAL} 
-                    />
-                    <div className="p-4 mt-6 bg-gray-900/50 rounded-lg border border-gray-700">
-                        <h3 className="text-lg font-bold text-gray-300 mb-3 text-center">Resumen Total del Historial</h3>
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
-                            <div>
-                                <p className="text-sm text-gray-400">Pasajeros Totales</p>
-                                <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-teal-400">
-                                    {historyTotals.totalPassengers.toLocaleString('es-CO')}
-                                </p>
-                            </div>
-                             <div>
-                                <p className="text-sm text-gray-400">Ganancia Total</p>
-                                <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-cyan-400">
-                                    {formatCurrency(historyTotals.totalEarnings)}
-                                </p>
-                                 <div className="mt-2 text-center">
-                                    <span className="text-sm font-bold text-sky-400">{formatCurrency(historyTotals.totalFixedCommission)}</span>
-                                    <p className="text-xs text-gray-400">15%</p>
-                                    <span className="text-sm font-bold text-teal-400 mt-1 block">{formatCurrency(historyTotals.totalPerPassengerCommission)}</span>
-                                    <p className="text-xs text-gray-400">Comisión</p>
-                                </div>
-                            </div>
-                            <div>
-                                <p className="text-sm text-gray-400">Gastos Totales</p>
-                                <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-red-500">
-                                    {formatCurrency(historyTotals.totalExpenses)}
-                                </p>
-                            </div>
-                            <div>
-                                <p className="text-sm text-gray-400">Entregado Total</p>
-                                <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-fuchsia-400">
-                                    {formatCurrency(historyTotals.totalDeliveredAmount)}
-                                </p>
-                            </div>
-                             <div>
-                                <p className="text-sm text-gray-400">Dinero En Empresa</p>
-                                <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">
-                                    {formatCurrency(historyTotals.totalAmountSettled)}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                  </>
-                )}
-
-                {history.length === 0 ? (
-                    <p className="text-gray-500 text-center py-8">No hay cálculos guardados.</p>
-                ) : (
-                    <ul className="space-y-4 mt-6">
-                        {history.map((entry) => (
-                           <li key={entry.id} className="bg-gray-900/60 p-4 rounded-lg border border-gray-700 hover:border-cyan-500 transition-all duration-200 group">
-                                <div className="flex flex-col sm:flex-row justify-between sm:items-start w-full">
-                                    <div className="flex-grow">
-                                        <p className="font-semibold text-gray-300 group-hover:text-white mb-3">{entry.timestamp}</p>
-                                        <div className="grid grid-cols-2 md:grid-cols-6 gap-x-4 gap-y-3 text-sm">
-                                            <div>
-                                                <p className="text-gray-400">Ruta</p>
-                                                <p className="font-bold text-cyan-400 text-base">{entry.formData.route}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-gray-400">Pasajeros</p>
-                                                <p className="font-bold text-white text-base">{parseFormattedNumber(entry.formData.numPassengers)}</p>
-                                            </div>
-                                            <div className="col-span-2 md:col-span-1">
-                                                <p className="text-gray-400">Ganancia</p>
-                                                <p className="font-bold text-green-400 text-base">{formatCurrency(entry.results.myEarnings)}</p>
-                                                <div className="mt-1">
-                                                    <p className="text-xs"><span className="text-gray-400">15%:</span> <span className="font-semibold text-sky-300">{formatCurrency(entry.results.fixedCommissionValue)}</span></p>
-                                                    <p className="text-xs"><span className="text-gray-400">Com:</span> <span className="font-semibold text-teal-300">{formatCurrency(entry.results.perPassengerCommissionValue)}</span></p>
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <p className="text-gray-400">Gastos</p>
-                                                <p className="font-bold text-amber-400 text-base">{formatCurrency(entry.results.totalExpenses)}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-gray-400">Entregado Total</p>
-                                                <p className="font-bold text-indigo-400 text-base">{formatCurrency(entry.results.totalDeliveredAmount || 0)}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-gray-400">Dinero En Empresa</p>
-                                                <p className="font-bold text-blue-400 text-base">{formatCurrency(entry.results.amountToSettle)}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center space-x-3 mt-4 sm:mt-0 sm:ml-4 flex-shrink-0 self-end sm:self-center">
-                                        <button onClick={() => handleLoadEntry(entry.id)} title="Cargar este cálculo" aria-label="Cargar este cálculo" className="p-2 rounded-full bg-gray-700 hover:bg-cyan-600 text-gray-300 hover:text-white transition-colors duration-200">
-                                            <RestoreIcon />
-                                        </button>
-                                        <button onClick={() => handleDeleteEntry(entry.id)} title="Borrar este cálculo" aria-label="Borrar este cálculo" className="p-2 rounded-full bg-gray-700 hover:bg-red-600 text-gray-300 hover:text-white transition-colors duration-200">
-                                            <TrashIcon />
-                                        </button>
-                                    </div>
-                                </div>
-                            </li>
-                        ))}
-                    </ul>
-                )}
-            </div>
-        </section>
-
-      </div>
-    </div>
-  );
-};
-
-export default App;
