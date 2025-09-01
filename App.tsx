@@ -433,10 +433,40 @@ const App: React.FC = () => {
   const [usedPhrases, setUsedPhrases] = useState<string[]>([]);
   const [editingTimestampId, setEditingTimestampId] = useState<string | null>(null);
   const [tempTimestamp, setTempTimestamp] = useState<string>('');
+  const [fabBottom, setFabBottom] = useState('1.5rem'); // For virtual keyboard adjustment
 
   useEffect(() => {
     saveHistoryToLocalStorage(history);
   }, [history]);
+
+  // Adjust FAB position when virtual keyboard is shown
+  useEffect(() => {
+    const visualViewport = window.visualViewport;
+    if (!visualViewport) {
+      return; // API not supported
+    }
+
+    const defaultBottomSpacingRem = 1.5; // Corresponds to `bottom-6`
+    const rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize);
+    const defaultBottomSpacingPx = defaultBottomSpacingRem * rootFontSize;
+
+    const handleResize = () => {
+      const keyboardHeight = window.innerHeight - visualViewport.height;
+
+      // Add a threshold to avoid reacting to browser UI changes
+      if (keyboardHeight > 100) {
+        setFabBottom(`${keyboardHeight + defaultBottomSpacingPx}px`);
+      } else {
+        setFabBottom(`${defaultBottomSpacingRem}rem`);
+      }
+    };
+
+    visualViewport.addEventListener('resize', handleResize);
+
+    return () => {
+      visualViewport.removeEventListener('resize', handleResize);
+    };
+  }, []);
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement> | { target: { name: string; value: string } }) => {
     const { name, value } = e.target;
@@ -903,7 +933,10 @@ const App: React.FC = () => {
         </section>
 
         {/* Floating Action Buttons */}
-        <div className="fixed bottom-6 right-6 sm:bottom-8 sm:right-8 z-40 flex flex-col gap-4">
+        <div 
+            className="fixed right-6 sm:right-8 z-40 flex flex-col gap-4 transition-all duration-200 ease-out"
+            style={{ bottom: fabBottom }}
+        >
             <button 
                 onClick={handleSaveCalculation} 
                 className="w-16 h-16 bg-cyan-600 hover:bg-cyan-700 text-white rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ease-in-out hover:scale-110 focus:outline-none focus:ring-4 focus:ring-cyan-500/50"
