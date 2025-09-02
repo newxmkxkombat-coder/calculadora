@@ -532,7 +532,7 @@ const App: React.FC = () => {
 
     const resultsForHistory: CalculationResults = {
       ...results,
-      amountToSettle: netAmountToSettle, // This is "Dinero En Empresa" (net)
+      amountToSettle: netAmountToSettle, // This is "En Empresa" (net)
       totalDeliveredAmount: grossAmountToSettle, // This is "Recaudado" (gross)
     };
 
@@ -796,7 +796,7 @@ const App: React.FC = () => {
                                 </p>
                             </div>
                              <div>
-                                <p className="text-sm text-gray-400">Dinero En Empresa</p>
+                                <p className="text-sm text-gray-400">En Empresa</p>
                                 <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">
                                     {formatCurrency(historyTotals.totalAmountSettled)}
                                 </p>
@@ -863,7 +863,7 @@ const App: React.FC = () => {
                                             </div>
                                             <div><p className="text-gray-400">Gastos</p><p className="font-bold text-amber-400 text-base">{formatCurrency(entry.results.totalExpenses)}</p></div>
                                             <div><p className="text-gray-400">Recaudado</p><p className="font-bold text-indigo-400 text-base">{formatCurrency(entry.results.totalDeliveredAmount || 0)}</p></div>
-                                            <div className="col-span-2"><p className="text-gray-400">Dinero En Empresa</p><p className="font-bold text-blue-400 text-base">{formatCurrency(entry.results.amountToSettle)}</p></div>
+                                            <div className="col-span-2"><p className="text-gray-400">En Empresa</p><p className="font-bold text-blue-400 text-base">{formatCurrency(entry.results.amountToSettle)}</p></div>
                                         </div>
 
                                         {/* --- Desktop Table Cells --- */}
