@@ -914,16 +914,24 @@ const App: React.FC = () => {
                                 <li key={entry.id} className="md:border-b md:border-gray-700 last:md:border-b-0">
                                   {/* --- Mobile Card --- */}
                                   <div className="md:hidden bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
-                                      <button onClick={() => handleToggleExpand(entry.id)} className="w-full p-4 text-left flex justify-between items-center bg-gray-800 hover:bg-cyan-500/10 transition-colors duration-200">
-                                          <div>
-                                              <p className="font-semibold text-gray-300">{formatTimestamp(entry.timestamp)}</p>
-                                              <p className="text-sm text-gray-400">Ruta {entry.formData.route}</p>
-                                          </div>
-                                           <div className="text-right">
-                                              <p className="font-bold text-green-400 text-lg">{formatCurrency(entry.results.myEarnings)}</p>
-                                              <p className="text-sm text-indigo-400">{formatCurrency(entry.results.totalDeliveredAmount || 0)}</p>
-                                          </div>
-                                          <ChevronDownIcon className={`transform transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
+                                      <button onClick={() => handleToggleExpand(entry.id)} className="w-full p-4 text-left bg-gray-800 hover:bg-cyan-500/10 transition-colors duration-200">
+                                        <div className="flex justify-between items-start gap-4">
+                                            <div>
+                                                <p className="font-semibold text-gray-300">{formatTimestamp(entry.timestamp)}</p>
+                                                <p className="text-sm text-gray-400">Ruta {entry.formData.route}</p>
+                                            </div>
+                                            <ChevronDownIcon className={`transform transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''} flex-shrink-0 mt-1`} />
+                                        </div>
+                                        <div className="mt-3 pt-3 border-t border-gray-700/50 flex justify-between items-end">
+                                            <div>
+                                                <p className="text-xs text-gray-400">Ganancia</p>
+                                                <p className="font-bold text-green-400 text-lg leading-tight">{formatCurrency(entry.results.myEarnings)}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-xs text-gray-400">Recaudado</p>
+                                                <p className="font-semibold text-indigo-400 text-base leading-tight">{formatCurrency(entry.results.totalDeliveredAmount || 0)}</p>
+                                            </div>
+                                        </div>
                                       </button>
                                       
                                       <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isExpanded ? 'max-h-[500px]' : 'max-h-0'}`}>
