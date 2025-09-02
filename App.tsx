@@ -964,24 +964,30 @@ const App: React.FC = () => {
 
         {/* Floating Action Buttons */}
         <div
-          className="fixed right-6 sm:right-8 z-40 flex flex-col gap-4 transition-[bottom] duration-300 ease-in-out"
+          className="fixed right-6 sm:right-8 z-40 flex flex-col items-end gap-4 transition-[bottom] duration-300 ease-in-out"
           style={{ bottom: fabBottom }}
         >
             <button 
                 onClick={handleSaveCalculation} 
-                className="w-16 h-16 bg-cyan-600 hover:bg-cyan-700 text-white rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ease-in-out hover:scale-110 focus:outline-none focus:ring-4 focus:ring-cyan-500/50"
+                className="group flex items-center justify-center w-auto h-16 px-6 bg-cyan-600 hover:bg-cyan-700 text-white rounded-full shadow-lg focus:outline-none focus:ring-4 focus:ring-cyan-500/50 transition-all duration-300 ease-in-out sm:w-16 sm:h-16 sm:px-0 sm:hover:w-48 sm:hover:justify-start sm:hover:px-5"
                 title={editingId ? 'Actualizar Datos' : 'Guardar Datos'}
                 aria-label={editingId ? 'Actualizar Datos' : 'Guardar Datos'}
             >
                 <SaveIcon />
+                <span className="font-semibold whitespace-nowrap ml-3 sm:w-0 sm:ml-0 sm:opacity-0 sm:group-hover:w-auto sm:group-hover:ml-3 sm:group-hover:opacity-100 transition-all duration-300">
+                    {editingId ? 'Actualizar' : 'Guardar'}
+                </span>
             </button>
             <button 
                 onClick={handleClearForm} 
-                className="w-16 h-16 bg-gray-600 hover:bg-gray-700 text-white rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ease-in-out hover:scale-110 focus:outline-none focus:ring-4 focus:ring-gray-500/50"
+                className="group flex items-center justify-center w-auto h-16 px-6 bg-gray-600 hover:bg-gray-700 text-white rounded-full shadow-lg focus:outline-none focus:ring-4 focus:ring-gray-500/50 transition-all duration-300 ease-in-out sm:w-16 sm:h-16 sm:px-0 sm:hover:w-48 sm:hover:justify-start sm:hover:px-5"
                 title={editingId ? 'Cancelar Edición' : 'Limpiar Formulario'}
                 aria-label={editingId ? 'Cancelar Edición' : 'Limpiar Formulario'}
             >
                 <BrushIcon />
+                 <span className="font-semibold whitespace-nowrap ml-3 sm:w-0 sm:ml-0 sm:opacity-0 sm:group-hover:w-auto sm:group-hover:ml-3 sm:group-hover:opacity-100 transition-all duration-300">
+                    {editingId ? 'Cancelar' : 'Limpiar'}
+                </span>
             </button>
         </div>
 
