@@ -879,7 +879,7 @@ const App: React.FC = () => {
                                         <div className="hidden md:block font-bold text-blue-400 text-base text-center">{formatCurrency(entry.results.amountToSettle)}</div>
 
                                         {/* --- Actions (Visible on all screens) --- */}
-                                        <div className="flex items-center space-x-2 mt-4 md:mt-0 justify-end border-t border-gray-700 pt-3 md:border-0 md:pt-0">
+                                        <div className="flex items-center space-x-2 mt-4 md:mt-0 justify-start md:justify-end border-t border-gray-700 pt-3 md:border-0 md:pt-0">
                                              <button onClick={() => handleMoveEntryUp(entry.id)} title="Mover hacia arriba" aria-label="Mover hacia arriba" disabled={index === 0} className="p-2 rounded-full bg-gray-700 hover:bg-sky-600 text-gray-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
                                                 <ArrowUpIcon />
                                             </button>
