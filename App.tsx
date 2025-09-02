@@ -1,6 +1,6 @@
 
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 
 // --- TYPE DEFINITIONS ---
 interface FormData {
@@ -432,6 +432,11 @@ const App: React.FC = () => {
   const [tempTimestamp, setTempTimestamp] = useState<string>('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [fabBottom, setFabBottom] = useState('1.5rem');
+  
+  // State for draggable FAB
+  const [isDragging, setIsDragging] = useState(false);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const dragStartRef = useRef({ x: 0, y: 0, initialX: 0, initialY: 0 });
 
   useEffect(() => {
     saveHistoryToLocalStorage(history);
@@ -444,7 +449,7 @@ const App: React.FC = () => {
         const handleResize = () => {
             const rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize);
             const isSmallScreen = window.innerWidth < 640;
-            const defaultBottomRem = isSmallScreen ? 1.5 : 2; // bottom-6 or sm:bottom-8
+            const defaultBottomRem = isSmallScreen ? 3 : 3.5; // Increased base position
             const defaultBottomPx = defaultBottomRem * rootFontSize;
 
             const keyboardHeight = window.innerHeight - visualViewport.height;
@@ -548,6 +553,9 @@ const App: React.FC = () => {
   }, [getInitialFormData]);
 
   const handleSaveCalculation = () => {
+    // Prevent save if dragging
+    if (isDragging) return;
+      
     const rawData = getRawData(formData);
     if (rawData.numPassengers === 0) {
       alert("No se puede guardar un cálculo sin pasajeros.");
@@ -689,6 +697,53 @@ const App: React.FC = () => {
   const handleToggleExpand = (id: string) => {
     setExpandedId(currentId => (currentId === id ? null : id));
   };
+  
+  // --- Draggable FAB Handlers ---
+  const getClientCoords = (e: React.MouseEvent | React.TouchEvent | MouseEvent | TouchEvent) => {
+      if ('touches' in e) {
+        return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      }
+      return { x: e.clientX, y: e.clientY };
+  };
+
+  const handleDragStart = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+    const { x, y } = getClientCoords(e);
+    dragStartRef.current = { x, y, initialX: position.x, initialY: position.y };
+  };
+
+  const handleDragMove = useCallback((e: MouseEvent | TouchEvent) => {
+    if (!isDragging) return;
+    const { x: currentX, y: currentY } = getClientCoords(e);
+    const { x: startX, y: startY, initialX, initialY } = dragStartRef.current;
+    
+    const dx = currentX - startX;
+    const dy = currentY - startY;
+
+    setPosition({ x: initialX + dx, y: initialY + dy });
+  }, [isDragging]);
+
+  const handleDragEnd = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  useEffect(() => {
+    if (isDragging) {
+      window.addEventListener('mousemove', handleDragMove);
+      window.addEventListener('touchmove', handleDragMove);
+      window.addEventListener('mouseup', handleDragEnd);
+      window.addEventListener('touchend', handleDragEnd);
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', handleDragMove);
+      window.removeEventListener('touchmove', handleDragMove);
+      window.removeEventListener('mouseup', handleDragEnd);
+      window.removeEventListener('touchend', handleDragEnd);
+    };
+  }, [isDragging, handleDragMove, handleDragEnd]);
+
 
   const historyTotals = useMemo(() => {
     return history.reduce((acc, entry) => {
@@ -952,12 +1007,20 @@ const App: React.FC = () => {
 
         {/* Floating Action Buttons */}
         <div
-          className="fixed right-6 sm:right-8 z-40 flex flex-col items-end gap-4 transition-[bottom] duration-300 ease-in-out"
-          style={{ bottom: fabBottom }}
+          className="fixed right-6 sm:right-8 z-40 flex flex-col items-end gap-3 transition-[bottom] duration-300 ease-in-out"
+          onMouseDown={handleDragStart}
+          onTouchStart={handleDragStart}
+          style={{ 
+              bottom: fabBottom,
+              transform: `translate(${position.x}px, ${position.y}px)`,
+              cursor: isDragging ? 'grabbing' : 'grab',
+              touchAction: 'none',
+              userSelect: 'none',
+          }}
         >
             <button 
                 onClick={handleSaveCalculation} 
-                className="py-3 px-6 bg-cyan-600 hover:bg-cyan-700 text-white rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-4 focus:ring-cyan-500/50 font-semibold"
+                className="py-2 px-4 bg-cyan-600 hover:bg-cyan-700 text-white rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-4 focus:ring-cyan-500/50 text-sm font-semibold"
                 title={editingId ? 'Actualizar Datos' : 'Guardar Datos'}
                 aria-label={editingId ? 'Actualizar Datos' : 'Guardar Datos'}
             >
@@ -965,7 +1028,7 @@ const App: React.FC = () => {
             </button>
             <button 
                 onClick={handleClearForm} 
-                className="py-3 px-6 bg-gray-600 hover:bg-gray-700 text-white rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-4 focus:ring-gray-500/50 font-semibold"
+                className="py-2 px-4 bg-gray-600 hover:bg-gray-700 text-white rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-4 focus:ring-gray-500/50 text-sm font-semibold"
                 title={editingId ? 'Cancelar Edición' : 'Limpiar Formulario'}
                 aria-label={editingId ? 'Cancelar Edición' : 'Limpiar Formulario'}
             >
