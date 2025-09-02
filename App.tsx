@@ -432,6 +432,7 @@ const App: React.FC = () => {
   const [tempTimestamp, setTempTimestamp] = useState<string>('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [fabBottom, setFabBottom] = useState('1.5rem');
+  const [showSaveSuccessAnim, setShowSaveSuccessAnim] = useState(false);
   
   // State for draggable FAB
   const [isDragging, setIsDragging] = useState(false);
@@ -553,8 +554,8 @@ const App: React.FC = () => {
   }, [getInitialFormData]);
 
   const handleSaveCalculation = () => {
-    // Prevent save if dragging
-    if (isDragging) return;
+    // Prevent save if dragging or during animation
+    if (isDragging || showSaveSuccessAnim) return;
       
     const rawData = getRawData(formData);
     if (rawData.numPassengers === 0) {
@@ -595,8 +596,13 @@ const App: React.FC = () => {
       };
       setHistory(prevHistory => [newEntry, ...prevHistory]);
     }
-    showMotivationalToast();
-    handleClearForm();
+    
+    setShowSaveSuccessAnim(true);
+    setTimeout(() => {
+        setShowSaveSuccessAnim(false);
+        showMotivationalToast();
+        handleClearForm();
+    }, 1200);
   };
 
     const handleEditTimestampStart = (id: string, timestamp: string) => {
@@ -1020,15 +1026,21 @@ const App: React.FC = () => {
         >
             <button 
                 onClick={handleSaveCalculation} 
-                className="py-2 px-4 bg-cyan-600 hover:bg-cyan-700 text-white rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-4 focus:ring-cyan-500/50 text-sm font-semibold"
+                disabled={showSaveSuccessAnim}
+                className={`py-2 px-4 text-white rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ease-in-out focus:outline-none focus:ring-4 text-sm font-semibold ${
+                    showSaveSuccessAnim 
+                    ? 'bg-green-500 scale-110' 
+                    : 'bg-cyan-600 hover:bg-cyan-700 hover:scale-105 focus:ring-cyan-500/50'
+                }`}
                 title={editingId ? 'Actualizar Datos' : 'Guardar Datos'}
                 aria-label={editingId ? 'Actualizar Datos' : 'Guardar Datos'}
             >
-                {editingId ? 'Actualizar' : 'Guardar'}
+              {showSaveSuccessAnim ? <CheckIcon /> : (editingId ? 'Actualizar' : 'Guardar')}
             </button>
             <button 
                 onClick={handleClearForm} 
-                className="py-2 px-4 bg-gray-600 hover:bg-gray-700 text-white rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-4 focus:ring-gray-500/50 text-sm font-semibold"
+                disabled={showSaveSuccessAnim}
+                className="py-2 px-4 bg-gray-600 hover:bg-gray-700 text-white rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-4 focus:ring-gray-500/50 text-sm font-semibold disabled:opacity-50"
                 title={editingId ? 'Cancelar Edición' : 'Limpiar Formulario'}
                 aria-label={editingId ? 'Cancelar Edición' : 'Limpiar Formulario'}
             >
