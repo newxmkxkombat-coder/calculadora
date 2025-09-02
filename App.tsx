@@ -158,21 +158,9 @@ const BriefcaseIcon = () => (
     </svg>
 );
 
-const BrushIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.664 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.162 1.163-.188 1.743-.14a4.5 4.5 0 004.474-4.474c-.047-.58-.122-1.193-.284-1.743A4.5 4.5 0 0019.5 3.855c-.55.162-1.163.188-1.743.14a4.5 4.5 0 00-4.474 4.474c.047.58.122 1.193.284 1.743z" />
-  </svg>
-);
-
-const SaveIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-    </svg>
-);
-
-const RestoreIcon = () => (
+const LoadIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h5M20 20v-5h-5M4 4l16 16" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
     </svg>
 );
 
@@ -912,7 +900,7 @@ const App: React.FC = () => {
                                             <div className="flex items-center space-x-2 mt-4 justify-start border-t border-gray-700 pt-3">
                                                 <button onClick={() => handleMoveEntryUp(entry.id)} title="Mover hacia arriba" aria-label="Mover hacia arriba" disabled={index === 0} className="p-2 rounded-full bg-gray-700 hover:bg-sky-600 text-gray-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowUpIcon /></button>
                                                 <button onClick={() => handleMoveEntryDown(entry.id)} title="Mover hacia abajo" aria-label="Mover hacia abajo" disabled={index === history.length - 1} className="p-2 rounded-full bg-gray-700 hover:bg-sky-600 text-gray-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowDownIcon /></button>
-                                                <button onClick={() => handleLoadEntry(entry.id)} title="Cargar este cálculo" aria-label="Cargar este cálculo" className="p-2 rounded-full bg-gray-700 hover:bg-cyan-600 text-gray-300 hover:text-white transition-colors duration-200"><RestoreIcon /></button>
+                                                <button onClick={() => handleLoadEntry(entry.id)} title="Cargar este cálculo" aria-label="Cargar este cálculo" className="p-2 rounded-full bg-gray-700 hover:bg-cyan-600 text-gray-300 hover:text-white transition-colors duration-200"><LoadIcon /></button>
                                                 <button onClick={() => handleDeleteEntry(entry.id)} title="Borrar este cálculo" aria-label="Borrar este cálculo" className="p-2 rounded-full bg-gray-700 hover:bg-red-600 text-gray-300 hover:text-white transition-colors duration-200"><TrashIcon /></button>
                                             </div>
                                         </div>
@@ -950,7 +938,7 @@ const App: React.FC = () => {
                                       <div className="flex items-center space-x-2 justify-end">
                                           <button onClick={() => handleMoveEntryUp(entry.id)} title="Mover hacia arriba" aria-label="Mover hacia arriba" disabled={index === 0} className="p-2 rounded-full bg-gray-700 hover:bg-sky-600 text-gray-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowUpIcon /></button>
                                           <button onClick={() => handleMoveEntryDown(entry.id)} title="Mover hacia abajo" aria-label="Mover hacia abajo" disabled={index === history.length - 1} className="p-2 rounded-full bg-gray-700 hover:bg-sky-600 text-gray-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowDownIcon /></button>
-                                          <button onClick={() => handleLoadEntry(entry.id)} title="Cargar este cálculo" aria-label="Cargar este cálculo" className="p-2 rounded-full bg-gray-700 hover:bg-cyan-600 text-gray-300 hover:text-white transition-colors duration-200"><RestoreIcon /></button>
+                                          <button onClick={() => handleLoadEntry(entry.id)} title="Cargar este cálculo" aria-label="Cargar este cálculo" className="p-2 rounded-full bg-gray-700 hover:bg-cyan-600 text-gray-300 hover:text-white transition-colors duration-200"><LoadIcon /></button>
                                           <button onClick={() => handleDeleteEntry(entry.id)} title="Borrar este cálculo" aria-label="Borrar este cálculo" className="p-2 rounded-full bg-gray-700 hover:bg-red-600 text-gray-300 hover:text-white transition-colors duration-200"><TrashIcon /></button>
                                       </div>
                                   </div>
@@ -969,25 +957,19 @@ const App: React.FC = () => {
         >
             <button 
                 onClick={handleSaveCalculation} 
-                className="group flex items-center justify-center w-auto h-16 px-6 bg-cyan-600 hover:bg-cyan-700 text-white rounded-full shadow-lg focus:outline-none focus:ring-4 focus:ring-cyan-500/50 transition-all duration-300 ease-in-out sm:w-16 sm:h-16 sm:px-0 sm:hover:w-48 sm:hover:justify-start sm:hover:px-5"
+                className="py-3 px-6 bg-cyan-600 hover:bg-cyan-700 text-white rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-4 focus:ring-cyan-500/50 font-semibold"
                 title={editingId ? 'Actualizar Datos' : 'Guardar Datos'}
                 aria-label={editingId ? 'Actualizar Datos' : 'Guardar Datos'}
             >
-                <SaveIcon />
-                <span className="font-semibold whitespace-nowrap ml-3 sm:w-0 sm:ml-0 sm:opacity-0 sm:group-hover:w-auto sm:group-hover:ml-3 sm:group-hover:opacity-100 transition-all duration-300">
-                    {editingId ? 'Actualizar' : 'Guardar'}
-                </span>
+                {editingId ? 'Actualizar' : 'Guardar'}
             </button>
             <button 
                 onClick={handleClearForm} 
-                className="group flex items-center justify-center w-auto h-16 px-6 bg-gray-600 hover:bg-gray-700 text-white rounded-full shadow-lg focus:outline-none focus:ring-4 focus:ring-gray-500/50 transition-all duration-300 ease-in-out sm:w-16 sm:h-16 sm:px-0 sm:hover:w-48 sm:hover:justify-start sm:hover:px-5"
+                className="py-3 px-6 bg-gray-600 hover:bg-gray-700 text-white rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-4 focus:ring-gray-500/50 font-semibold"
                 title={editingId ? 'Cancelar Edición' : 'Limpiar Formulario'}
                 aria-label={editingId ? 'Cancelar Edición' : 'Limpiar Formulario'}
             >
-                <BrushIcon />
-                 <span className="font-semibold whitespace-nowrap ml-3 sm:w-0 sm:ml-0 sm:opacity-0 sm:group-hover:w-auto sm:group-hover:ml-3 sm:group-hover:opacity-100 transition-all duration-300">
-                    {editingId ? 'Cancelar' : 'Limpiar'}
-                </span>
+                {editingId ? 'Cancelar' : 'Limpiar'}
             </button>
         </div>
 
