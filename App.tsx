@@ -220,13 +220,14 @@ interface InputControlProps {
   name: keyof FormData;
   value: string;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onFocus?: (e: React.FocusEvent<HTMLInputElement>) => void;
   placeholder?: string;
   icon: React.ReactNode;
   unit?: string;
   isNumericFormatted?: boolean;
 }
 
-const InputControl: React.FC<InputControlProps> = ({ label, name, value, onChange, placeholder = '0', icon, unit, isNumericFormatted = false }) => (
+const InputControl: React.FC<InputControlProps> = ({ label, name, value, onChange, onFocus, placeholder = '0', icon, unit, isNumericFormatted = false }) => (
   <div className="mb-4">
     <label htmlFor={name} className="block text-base font-semibold text-gray-300 mb-2 tracking-wide">
       {label}
@@ -243,7 +244,10 @@ const InputControl: React.FC<InputControlProps> = ({ label, name, value, onChang
           onChange={onChange}
           placeholder={placeholder}
           className="w-full bg-transparent py-3 pl-3 text-white placeholder-gray-500 focus:outline-none"
-          onFocus={(e) => e.target.select()}
+          onFocus={(e) => {
+            e.target.select();
+            if (onFocus) onFocus(e);
+          }}
           aria-label={label}
         />
         {unit && (
@@ -438,6 +442,7 @@ const App: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const dragStartRef = useRef({ x: 0, y: 0, initialX: 0, initialY: 0 });
+  const focusedElementRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     saveHistoryToLocalStorage(history);
@@ -450,22 +455,37 @@ const App: React.FC = () => {
         const handleResize = () => {
             const rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize);
             const isSmallScreen = window.innerWidth < 640;
-            const defaultBottomRem = isSmallScreen ? 3 : 3.5; // Increased base position
+            const defaultBottomRem = isSmallScreen ? 3 : 3.5;
             const defaultBottomPx = defaultBottomRem * rootFontSize;
 
             const keyboardHeight = window.innerHeight - visualViewport.height;
 
-            if (keyboardHeight > 50) { // Add a threshold to avoid minor fluctuations
-                // Keyboard is open
+            if (keyboardHeight > 50) { // Keyboard is likely open
                 setFabBottom(`${keyboardHeight + defaultBottomPx}px`);
+
+                // Scroll the focused input into view if it's obscured
+                if (focusedElementRef.current) {
+                    setTimeout(() => {
+                        if (!focusedElementRef.current) return;
+                        const inputRect = focusedElementRef.current.getBoundingClientRect();
+                        
+                        // If the input's bottom edge is below the visible viewport's bottom edge
+                        if (inputRect.bottom > visualViewport.height) {
+                            focusedElementRef.current.scrollIntoView({
+                                behavior: 'smooth',
+                                block: 'center',
+                            });
+                        }
+                    }, 150); // Delay to allow layout to reflow
+                }
             } else {
-                // Keyboard is closed, use rem value for responsiveness
+                // Keyboard is likely closed
                 setFabBottom(`${defaultBottomRem}rem`);
             }
         };
 
         visualViewport.addEventListener('resize', handleResize);
-        window.addEventListener('resize', handleResize); // For breakpoint changes
+        window.addEventListener('resize', handleResize);
         
         handleResize(); // Initial call
 
@@ -473,7 +493,7 @@ const App: React.FC = () => {
             visualViewport.removeEventListener('resize', handleResize);
             window.removeEventListener('resize', handleResize);
         };
-    }, []);
+    }, []); // No dependencies needed, as we're using a ref
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement> | { target: { name: string; value: string } }) => {
     const { name, value } = e.target;
@@ -704,6 +724,10 @@ const App: React.FC = () => {
     setExpandedId(currentId => (currentId === id ? null : id));
   };
   
+  const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    focusedElementRef.current = e.target;
+  };
+
   // --- Draggable FAB Handlers ---
   const getClientCoords = (e: React.MouseEvent | React.TouchEvent | MouseEvent | TouchEvent) => {
       if ('touches' in e) {
@@ -745,8 +769,8 @@ const App: React.FC = () => {
     return () => {
       window.removeEventListener('mousemove', handleDragMove);
       window.removeEventListener('touchmove', handleDragMove);
-      window.removeEventListener('mouseup', handleDragEnd);
-      window.removeEventListener('touchend', handleDragEnd);
+      window.addEventListener('mouseup', handleDragEnd);
+      window.addEventListener('touchend', handleDragEnd);
     };
   }, [isDragging, handleDragMove, handleDragEnd]);
 
@@ -805,22 +829,23 @@ const App: React.FC = () => {
           <div className="lg:col-span-3 bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700">
             <h2 className="text-2xl font-bold mb-6 text-cyan-400">Datos del Día</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
-                <InputControl label="Número de Pasajeros" name="numPassengers" value={formData.numPassengers} onChange={handleChange} icon={<UsersIcon />} />
-                <InputControl label="Valor del Pasaje" name="fareValue" value={formData.fareValue} onChange={handleChange} icon={<MoneyIcon />} unit="$" isNumericFormatted />
-                <InputControl label="Comisión Fija" name="fixedCommission" value={formData.fixedCommission} onChange={handleChange} icon={<PercentageIcon />} unit="%" />
-                <InputControl label="Comisión por Pasajero" name="commissionPerPassenger" value={formData.commissionPerPassenger} onChange={handleChange} icon={<MoneyIcon />} unit="$" isNumericFormatted />
+                <InputControl label="Número de Pasajeros" name="numPassengers" value={formData.numPassengers} onChange={handleChange} onFocus={handleInputFocus} icon={<UsersIcon />} />
+                <InputControl label="Valor del Pasaje" name="fareValue" value={formData.fareValue} onChange={handleChange} onFocus={handleInputFocus} icon={<MoneyIcon />} unit="$" isNumericFormatted />
+                <InputControl label="Comisión Fija" name="fixedCommission" value={formData.fixedCommission} onChange={handleChange} onFocus={handleInputFocus} icon={<PercentageIcon />} unit="%" />
+                <InputControl label="Comisión por Pasajero" name="commissionPerPassenger" value={formData.commissionPerPassenger} onChange={handleChange} onFocus={handleInputFocus} icon={<MoneyIcon />} unit="$" isNumericFormatted />
                 <CheckboxControlGroup label="Ruta" name="route" value={formData.route} onChange={handleChange} icon={<RouteIcon />} options={['9', '11', '29', '60']} />
             </div>
             
             <h2 className="text-2xl font-bold mb-6 mt-8 text-amber-400">Gastos del Día</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
-                <InputControl label="Combustible" name="fuelExpenses" value={formData.fuelExpenses} onChange={handleChange} icon={<FuelIcon />} unit="$" isNumericFormatted />
-                <InputControl label="Taller (Lavada,Tencioanda,Engrase,etc.)" name="variableExpenses" value={formData.variableExpenses} onChange={handleChange} icon={<WrenchIcon />} unit="$" isNumericFormatted placeholder="Valor Total" />
+                <InputControl label="Combustible" name="fuelExpenses" value={formData.fuelExpenses} onChange={handleChange} onFocus={handleInputFocus} icon={<FuelIcon />} unit="$" isNumericFormatted />
+                <InputControl label="Taller (Lavada,Tencioanda,Engrase,etc.)" name="variableExpenses" value={formData.variableExpenses} onChange={handleChange} onFocus={handleInputFocus} icon={<WrenchIcon />} unit="$" isNumericFormatted placeholder="Valor Total" />
                 <InputControl 
                   label="Gastos Administrativos" 
                   name="administrativeExpenses" 
                   value={formData.administrativeExpenses} 
                   onChange={handleChange} 
+                  onFocus={handleInputFocus}
                   icon={<BriefcaseIcon />} 
                   unit="$" 
                   isNumericFormatted 
