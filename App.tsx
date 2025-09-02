@@ -18,7 +18,7 @@ interface CalculationResults {
   myEarnings: number;
   totalExpenses: number;
   amountToSettle: number; // In history, this is NET. In main state, it's GROSS.
-  totalDeliveredAmount?: number; // GROSS amount, only for history.
+  totalDeliveredAmount?: number; // Recaudado (GROSS amount), only for history.
   fixedCommissionValue: number;
   perPassengerCommissionValue: number;
 }
@@ -533,7 +533,7 @@ const App: React.FC = () => {
     const resultsForHistory: CalculationResults = {
       ...results,
       amountToSettle: netAmountToSettle, // This is "Dinero En Empresa" (net)
-      totalDeliveredAmount: grossAmountToSettle, // This is "Dinero Entregado Total" (gross)
+      totalDeliveredAmount: grossAmountToSettle, // This is "Recaudado" (gross)
     };
 
     if (editingId) {
@@ -661,7 +661,7 @@ const App: React.FC = () => {
       acc.totalEarnings += entry.results.myEarnings;
       acc.totalExpenses += entry.results.totalExpenses;
       acc.totalAmountSettled += entry.results.amountToSettle; // Net amount
-      acc.totalDeliveredAmount += entry.results.totalDeliveredAmount || 0; // Gross amount
+      acc.totalDeliveredAmount += entry.results.totalDeliveredAmount || 0; // Recaudado (Gross amount)
       acc.totalPassengers += parseFloat(parseFormattedNumber(entry.formData.numPassengers)) || 0;
       acc.totalFixedCommission += entry.results.fixedCommissionValue || 0;
       acc.totalPerPassengerCommission += entry.results.perPassengerCommissionValue || 0;
@@ -684,7 +684,7 @@ const App: React.FC = () => {
       <div>Pasajeros</div>
       <div className="text-center">Ganancia</div>
       <div className="text-center">Gastos</div>
-      <div className="text-center">Entregado</div>
+      <div className="text-center">Recaudado</div>
       <div className="text-center">En Empresa</div>
       <div className="text-right">Acciones</div>
     </div>
@@ -790,7 +790,7 @@ const App: React.FC = () => {
                                 </p>
                             </div>
                             <div>
-                                <p className="text-sm text-gray-400">Entregado Total</p>
+                                <p className="text-sm text-gray-400">Recaudado</p>
                                 <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-fuchsia-400">
                                     {formatCurrency(historyTotals.totalDeliveredAmount)}
                                 </p>
@@ -862,7 +862,7 @@ const App: React.FC = () => {
                                                 </div>
                                             </div>
                                             <div><p className="text-gray-400">Gastos</p><p className="font-bold text-amber-400 text-base">{formatCurrency(entry.results.totalExpenses)}</p></div>
-                                            <div><p className="text-gray-400">Entregado</p><p className="font-bold text-indigo-400 text-base">{formatCurrency(entry.results.totalDeliveredAmount || 0)}</p></div>
+                                            <div><p className="text-gray-400">Recaudado</p><p className="font-bold text-indigo-400 text-base">{formatCurrency(entry.results.totalDeliveredAmount || 0)}</p></div>
                                             <div className="col-span-2"><p className="text-gray-400">Dinero En Empresa</p><p className="font-bold text-blue-400 text-base">{formatCurrency(entry.results.amountToSettle)}</p></div>
                                         </div>
 
