@@ -1,5 +1,5 @@
 {
-  "name": "Panel del Conductor Pro",
-  "description": "Una aplicación web profesional para que los conductores de autobús registren y analicen sus jornadas laborales, calculando ganancias, gastos y liquidaciones de forma eficiente.",
+  "name": "Calculadora de Ganancias para Conductor",
+  "description": "Una aplicación web para que los conductores de autobús calculen sus ganancias diarias, gastos y el monto a liquidar al propietario del vehículo, basado en pasajeros, tarifas y comisiones.",
   "requestFramePermissions": []
 }
