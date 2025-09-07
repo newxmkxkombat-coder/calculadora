@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 
 // --- TYPE DEFINITIONS ---
@@ -31,12 +29,11 @@ interface HistoryEntry {
   results: CalculationResults;
 }
 
-const INITIAL_FORM_DATA: Omit<FormData, 'administrativeExpenses'> = {
+const INITIAL_FORM_DATA: Omit<FormData, 'administrativeExpenses' | 'route'> = {
   numPassengers: '',
   fareValue: '3.000',
   fixedCommission: '15',
   commissionPerPassenger: '100',
-  route: '9',
   fuelExpenses: '',
   variableExpenses: '20.000',
 };
@@ -116,21 +113,21 @@ const loadHistoryFromLocalStorage = (): HistoryEntry[] => {
 
 // --- SVG ICONS ---
 const UsersIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-  </svg>
-);
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+    </svg>
+  );
 
 const MoneyIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01M12 6v-1h4v1m-4 0H8m11 10h-3.857A4.002 4.002 0 0012 18c-2.209 0-4-1.791-4-4s1.791-4 4-4 4 1.791 4 4v1" />
-  </svg>
-);
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01M12 6v-1h4v1m-4 0H8m11 10h-3.857A4.002 4.002 0 0012 18c-2.209 0-4-1.791-4-4s1.791-4 4-4 4 1.791 4 4v1" />
+    </svg>
+  );
 
 const PercentageIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" />
-  </svg>
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" />
+    </svg>
 );
 
 const RouteIcon = () => (
@@ -206,83 +203,103 @@ const ArrowDownIcon = () => (
     </svg>
 );
 
-// FIX: Update ChevronDownIcon to accept and merge a className prop to allow for dynamic styling (e.g., rotation).
 const ChevronDownIcon: React.FC<{ className?: string }> = ({ className }) => (
     <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 ${className || ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
     </svg>
 );
 
+const WalletIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+    </svg>
+);
 
-// --- REUSABLE UI COMPONENTS ---
-interface InputControlProps {
-  label: string;
-  name: keyof FormData;
-  value: string;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onFocus?: (e: React.FocusEvent<HTMLInputElement>) => void;
-  placeholder?: string;
-  icon: React.ReactNode;
-  unit?: string;
-  isNumericFormatted?: boolean;
-}
+const TrendingDownIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
+    </svg>
+);
 
-const InputControl: React.FC<InputControlProps> = ({ label, name, value, onChange, onFocus, placeholder = '0', icon, unit, isNumericFormatted = false }) => (
-  <div className="mb-4">
-    <label htmlFor={name} className="block text-base font-semibold text-gray-300 mb-2 tracking-wide">
-      {label}
-    </label>
-    <div className="flex items-center bg-gray-800 border border-gray-700 rounded-lg transition-all duration-200 focus-within:ring-2 focus-within:ring-cyan-500">
-      <div className="pl-3 text-gray-500 pointer-events-none">{icon}</div>
-      <div className="relative flex-grow">
-        <input
-          type="text"
-          inputMode="numeric"
-          id={name}
-          name={name}
-          value={value}
-          onChange={onChange}
-          placeholder={placeholder}
-          className="w-full bg-transparent py-3 pl-3 text-white placeholder-gray-500 focus:outline-none"
-          onFocus={(e) => {
-            e.target.select();
-            if (onFocus) onFocus(e);
-          }}
-          aria-label={label}
-        />
-        {unit && (
-          <span className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 pointer-events-none">
-            {unit}
-          </span>
-        )}
-      </div>
-    </div>
-  </div>
+const CashIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+    </svg>
+);
+
+const ClipboardCheckIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+    </svg>
 );
 
 
-interface CheckboxControlGroupProps {
-  label: string;
-  name: keyof FormData;
-  value: string;
-  onChange: (e: { target: { name: keyof FormData; value: string } }) => void;
-  icon: React.ReactNode;
-  options: string[];
-}
-
-const CheckboxControlGroup: React.FC<CheckboxControlGroupProps> = ({ label, name, value, onChange, icon, options }) => {
-  const handleCheckboxChange = (optionValue: string) => {
-    onChange({ target: { name, value: optionValue } });
-  };
-
-  return (
-    <div className="mb-4 sm:col-span-2">
-      <label className="block text-base font-semibold text-gray-300 mb-3 tracking-wide">
-        {label}
-      </label>
-      <div className="relative flex items-center">
-        <div className="absolute left-0 pl-3 text-gray-500 pointer-events-none">{icon}</div>
-        <div className="pl-10 grid grid-cols-2 sm:grid-cols-4 gap-3 w-full">
+// --- REUSABLE UI COMPONENTS ---
+interface InputControlProps {
+    label: string;
+    name: keyof FormData;
+    value: string;
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    onFocus?: (e: React.FocusEvent<HTMLInputElement>) => void;
+    placeholder?: string;
+    icon: React.ReactNode;
+    unit?: string;
+  }
+  
+  const InputControl: React.FC<InputControlProps> = ({ label, name, value, onChange, onFocus, placeholder = '0', icon, unit }) => (
+    <div className="bg-gray-800 p-3 rounded-xl flex items-center gap-4 border border-gray-700 transition-all duration-300 focus-within:border-cyan-500">
+      <div className="text-cyan-400">{icon}</div>
+      <div className="flex-grow">
+        <label htmlFor={name} className="block text-xs font-medium text-gray-400 mb-1">
+          {label}
+        </label>
+        <div className="relative">
+          <input
+            type="text"
+            inputMode="numeric"
+            id={name}
+            name={name}
+            value={value}
+            onChange={onChange}
+            placeholder={placeholder}
+            className="w-full bg-transparent text-white placeholder-gray-500 focus:outline-none text-lg font-semibold"
+            onFocus={(e) => {
+              e.target.select();
+              if (onFocus) onFocus(e);
+            }}
+            aria-label={label}
+          />
+          {unit && (
+            <span className="absolute inset-y-0 right-0 flex items-center text-gray-400 pointer-events-none text-base">
+              {unit}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+  
+  interface CheckboxControlGroupProps {
+    label: string;
+    name: keyof FormData;
+    value: string;
+    onChange: (e: { target: { name: keyof FormData; value: string } }) => void;
+    icon: React.ReactNode;
+    options: string[];
+  }
+  
+  const CheckboxControlGroup: React.FC<CheckboxControlGroupProps> = ({ label, name, value, onChange, icon, options }) => {
+    const handleCheckboxChange = (optionValue: string) => {
+      onChange({ target: { name, value: optionValue } });
+    };
+  
+    return (
+      <div className="p-3 rounded-xl border border-gray-700 bg-gray-800">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="text-cyan-400">{icon}</div>
+          <label className="block text-xs font-medium text-gray-400">{label}</label>
+        </div>
+        <div className="grid grid-cols-4 gap-2">
           {options.map(option => (
             <div key={option}>
               <input
@@ -292,13 +309,13 @@ const CheckboxControlGroup: React.FC<CheckboxControlGroupProps> = ({ label, name
                 value={option}
                 checked={value === option}
                 onChange={() => handleCheckboxChange(option)}
-                className="hidden peer"
+                className="hidden peer route-checkbox"
                 aria-labelledby={`label-${name}-${option}`}
               />
               <label
                 id={`label-${name}-${option}`}
                 htmlFor={`${name}-${option}`}
-                className="w-full block text-center py-2 px-4 border border-gray-700 rounded-lg cursor-pointer transition-all duration-200 font-semibold bg-gray-800 text-gray-400 peer-checked:bg-cyan-600 peer-checked:text-white peer-checked:border-cyan-500 hover:border-gray-500 peer-checked:hover:bg-cyan-700"
+                className="w-full block text-center py-2 px-2 border-2 border-gray-700 rounded-lg cursor-pointer transition-all duration-300 font-semibold bg-gray-800 text-gray-300 peer-checked:bg-cyan-600 peer-checked:text-white peer-checked:border-cyan-500 hover:border-gray-500 peer-checked:hover:bg-cyan-700 text-sm"
               >
                 {option}
               </label>
@@ -306,33 +323,9 @@ const CheckboxControlGroup: React.FC<CheckboxControlGroupProps> = ({ label, name
           ))}
         </div>
       </div>
-    </div>
-  );
-};
-
-interface ResultDisplayProps {
-  label: string;
-  value: number;
-}
-
-const ResultDisplay: React.FC<ResultDisplayProps> = ({ label, value }) => {
-  const formattedValue = formatCurrency(value);
-
-  const valueColor = label.includes('Debo Tener') ? 'from-purple-500 to-pink-500' :
-                     label.includes('Sueldo') ? 'from-green-400 to-cyan-400' : 
-                     label.includes('Gastos') ? 'from-amber-400 to-red-500' :
-                     'from-blue-400 to-purple-400';
-
-  return (
-    <div className="bg-gray-800/50 p-5 rounded-lg flex justify-between items-center mb-4 border border-gray-700 shadow-inner">
-      <span className="text-gray-300 text-lg font-medium">{label}</span>
-      <span className={`text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r ${valueColor}`}>
-        {formattedValue}
-      </span>
-    </div>
-  );
-};
-
+    );
+  };
+  
 interface PassengerGoalProgressProps {
   totalPassengers: number;
   goal: number;
@@ -420,9 +413,26 @@ const App: React.FC = () => {
   const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistoryFromLocalStorage());
   
   const getInitialFormData = useCallback((): FormData => {
+    const routeSequence = ['60', '9', '11', '29'];
+    // Anchor date: A day known to correspond to the start of the sequence ('60').
+    const anchorDate = new Date('2024-07-26');
+    const today = new Date();
+
+    // Set hours to 0 to avoid DST or timezone issues when calculating day difference
+    anchorDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+
+    const timeDiff = today.getTime() - anchorDate.getTime();
+    const dayDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+
+    // Use modulo to cycle through the sequence. Ensure the index is positive.
+    const todayIndex = (dayDiff % routeSequence.length + routeSequence.length) % routeSequence.length;
+    const dailyDefaultRoute = routeSequence[todayIndex];
+
     const isPastAdminLimit = history.length >= ADMIN_EXPENSE_DAYS_LIMIT;
     return {
       ...INITIAL_FORM_DATA,
+      route: dailyDefaultRoute,
       administrativeExpenses: isPastAdminLimit ? '0' : ADMIN_EXPENSE_VALUE,
     };
   }, [history.length]);
@@ -502,9 +512,29 @@ const App: React.FC = () => {
 
     let processedValue = value;
     if (fieldsToFormat.includes(name as keyof FormData)) {
-      processedValue = formatNumberWithDots(value);
+      let cleanValue = parseFormattedNumber(value);
+
+      if (name === 'fuelExpenses') {
+          if (cleanValue.length > 6) {
+              cleanValue = cleanValue.slice(0, 6);
+          }
+          if (cleanValue.length === 6 && document.activeElement instanceof HTMLElement) {
+              document.activeElement.blur();
+          }
+      }
+    
+      processedValue = formatNumberWithDots(cleanValue);
+
     } else if (numericOnlyFields.includes(name as keyof FormData)) {
       processedValue = value.replace(/[^\d]/g, '');
+      if (name === 'numPassengers') {
+        if (processedValue.length > 3) {
+          processedValue = processedValue.slice(0, 3);
+        }
+        if (processedValue.length === 3 && document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
+      }
     }
     
     setFormData(prev => ({ ...prev, [name]: processedValue }));
@@ -809,67 +839,86 @@ const App: React.FC = () => {
     </div>
   );
 
+  const handleBackgroundClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+    // Do nothing if an interactive element like an input, button, or label was clicked.
+    // This allows for normal interaction without dismissing the keyboard unexpectedly.
+    if (target.closest('input, button, a, label')) {
+        return;
+    }
+
+    // If an input element is currently focused, remove focus (blur) to dismiss the keyboard.
+    if (document.activeElement instanceof HTMLInputElement) {
+        document.activeElement.blur();
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-gray-900 text-white p-4 sm:p-6 lg:p-8" onClick={handleBackgroundClick}>
       <Toast 
         message={toastMessage} 
         show={!!toastMessage} 
         onClose={() => setToastMessage('')} 
       />
-      <div className="max-w-7xl mx-auto">
-        <header className="text-center mb-8">
-          <h1 className="text-4xl sm:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600">
-            Calculadora de Ganancias
-          </h1>
-          <p className="text-gray-400 mt-2 text-lg">Para conductores de bus</p>
+      <div className="max-w-6xl mx-auto">
+        <header className="mb-6">
+            <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
+                <div className="text-center mb-4 pb-4 border-b border-gray-700/60">
+                    <div className="flex items-center justify-center gap-2 text-sm text-gray-300 mb-1">
+                        <ClipboardCheckIcon />
+                        <span className="font-medium">Entrega</span>
+                    </div>
+                    <p className="font-bold text-4xl text-blue-400 tracking-tight">{formatCurrency(results.amountToSettle)}</p>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                    <div className="text-center">
+                        <p className="text-xs text-gray-400">Mi Sueldo</p>
+                        <p className="font-semibold text-lg text-green-400">{formatCurrency(results.myEarnings)}</p>
+                    </div>
+                    <div className="text-center">
+                        <p className="text-xs text-gray-400">Gastos</p>
+                        <p className="font-semibold text-lg text-red-500">{formatCurrency(results.totalExpenses)}</p>
+                    </div>
+                    <div className="text-center">
+                        <p className="text-xs text-gray-400">Recaudado</p>
+                        <p className="font-semibold text-lg text-gray-300">{formatCurrency(results.totalRevenue)}</p>
+                    </div>
+                </div>
+            </div>
         </header>
 
-        <main className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-          {/* Columna de Entradas */}
-          <div className="lg:col-span-3 bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700">
-            <h2 className="text-2xl font-bold mb-6 text-cyan-400">Datos del Día</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
-                <InputControl label="Número de Pasajeros" name="numPassengers" value={formData.numPassengers} onChange={handleChange} onFocus={handleInputFocus} icon={<UsersIcon />} />
-                <InputControl label="Valor del Pasaje" name="fareValue" value={formData.fareValue} onChange={handleChange} onFocus={handleInputFocus} icon={<MoneyIcon />} unit="$" isNumericFormatted />
-                <InputControl label="Comisión Fija" name="fixedCommission" value={formData.fixedCommission} onChange={handleChange} onFocus={handleInputFocus} icon={<PercentageIcon />} unit="%" />
-                <InputControl label="Comisión por Pasajero" name="commissionPerPassenger" value={formData.commissionPerPassenger} onChange={handleChange} onFocus={handleInputFocus} icon={<MoneyIcon />} unit="$" isNumericFormatted />
-                <CheckboxControlGroup label="Ruta" name="route" value={formData.route} onChange={handleChange} icon={<RouteIcon />} options={['9', '11', '29', '60']} />
+        <main>
+            <div className="bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 p-4 sm:p-6 space-y-6">
+                <div>
+                    <h3 className="text-base font-semibold text-cyan-400 mb-3 ml-1">DATOS DEL DÍA</h3>
+                    <div className="space-y-3">
+                        <InputControl label="Número de Pasajeros" name="numPassengers" value={formData.numPassengers} onChange={handleChange} onFocus={handleInputFocus} icon={<UsersIcon />} />
+                        <div className="grid grid-cols-2 gap-3">
+                            <InputControl label="Valor Pasaje" name="fareValue" value={formData.fareValue} onChange={handleChange} onFocus={handleInputFocus} icon={<MoneyIcon />} unit="$" />
+                            <InputControl label="Comisión Fija" name="fixedCommission" value={formData.fixedCommission} onChange={handleChange} onFocus={handleInputFocus} icon={<PercentageIcon />} unit="%" />
+                        </div>
+                        <InputControl label="Comisión por Pasajero" name="commissionPerPassenger" value={formData.commissionPerPassenger} onChange={handleChange} onFocus={handleInputFocus} icon={<MoneyIcon />} unit="$" />
+                        <CheckboxControlGroup label="Ruta" name="route" value={formData.route} onChange={handleChange} icon={<RouteIcon />} options={['9', '11', '29', '60']} />
+                    </div>
+                </div>
+                <div>
+                    <h3 className="text-base font-semibold text-amber-400 mb-3 ml-1">GASTOS DEL DÍA</h3>
+                    <div className="space-y-3">
+                        <InputControl label="Combustible" name="fuelExpenses" value={formData.fuelExpenses} onChange={handleChange} onFocus={handleInputFocus} icon={<FuelIcon />} unit="$" />
+                        <InputControl label="Taller (Lavada, Engrase, etc.)" name="variableExpenses" value={formData.variableExpenses} onChange={handleChange} onFocus={handleInputFocus} icon={<WrenchIcon />} unit="$" placeholder="Valor Total" />
+                        <InputControl label="Gastos Administrativos" name="administrativeExpenses" value={formData.administrativeExpenses} onChange={handleChange} onFocus={handleInputFocus} icon={<BriefcaseIcon />} unit="$" />
+                    </div>
+                </div>
             </div>
-            
-            <h2 className="text-2xl font-bold mb-6 mt-8 text-amber-400">Gastos del Día</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
-                <InputControl label="Combustible" name="fuelExpenses" value={formData.fuelExpenses} onChange={handleChange} onFocus={handleInputFocus} icon={<FuelIcon />} unit="$" isNumericFormatted />
-                <InputControl label="Taller (Lavada,Tencioanda,Engrase,etc.)" name="variableExpenses" value={formData.variableExpenses} onChange={handleChange} onFocus={handleInputFocus} icon={<WrenchIcon />} unit="$" isNumericFormatted placeholder="Valor Total" />
-                <InputControl 
-                  label="Gastos Administrativos" 
-                  name="administrativeExpenses" 
-                  value={formData.administrativeExpenses} 
-                  onChange={handleChange} 
-                  onFocus={handleInputFocus}
-                  icon={<BriefcaseIcon />} 
-                  unit="$" 
-                  isNumericFormatted 
-                />
-            </div>
-          </div>
-
-          {/* Columna de Resultados */}
-          <div className="lg:col-span-2 bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700 flex flex-col justify-center">
-            <h2 className="text-2xl font-bold mb-6 text-green-400">Resumen</h2>
-            <ResultDisplay label="Debo Tener" value={results.totalRevenue} />
-            <ResultDisplay label="Mi Sueldo" value={results.myEarnings} />
-            <ResultDisplay label="Gastos Operativos" value={results.totalExpenses} />
-            <ResultDisplay label="Total A Entregar" value={results.amountToSettle} />
-          </div>
         </main>
         
         {/* History Section */}
-        <section className="mt-10">
-            <div className="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700">
+        <section className="mt-12">
+            <div className="bg-gray-800 p-4 sm:p-6 rounded-2xl shadow-2xl border border-gray-700">
                 <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-6">
                     <h2 className="text-2xl font-bold text-cyan-400 mb-4 sm:mb-0">Historial</h2>
                      {history.length > 0 && (
-                        <button onClick={handleClearAllHistory} className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-all duration-300 flex items-center justify-center text-sm">
+                        <button onClick={handleClearAllHistory} className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-all duration-300 flex items-center justify-center text-sm hover:scale-105">
                             <TrashIcon />
                             <span className="ml-2">Borrar Historial</span>
                         </button>
