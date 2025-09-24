@@ -17,7 +17,7 @@ interface CalculationResults {
   myEarnings: number;
   totalExpenses: number;
   amountToSettle: number; // In history, this is NET. In main state, it's GROSS.
-  totalDeliveredAmount?: number; // Debo Tener (GROSS amount), only for history.
+  totalDeliveredAmount?: number; // Recaudado (GROSS amount), only for history.
   fixedCommissionValue: number;
   perPassengerCommissionValue: number;
 }
@@ -246,37 +246,40 @@ interface InputControlProps {
     unit?: string;
   }
   
-  const InputControl: React.FC<InputControlProps> = ({ label, name, value, onChange, onFocus, placeholder = '0', icon, unit }) => (
-    <div className="bg-gray-800 p-3 rounded-xl flex items-center gap-4 border border-gray-700 transition-all duration-300 focus-within:border-cyan-500">
-      <div className="text-cyan-400">{icon}</div>
-      <div className="flex-grow">
-        <label htmlFor={name} className="block text-xs font-medium text-gray-400 mb-1">
-          {label}
-        </label>
-        <div className="relative">
-          <input
-            type="text"
-            inputMode="numeric"
-            id={name}
-            name={name}
-            value={value}
-            onChange={onChange}
-            placeholder={placeholder}
-            className="w-full bg-transparent text-white placeholder-gray-500 focus:outline-none text-lg font-semibold"
-            onFocus={(e) => {
-              e.target.select();
-              if (onFocus) onFocus(e);
-            }}
-            aria-label={label}
-          />
-          {unit && (
-            <span className="absolute inset-y-0 right-0 flex items-center text-gray-400 pointer-events-none text-base">
-              {unit}
-            </span>
-          )}
+  const InputControl = React.forwardRef<HTMLInputElement, InputControlProps>(
+    ({ label, name, value, onChange, onFocus, placeholder = '0', icon, unit }, ref) => (
+      <div className="bg-gray-800 p-3 rounded-xl flex items-center gap-4 border border-gray-700 transition-all duration-300 focus-within:border-cyan-500">
+        <div className="text-cyan-400">{icon}</div>
+        <div className="flex-grow">
+          <label htmlFor={name} className="block text-xs font-medium text-gray-400 mb-1">
+            {label}
+          </label>
+          <div className="relative">
+            <input
+              ref={ref}
+              type="text"
+              inputMode="numeric"
+              id={name}
+              name={name}
+              value={value}
+              onChange={onChange}
+              placeholder={placeholder}
+              className="w-full bg-transparent text-white placeholder-gray-500 focus:outline-none text-lg font-semibold"
+              onFocus={(e) => {
+                e.target.select();
+                if (onFocus) onFocus(e);
+              }}
+              aria-label={label}
+            />
+            {unit && (
+              <span className="absolute inset-y-0 right-0 flex items-center text-gray-400 pointer-events-none text-base">
+                {unit}
+              </span>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    )
   );
   
   interface CheckboxControlGroupProps {
@@ -448,6 +451,8 @@ const App: React.FC = () => {
   const [fabBottom, setFabBottom] = useState('1.5rem');
   const [showSaveSuccessAnim, setShowSaveSuccessAnim] = useState(false);
   
+  const fuelInputRef = useRef<HTMLInputElement>(null);
+
   // State for draggable FAB
   const [isDragging, setIsDragging] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -518,8 +523,11 @@ const App: React.FC = () => {
           if (cleanValue.length > 6) {
               cleanValue = cleanValue.slice(0, 6);
           }
-          if (cleanValue.length === 6 && document.activeElement instanceof HTMLElement) {
-              document.activeElement.blur();
+          if (cleanValue.length === 6) {
+              if (document.activeElement instanceof HTMLElement) {
+                  document.activeElement.blur();
+              }
+              window.scrollTo({ top: 0, behavior: 'smooth' });
           }
       }
     
@@ -531,8 +539,9 @@ const App: React.FC = () => {
         if (processedValue.length > 3) {
           processedValue = processedValue.slice(0, 3);
         }
-        if (processedValue.length === 3 && document.activeElement instanceof HTMLElement) {
-          document.activeElement.blur();
+        if (processedValue.length === 3) {
+          fuelInputRef.current?.focus();
+          fuelInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
       }
     }
@@ -622,7 +631,7 @@ const App: React.FC = () => {
     const resultsForHistory: CalculationResults = {
       ...results,
       amountToSettle: netAmountToSettle, // This is "En Empresa" (net)
-      totalDeliveredAmount: grossAmountToSettle, // This is "Debo Tener" (gross)
+      totalDeliveredAmount: grossAmountToSettle, // This is "Recaudado" (gross)
     };
 
     if (editingId) {
@@ -810,7 +819,7 @@ const App: React.FC = () => {
       acc.totalEarnings += entry.results.myEarnings;
       acc.totalExpenses += entry.results.totalExpenses;
       acc.totalAmountSettled += entry.results.amountToSettle; // Net amount
-      acc.totalDeliveredAmount += entry.results.totalDeliveredAmount || 0; // Debo Tener (Gross amount)
+      acc.totalDeliveredAmount += entry.results.totalDeliveredAmount || 0; // Recaudado (Gross amount)
       acc.totalPassengers += parseFloat(parseFormattedNumber(entry.formData.numPassengers)) || 0;
       acc.totalFixedCommission += entry.results.fixedCommissionValue || 0;
       acc.totalPerPassengerCommission += entry.results.perPassengerCommissionValue || 0;
@@ -833,7 +842,7 @@ const App: React.FC = () => {
       <div>Pasajeros</div>
       <div className="text-center">Ganancia</div>
       <div className="text-center">Gastos</div>
-      <div className="text-center">Debo Tener</div>
+      <div className="text-center">Recaudado</div>
       <div className="text-center">En Empresa</div>
       <div className="text-right">Acciones</div>
     </div>
@@ -880,7 +889,7 @@ const App: React.FC = () => {
                         <p className="font-semibold text-lg text-red-500">{formatCurrency(results.totalExpenses)}</p>
                     </div>
                     <div className="text-center">
-                        <p className="text-xs text-gray-400">Debo Tener</p>
+                        <p className="text-xs text-gray-400">Recaudado</p>
                         <p className="font-semibold text-lg text-gray-300">{formatCurrency(results.totalRevenue)}</p>
                     </div>
                 </div>
@@ -904,7 +913,7 @@ const App: React.FC = () => {
                 <div>
                     <h3 className="text-base font-semibold text-amber-400 mb-3 ml-1">GASTOS DEL DÍA</h3>
                     <div className="space-y-3">
-                        <InputControl label="Combustible" name="fuelExpenses" value={formData.fuelExpenses} onChange={handleChange} onFocus={handleInputFocus} icon={<FuelIcon />} unit="$" />
+                        <InputControl ref={fuelInputRef} label="Combustible" name="fuelExpenses" value={formData.fuelExpenses} onChange={handleChange} onFocus={handleInputFocus} icon={<FuelIcon />} unit="$" />
                         <InputControl label="Taller (Lavada, Engrase, etc.)" name="variableExpenses" value={formData.variableExpenses} onChange={handleChange} onFocus={handleInputFocus} icon={<WrenchIcon />} unit="$" placeholder="Valor Total" />
                         <InputControl label="Gastos Administrativos" name="administrativeExpenses" value={formData.administrativeExpenses} onChange={handleChange} onFocus={handleInputFocus} icon={<BriefcaseIcon />} unit="$" />
                     </div>
@@ -959,7 +968,7 @@ const App: React.FC = () => {
                                 </p>
                             </div>
                             <div>
-                                <p className="text-sm text-gray-400">Debo Tener</p>
+                                <p className="text-sm text-gray-400">Recaudado</p>
                                 <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-fuchsia-400">
                                     {formatCurrency(historyTotals.totalDeliveredAmount)}
                                 </p>
@@ -1002,7 +1011,7 @@ const App: React.FC = () => {
                                                 <p className="font-bold text-green-400 text-lg leading-tight">{formatCurrency(entry.results.myEarnings)}</p>
                                             </div>
                                             <div className="text-right">
-                                                <p className="text-xs text-gray-400">Debo Tener</p>
+                                                <p className="text-xs text-gray-400">Recaudado</p>
                                                 <p className="font-semibold text-indigo-400 text-base leading-tight">{formatCurrency(entry.results.totalDeliveredAmount || 0)}</p>
                                             </div>
                                         </div>
