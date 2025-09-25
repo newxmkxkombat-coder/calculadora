@@ -343,12 +343,13 @@ const PassengerGoalProgress: React.FC<PassengerGoalProgressProps> = ({ totalPass
     const currentDay = today.getDate();
     const totalDaysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
     
-    // Days remaining, including today. If it's the last day, daysRemaining is 1.
-    const daysLeft = Math.max(1, totalDaysInMonth - currentDay + 1);
+    // Days remaining, EXCLUDING today.
+    const daysLeft = totalDaysInMonth - currentDay;
     
     const passengersNeeded = Math.max(0, goal - totalPassengers);
     
-    const dailyTarget = passengersNeeded > 0 ? Math.ceil(passengersNeeded / daysLeft) : 0;
+    // If there are days left, calculate daily target. Otherwise, it's 0.
+    const dailyTarget = daysLeft > 0 ? Math.ceil(passengersNeeded / daysLeft) : 0;
     
     return { dailyGoal: dailyTarget, daysRemaining: daysLeft };
   }, [totalPassengers, goal]);
@@ -395,7 +396,7 @@ const PassengerGoalProgress: React.FC<PassengerGoalProgressProps> = ({ totalPass
             {dailyGoal.toLocaleString('es-CO')}
             <span className="text-base font-medium text-gray-400 ml-1">pasajeros / día</span>
           </p>
-          <p className="text-xs text-gray-500">(Durante los {daysRemaining} días restantes del mes)</p>
+          <p className="text-xs text-gray-500">(Quedan {daysRemaining} días para finalizar el mes)</p>
         </div>
       )}
 
