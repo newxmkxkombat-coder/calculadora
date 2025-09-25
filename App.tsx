@@ -338,6 +338,22 @@ const PassengerGoalProgress: React.FC<PassengerGoalProgressProps> = ({ totalPass
   const remaining = Math.max(0, goal - totalPassengers);
   const percentage = Math.min(100, (totalPassengers / goal) * 100);
 
+  const { dailyGoal, daysRemaining } = useMemo(() => {
+    const today = new Date();
+    const currentDay = today.getDate();
+    const totalDaysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+    
+    // Days remaining, including today. If it's the last day, daysRemaining is 1.
+    const daysLeft = Math.max(1, totalDaysInMonth - currentDay + 1);
+    
+    const passengersNeeded = Math.max(0, goal - totalPassengers);
+    
+    const dailyTarget = passengersNeeded > 0 ? Math.ceil(passengersNeeded / daysLeft) : 0;
+    
+    return { dailyGoal: dailyTarget, daysRemaining: daysLeft };
+  }, [totalPassengers, goal]);
+
+
   const getMotivationalMessage = () => {
     if (percentage >= 100) return "¡Meta cumplida y superada! ¡Excelente trabajo!";
     if (percentage >= 80) return "¡Ya casi lo logras, sigue así!";
@@ -371,6 +387,18 @@ const PassengerGoalProgress: React.FC<PassengerGoalProgressProps> = ({ totalPass
         <span>Faltan: <span className="text-amber-400 font-bold">{remaining.toLocaleString('es-CO')}</span></span>
         <span>Meta: <span className="text-green-400 font-bold">{goal.toLocaleString('es-CO')}</span></span>
       </div>
+
+      {dailyGoal > 0 && (
+        <div className="text-center mt-5 pt-4 border-t border-gray-700/60">
+          <p className="text-sm text-gray-400">Para cumplir, necesitas un promedio de:</p>
+          <p className="text-2xl font-extrabold text-cyan-300 my-1">
+            {dailyGoal.toLocaleString('es-CO')}
+            <span className="text-base font-medium text-gray-400 ml-1">pasajeros / día</span>
+          </p>
+          <p className="text-xs text-gray-500">(Durante los {daysRemaining} días restantes del mes)</p>
+        </div>
+      )}
+
        <p className="text-center text-sm text-gray-400 mt-4 italic">{getMotivationalMessage()}</p>
     </div>
   );
