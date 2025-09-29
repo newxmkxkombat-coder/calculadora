@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { GoogleGenAI, Modality, Blob as GenAIBlob, LiveSession } from "@google/genai";
+import { GoogleGenAI } from '@google/genai';` `@google/genai';
 
 // --- CONSTANTS ---
 const SILENCE_THRESHOLD = 0.012; // Adjusted RMS sensitivity to better filter background noise
