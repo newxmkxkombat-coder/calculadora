@@ -233,6 +233,18 @@ const ClipboardCheckIcon = () => (
     </svg>
 );
 
+const ClockIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+);
+
+const CalendarIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+    </svg>
+);
+
 
 // --- REUSABLE UI COMPONENTS ---
 interface InputControlProps {
@@ -339,16 +351,27 @@ const PassengerGoalProgress: React.FC<PassengerGoalProgressProps> = ({ totalPass
   const percentage = Math.min(100, (totalPassengers / goal) * 100);
 
   const { dailyGoal, daysRemaining } = useMemo(() => {
-    const today = new Date();
-    const currentDay = today.getDate();
-    const totalDaysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-    
-    // Days remaining, EXCLUDING today.
-    const daysLeft = totalDaysInMonth - currentDay;
-    
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    const currentDayOfMonth = now.getDate();
+    const totalDaysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+
+    // Calculate base days remaining including today
+    let daysLeft = totalDaysInMonth - currentDayOfMonth + 1;
+
+    // --- Workday Logic ---
+    // A workday is from 4:00 AM to 8:30 PM (20:30)
+    const isAfterWorkday = currentHour > 20 || (currentHour === 20 && currentMinute >= 30);
+    const isBeforeWorkday = currentHour < 4;
+
+    // If it's outside working hours, the current day doesn't count for making progress.
+    if (isAfterWorkday || isBeforeWorkday) {
+        daysLeft -= 1;
+    }
+
     const passengersNeeded = Math.max(0, goal - totalPassengers);
     
-    // If there are days left, calculate daily target. Otherwise, it's 0.
     const dailyTarget = daysLeft > 0 ? Math.ceil(passengersNeeded / daysLeft) : 0;
     
     return { dailyGoal: dailyTarget, daysRemaining: daysLeft };
@@ -437,6 +460,38 @@ const Toast: React.FC<ToastProps> = ({ message, show, onClose }) => {
       )}
     </div>
   );
+};
+
+// --- DIGITAL CLOCK COMPONENT ---
+const DigitalClock: React.FC = () => {
+    const [time, setTime] = useState(new Date());
+
+    useEffect(() => {
+        const timerId = setInterval(() => {
+            setTime(new Date());
+        }, 1000);
+
+        return () => {
+            clearInterval(timerId);
+        };
+    }, []);
+
+    const formatTime = (date: Date) => {
+        // Use toLocaleTimeString for a 12-hour format with AM/PM
+        return date.toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: true,
+        });
+    };
+
+    return (
+        <div className="flex items-center gap-1.5">
+            <ClockIcon />
+            <p className="font-mono tracking-wider">{formatTime(time)}</p>
+        </div>
+    );
 };
 
 
@@ -901,25 +956,34 @@ const App: React.FC = () => {
       <div className="max-w-6xl mx-auto">
         <header className="mb-6">
             <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
-                <div className="text-center mb-4 pb-4 border-b border-gray-700/60">
-                    <div className="flex items-center justify-center gap-2 text-sm text-gray-300 mb-1">
-                        <ClipboardCheckIcon />
-                        <span className="font-medium">Entrega</span>
+                <div className="flex justify-between items-center text-xs text-gray-400 mb-3">
+                    <div className="flex items-center gap-1.5">
+                        <CalendarIcon />
+                        <span>{new Date().toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
                     </div>
-                    <p className="font-bold text-4xl text-blue-400 tracking-tight">{formatCurrency(results.amountToSettle)}</p>
+                    <DigitalClock />
                 </div>
-                <div className="grid grid-cols-3 gap-2">
-                    <div className="text-center">
-                        <p className="text-xs text-gray-400">Mi Sueldo</p>
-                        <p className="font-semibold text-lg text-green-400">{formatCurrency(results.myEarnings)}</p>
+                <div className="border-t border-gray-700/60 pt-3">
+                    <div className="text-center mb-4 pb-4 border-b border-gray-700/60">
+                        <div className="flex items-center justify-center gap-2 text-sm text-gray-300 mb-1">
+                            <ClipboardCheckIcon />
+                            <span className="font-medium">Entrega</span>
+                        </div>
+                        <p className="font-bold text-4xl text-blue-400 tracking-tight">{formatCurrency(results.amountToSettle)}</p>
                     </div>
-                    <div className="text-center">
-                        <p className="text-xs text-gray-400">Gastos</p>
-                        <p className="font-semibold text-lg text-red-500">{formatCurrency(results.totalExpenses)}</p>
-                    </div>
-                    <div className="text-center">
-                        <p className="text-xs text-gray-400">Recaudado</p>
-                        <p className="font-semibold text-lg text-gray-300">{formatCurrency(results.totalRevenue)}</p>
+                    <div className="grid grid-cols-3 gap-2">
+                        <div className="text-center">
+                            <p className="text-xs text-gray-400">Mi Sueldo</p>
+                            <p className="font-semibold text-lg text-green-400">{formatCurrency(results.myEarnings)}</p>
+                        </div>
+                        <div className="text-center">
+                            <p className="text-xs text-gray-400">Gastos</p>
+                            <p className="font-semibold text-lg text-red-500">{formatCurrency(results.totalExpenses)}</p>
+                        </div>
+                        <div className="text-center">
+                            <p className="text-xs text-gray-400">Recaudado</p>
+                            <p className="font-semibold text-lg text-gray-300">{formatCurrency(results.totalRevenue)}</p>
+                        </div>
                     </div>
                 </div>
             </div>
