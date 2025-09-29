@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Calculadora de Ganancias para Conductor</title>
+    <title>Control Diario de Conductor</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,6 +11,11 @@
     <style>
       body {
         font-family: 'Inter', sans-serif;
+        background-color: #0f172a; /* bg-slate-900 */
+        background-image: radial-gradient(circle at top, rgba(14, 116, 144, 0.25) 0%, transparent 45%);
+      }
+      .route-checkbox:checked + label {
+        box-shadow: 0 0 15px rgba(20, 184, 166, 0.5);
       }
     </style>
   <script type="importmap">
@@ -18,13 +23,14 @@
   "imports": {
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
     "react/": "https://aistudiocdn.com/react@^19.1.1/",
-    "react": "https://aistudiocdn.com/react@^19.1.1"
+    "react": "https://aistudiocdn.com/react@^19.1.1",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.21.0"
   }
 }
 </script>
 
 </head>
-  <body class="bg-gray-900">
+  <body class="bg-slate-900">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>
