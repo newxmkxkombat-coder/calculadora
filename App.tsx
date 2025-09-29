@@ -1,11 +1,4 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { GoogleGenAI } from '@google/genai';`?` `@google/genai';
-
-// --- CONSTANTS ---
-const SILENCE_THRESHOLD = 0.012; // Adjusted RMS sensitivity to better filter background noise
-const SILENCE_DELAY = 1000;      // Pause detection set to 1 second as requested
-const NO_SPEECH_TIMEOUT = 7000;  // 7 seconds to cancel if no speech is detected
-const SPEECH_CONFIRMATION_BUFFER = 3; // Number of consecutive audio chunks above threshold to confirm speech
 
 // --- TYPE DEFINITIONS ---
 interface FormData {
@@ -211,7 +204,7 @@ const ArrowDownIcon = () => (
 );
 
 const ChevronDownIcon: React.FC<{ className?: string }> = ({ className }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 ${className || ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 ${className || ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
     </svg>
 );
@@ -249,12 +242,6 @@ const ClockIcon = () => (
 const CalendarIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-    </svg>
-);
-
-const MicrophoneIcon: React.FC<{ className?: string }> = ({ className }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" className={`h-8 w-8 transition-colors duration-200 ${className}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
     </svg>
 );
 
@@ -475,64 +462,6 @@ const Toast: React.FC<ToastProps> = ({ message, show, onClose }) => {
   );
 };
 
-// --- VOICE COMMAND MODAL ---
-type VoiceStatus = 'idle' | 'listening' | 'processing' | 'error';
-interface VoiceCommandModalProps {
-  status: VoiceStatus;
-  error: string;
-  onClose: () => void;
-  onRetry: () => void;
-  micVolume: number;
-  isSpeaking: boolean;
-}
-
-const VoiceCommandModal: React.FC<VoiceCommandModalProps> = ({ status, error, onClose, onRetry, micVolume, isSpeaking }) => {
-  if (status === 'idle') return null;
-
-  const volumeScale = Math.min(1 + micVolume * 15, 3);
-
-  return (
-    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" aria-modal="true" role="dialog">
-      <div className="bg-gray-800 rounded-2xl p-6 sm:p-8 text-center max-w-md w-full border border-gray-700 shadow-2xl">
-        <h2 className="text-2xl font-bold text-cyan-400 mb-4">Registro por Voz</h2>
-        {status === 'listening' && (
-          <>
-            <div className="my-6 h-28 flex items-center justify-center">
-              <div className="relative inline-flex items-center justify-center">
-                <div
-                    className="absolute h-24 w-24 bg-cyan-500/10 rounded-full transition-transform duration-100"
-                    style={{ transform: `scale(${volumeScale})` }}
-                    aria-hidden="true"
-                ></div>
-                {isSpeaking && <div className="absolute h-28 w-28 bg-cyan-500/20 rounded-full animate-ping" aria-hidden="true"></div>}
-                <MicrophoneIcon className={isSpeaking ? 'text-cyan-300' : 'text-gray-400'} />
-              </div>
-            </div>
-            <p className="text-gray-300 mb-2 h-6">{isSpeaking ? 'Te escucho...' : 'Habla ahora...'}</p>
-            <p className="text-xs text-gray-400">Ej: "315 pasajeros, ruta 29 y 135 mil de combustible... <span className="font-bold text-cyan-300">listo</span>"</p>
-            <p className="text-xs text-gray-500 mt-1">Di "listo" para terminar o simplemente haz una pausa.</p>
-            <button onClick={onClose} className="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">Cancelar</button>
-          </>
-        )}
-        {status === 'processing' && (
-          <>
-            <div className="my-6 animate-spin h-16 w-16 border-4 border-cyan-400 border-t-transparent rounded-full mx-auto"></div>
-            <p className="text-gray-300">Procesando tu comando...</p>
-          </>
-        )}
-        {status === 'error' && (
-          <>
-            <p className="text-red-400 my-6">{error}</p>
-            <div className="flex justify-center gap-4">
-              <button onClick={onRetry} className="bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors">Reintentar</button>
-              <button onClick={onClose} className="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">Cerrar</button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-};
 
 // --- DIGITAL CLOCK COMPONENT ---
 const DigitalClock: React.FC = () => {
@@ -614,53 +543,6 @@ const App: React.FC = () => {
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const dragStartRef = useRef({ x: 0, y: 0, initialX: 0, initialY: 0 });
   const focusedElementRef = useRef<HTMLInputElement | null>(null);
-
-  // --- State and Refs for Voice Commands ---
-  const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>('idle');
-  const [voiceError, setVoiceError] = useState('');
-  const [isVoiceSupported, setIsVoiceSupported] = useState(false);
-  const [micPermissionStatus, setMicPermissionStatus] = useState<'prompt' | 'granted' | 'denied' | 'checking'>('checking');
-  const [micVolume, setMicVolume] = useState(0);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const isSpeakingRef = useRef(false);
-
-  const aiRef = useRef<GoogleGenAI | null>(null);
-  const sessionRef = useRef<LiveSession | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null);
-  const mediaStreamRef = useRef<MediaStream | null>(null);
-  
-  const accumulatedTranscriptionRef = useRef('');
-  const silenceTimerRef = useRef<number | null>(null);
-  const noSpeechTimeoutRef = useRef<number | null>(null);
-  const speakingBufferRef = useRef(0);
-  const volumeUpdateTimerRef = useRef<number | null>(null);
-  const isProcessingRef = useRef(false); // Ref to prevent double processing
-
-  useEffect(() => {
-    // Check for browser support on component mount
-    const supported = !!(
-        navigator.mediaDevices && 
-        navigator.mediaDevices.getUserMedia && 
-        (window.AudioContext || (window as any).webkitAudioContext) &&
-        window.isSecureContext // Microphone access requires a secure context (HTTPS)
-    );
-    setIsVoiceSupported(supported);
-  }, []);
-
-  useEffect(() => {
-    // Smartly check and monitor microphone permissions
-    if (isVoiceSupported && navigator.permissions) {
-        navigator.permissions.query({ name: 'microphone' as PermissionName }).then(status => {
-            setMicPermissionStatus(status.state);
-            status.onchange = () => {
-                setMicPermissionStatus(status.state);
-            };
-        });
-    } else if (!isVoiceSupported) {
-        setMicPermissionStatus('denied'); // Treat unsupported as denied for UI purposes
-    }
-}, [isVoiceSupported]);
 
   useEffect(() => {
     saveHistoryToLocalStorage(history);
@@ -1016,283 +898,6 @@ const App: React.FC = () => {
     };
   }, [isDragging, handleDragMove, handleDragEnd]);
 
-    // --- Voice Command Logic ---
-    const encode = (bytes: Uint8Array) => {
-        let binary = '';
-        const len = bytes.byteLength;
-        for (let i = 0; i < len; i++) {
-            binary += String.fromCharCode(bytes[i]);
-        }
-        return btoa(binary);
-    }
-
-    const createBlob = (data: Float32Array): GenAIBlob => {
-        const l = data.length;
-        const int16 = new Int16Array(l);
-        for (let i = 0; i < l; i++) {
-            int16[i] = data[i] * 32768;
-        }
-        return {
-            data: encode(new Uint8Array(int16.buffer)),
-            mimeType: 'audio/pcm;rate=16000',
-        };
-    }
-
-    const extractDataFromText = useCallback(async (transcription: string) => {
-        if (!transcription.trim()) {
-            setVoiceError("No se detectó ningún comando de voz.");
-            setVoiceStatus('error');
-            isProcessingRef.current = false;
-            return;
-        }
-        setVoiceStatus('processing');
-        try {
-            if (!aiRef.current) {
-                aiRef.current = new GoogleGenAI({ apiKey: process.env.API_KEY });
-            }
-            
-            const prompt = `
-              You are a highly intelligent assistant for a bus driver in Colombia. Your task is to accurately extract specific data points from the driver's spoken commands. The driver might speak naturally and not in a fixed order.
-
-              Data to Extract:
-              - numPassengers: The total number of passengers.
-              - route: The route number. Must be one of: '9', '11', '29', '60'.
-              - fuelExpenses: The cost of fuel. The user might say "mil" which means thousands (e.g., "120 mil" is 120000).
-              - variableExpenses: The cost of other expenses like "taller" (workshop), "lavada" (washing), "engrase" (greasing). Also handle "mil".
-
-              Output Format: 
-              You MUST respond with a valid JSON object ONLY. Do not add any other text or explanations. If a piece of information is not mentioned, its value should be null.
-
-              Examples:
-              - User says: "ruta 60, 412 pasajeros, 150 de combustible" -> {"numPassengers": 412, "route": "60", "fuelExpenses": 150000, "variableExpenses": null}
-              - User says: "le puse 135 mil de gasolina y 20 de lavada, fueron 350 pasajeros en la 29" -> {"numPassengers": 350, "route": "29", "fuelExpenses": 135000, "variableExpenses": 20000}
-              - User says: "hoy fueron 280 pasajeros" -> {"numPassengers": 280, "route": null, "fuelExpenses": null, "variableExpenses": null}
-
-              User's Command: "${transcription}"
-            `;
-            const response = await aiRef.current.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: prompt,
-                config: { responseMimeType: 'application/json' },
-            });
-            const resultText = response.text.trim();
-            const extractedData = JSON.parse(resultText);
-            setFormData(prev => {
-                const newData = { ...prev };
-                if (extractedData.numPassengers && typeof extractedData.numPassengers === 'number') {
-                    newData.numPassengers = String(extractedData.numPassengers);
-                }
-                if (extractedData.route && ['9', '11', '29', '60'].includes(String(extractedData.route))) {
-                    newData.route = String(extractedData.route);
-                }
-                if (extractedData.fuelExpenses && typeof extractedData.fuelExpenses === 'number') {
-                    newData.fuelExpenses = formatNumberWithDots(String(extractedData.fuelExpenses));
-                }
-                if (extractedData.variableExpenses && typeof extractedData.variableExpenses === 'number') {
-                    newData.variableExpenses = formatNumberWithDots(String(extractedData.variableExpenses));
-                }
-                return newData;
-            });
-            setVoiceStatus('idle');
-        } catch (error) {
-            console.error("Error extracting data:", error);
-            setVoiceError("No pude procesar el comando. Inténtalo de nuevo.");
-            setVoiceStatus('error');
-        } finally {
-            isProcessingRef.current = false;
-        }
-    }, []);
-
-    const stopListening = useCallback(() => {
-        // Clear all timers
-        if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-        if (noSpeechTimeoutRef.current) clearTimeout(noSpeechTimeoutRef.current);
-        if (volumeUpdateTimerRef.current) clearTimeout(volumeUpdateTimerRef.current);
-        silenceTimerRef.current = null;
-        noSpeechTimeoutRef.current = null;
-        volumeUpdateTimerRef.current = null;
-        
-        // Stop media stream tracks
-        if (mediaStreamRef.current) {
-            mediaStreamRef.current.getTracks().forEach(track => track.stop());
-            mediaStreamRef.current = null;
-        }
-
-        // Disconnect and nullify script processor
-        if (scriptProcessorRef.current) {
-            scriptProcessorRef.current.disconnect();
-            scriptProcessorRef.current = null;
-        }
-
-        // Close AudioContext
-        if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-            audioContextRef.current.close().catch(console.error);
-            audioContextRef.current = null;
-        }
-
-        // Close Gemini session
-        if (sessionRef.current) {
-            sessionRef.current.close();
-            sessionRef.current = null;
-        }
-
-        isSpeakingRef.current = false;
-        setIsSpeaking(false);
-        setMicVolume(0);
-
-        // Reset state, unless we are showing a final status like 'processing' or 'error'
-        if (voiceStatus !== 'error' && voiceStatus !== 'processing') {
-            setVoiceStatus('idle');
-        }
-    }, [voiceStatus]);
-
-    const processAndStop = useCallback((transcription) => {
-        if (isProcessingRef.current) return;
-        isProcessingRef.current = true;
-        stopListening();
-        extractDataFromText(transcription);
-    }, [stopListening, extractDataFromText]);
-
-    const startListening = useCallback(async () => {
-        if (!isVoiceSupported) {
-            setVoiceError("El registro por voz no es compatible con este navegador.");
-            setVoiceStatus('error');
-            return;
-        }
-        
-        setVoiceError('');
-        accumulatedTranscriptionRef.current = '';
-        speakingBufferRef.current = 0;
-        isSpeakingRef.current = false;
-        setIsSpeaking(false);
-        setMicVolume(0);
-        isProcessingRef.current = false;
-        if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-        if (noSpeechTimeoutRef.current) clearTimeout(noSpeechTimeoutRef.current);
-
-        setVoiceStatus('listening');
-
-        try {
-            if (!aiRef.current) {
-                aiRef.current = new GoogleGenAI({ apiKey: process.env.API_KEY });
-            }
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaStreamRef.current = stream;
-            
-            const context = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
-            audioContextRef.current = context;
-            
-            const source = context.createMediaStreamSource(stream);
-            const processor = context.createScriptProcessor(4096, 1, 1);
-            scriptProcessorRef.current = processor;
-            
-            const sessionPromise = aiRef.current.live.connect({
-                model: 'gemini-2.5-flash-native-audio-preview-09-2025',
-                callbacks: {
-                    onopen: () => {
-                        source.connect(processor);
-                        processor.connect(context.destination);
-                        noSpeechTimeoutRef.current = window.setTimeout(() => {
-                            if (isProcessingRef.current) return;
-                            setVoiceError("No se detectó voz. Intenta de nuevo.");
-                            setVoiceStatus('error');
-                            stopListening();
-                        }, NO_SPEECH_TIMEOUT);
-                    },
-                    onmessage: (message) => {
-                        if (message.serverContent?.inputTranscription) {
-                            accumulatedTranscriptionRef.current += message.serverContent.inputTranscription.text;
-                            const finalTranscription = accumulatedTranscriptionRef.current.trim();
-                            if (/\blisto\.?$/i.test(finalTranscription)) {
-                                const transcriptionForAI = finalTranscription.replace(/\blisto\.?$/i, '').trim();
-                                processAndStop(transcriptionForAI);
-                            }
-                        }
-                    },
-                    onerror: (e) => {
-                        console.error('Live session error:', e);
-                        setVoiceError('Hubo un error de conexión.');
-                        setVoiceStatus('error');
-                        stopListening();
-                    },
-                    onclose: () => { /* Cleanup is handled in stopListening */ }
-                },
-                config: { responseModalities: [Modality.AUDIO], inputAudioTranscription: {} }
-            });
-
-            sessionPromise.then(session => {
-                sessionRef.current = session;
-                processor.onaudioprocess = (audioProcessingEvent) => {
-                    if (!sessionRef.current) return;
-                    const inputData = audioProcessingEvent.inputBuffer.getChannelData(0);
-                    
-                    sessionPromise.then(s => s.sendRealtimeInput({ media: createBlob(inputData) }));
-
-                    let sum = 0;
-                    for (let i = 0; i < inputData.length; i++) {
-                        sum += inputData[i] * inputData[i];
-                    }
-                    const rms = Math.sqrt(sum / inputData.length);
-                    
-                    if (!volumeUpdateTimerRef.current) {
-                        volumeUpdateTimerRef.current = window.setTimeout(() => {
-                            setMicVolume(rms);
-                            volumeUpdateTimerRef.current = null;
-                        }, 100);
-                    }
-
-                    if (rms > SILENCE_THRESHOLD) {
-                        if (silenceTimerRef.current) {
-                            clearTimeout(silenceTimerRef.current);
-                            silenceTimerRef.current = null;
-                        }
-                        if (!isSpeakingRef.current) {
-                            speakingBufferRef.current++;
-                            if (speakingBufferRef.current > SPEECH_CONFIRMATION_BUFFER) {
-                                if (noSpeechTimeoutRef.current) {
-                                    clearTimeout(noSpeechTimeoutRef.current);
-                                    noSpeechTimeoutRef.current = null;
-                                }
-                                isSpeakingRef.current = true;
-                                setIsSpeaking(true);
-                            }
-                        }
-                    } else if (isSpeakingRef.current) {
-                        if (!silenceTimerRef.current) {
-                            silenceTimerRef.current = window.setTimeout(() => {
-                                processAndStop(accumulatedTranscriptionRef.current);
-                            }, SILENCE_DELAY);
-                        }
-                    }
-                };
-            }).catch(err => {
-                 console.error('Failed to connect to live session:', err);
-                 setVoiceError('No se pudo iniciar la sesión de voz.');
-                 setVoiceStatus('error');
-                 stopListening();
-            });
-
-        } catch (err) {
-            console.error("Error accessing microphone:", err);
-            setVoiceError("No se pudo acceder al micrófono.");
-            setVoiceStatus('error');
-        }
-    }, [isVoiceSupported, processAndStop, stopListening]);
-
-    const handleVoiceCommand = () => {
-        if (micPermissionStatus === 'denied') {
-            setVoiceError("El acceso al micrófono está bloqueado. Por favor, habilítalo en la configuración de tu navegador.");
-            setVoiceStatus('error');
-            return;
-        }
-
-        if (voiceStatus === 'idle' || voiceStatus === 'error') {
-            startListening();
-        } else {
-            stopListening();
-        }
-    };
-
 
   const historyTotals = useMemo(() => {
     return history.reduce((acc, entry) => {
@@ -1349,14 +954,6 @@ const App: React.FC = () => {
         show={!!toastMessage} 
         onClose={() => setToastMessage('')} 
       />
-      <VoiceCommandModal
-          status={voiceStatus}
-          error={voiceError}
-          onClose={stopListening}
-          onRetry={startListening}
-          micVolume={micVolume}
-          isSpeaking={isSpeaking}
-      />
       <div className="max-w-6xl mx-auto">
         <header className="mb-6">
             <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
@@ -1398,16 +995,6 @@ const App: React.FC = () => {
                 <div>
                      <div className="flex justify-between items-center mb-3">
                         <h3 className="text-base font-semibold text-cyan-400 ml-1">DATOS DEL DÍA</h3>
-                        {isVoiceSupported && (
-                            <button 
-                                onClick={handleVoiceCommand}
-                                title="Registrar datos por voz"
-                                aria-label="Registrar datos por voz"
-                                className="p-2 rounded-full text-cyan-400 bg-gray-700/50 hover:bg-cyan-500/20 hover:text-white transition-colors duration-300"
-                            >
-                                <MicrophoneIcon className="h-6 w-6"/>
-                            </button>
-                        )}
                     </div>
                     <div className="space-y-3">
                         <InputControl label="Número de Pasajeros" name="numPassengers" value={formData.numPassengers} onChange={handleChange} onFocus={handleInputFocus} icon={<UsersIcon />} />
