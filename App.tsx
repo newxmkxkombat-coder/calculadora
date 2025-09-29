@@ -1021,7 +1021,14 @@ const App: React.FC = () => {
         <section className="mt-12">
             <div className="bg-slate-800/60 p-4 sm:p-6 rounded-2xl shadow-2xl border border-slate-700">
                 <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-6">
-                    <h2 className="text-2xl font-bold text-teal-300 mb-4 sm:mb-0">Historial</h2>
+                    <div className="flex items-center gap-3 mb-4 sm:mb-0">
+                        <h2 className="text-2xl font-bold text-teal-300">Historial</h2>
+                        {history.length > 0 && (
+                            <span className="bg-teal-600/80 text-teal-100 text-sm font-bold px-3 py-1 rounded-full">
+                                {history.length} {history.length === 1 ? 'día laborado' : 'días laborados'}
+                            </span>
+                        )}
+                    </div>
                      {history.length > 0 && (
                         <button onClick={handleClearAllHistory} className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-all duration-300 flex items-center justify-center text-sm hover:scale-105">
                             <TrashIcon />
