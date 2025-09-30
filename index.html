@@ -12,10 +12,14 @@
       body {
         font-family: 'Inter', sans-serif;
         background-color: #0f172a; /* bg-slate-900 */
-        background-image: radial-gradient(circle at top, rgba(14, 116, 144, 0.25) 0%, transparent 45%);
+        background-image: radial-gradient(circle at top, rgba(34, 211, 238, 0.15) 0%, transparent 40%);
+      }
+      @keyframes pulse-glow {
+        0%, 100% { box-shadow: 0 0 15px rgba(20, 184, 166, 0.5); }
+        50% { box-shadow: 0 0 25px rgba(20, 184, 166, 0.7); }
       }
       .route-checkbox:checked + label {
-        box-shadow: 0 0 15px rgba(20, 184, 166, 0.5);
+        animation: pulse-glow 2.5s infinite ease-in-out;
       }
     </style>
   <script type="importmap">
