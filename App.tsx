@@ -260,7 +260,7 @@ interface InputControlProps {
   
   const InputControl = React.forwardRef<HTMLInputElement, InputControlProps>(
     ({ label, name, value, onChange, onFocus, placeholder = '0', icon, unit }, ref) => (
-      <div className="bg-slate-800/70 p-3 rounded-xl flex items-center gap-4 border border-slate-700 transition-all duration-300 focus-within:border-teal-400 focus-within:shadow-[0_0_15px_rgba(45,212,191,0.3)]">
+      <div className="bg-slate-800/70 p-3 rounded-xl flex items-center gap-4 border border-slate-700 transition-all duration-300 focus-within:border-teal-400 focus-within:shadow-[0_0_20px_rgba(20,184,166,0.4)]">
         <div className="text-teal-400">{icon}</div>
         <div className="flex-grow">
           <label htmlFor={name} className="block text-xs font-medium text-slate-400 mb-1">
@@ -955,7 +955,7 @@ const App: React.FC = () => {
       />
       <div className="max-w-6xl mx-auto">
         <header className="mb-6">
-            <div className="bg-slate-800/50 backdrop-blur-sm p-4 rounded-xl border border-cyan-500/20 shadow-lg">
+            <div className="bg-gradient-to-b from-slate-800/60 to-slate-900/40 backdrop-blur-sm p-4 rounded-xl border border-cyan-500/20 shadow-lg">
                 <div className="flex justify-between items-center text-xs text-slate-400 mb-3">
                     <div className="flex items-center gap-1.5">
                         <CalendarIcon />
@@ -978,11 +978,11 @@ const App: React.FC = () => {
                         </div>
                         <div className="text-center">
                             <p className="text-xs text-slate-400">Gastos</p>
-                             <p className="font-semibold text-lg text-transparent bg-clip-text bg-gradient-to-r from-amber-500 to-red-500">{formatCurrency(results.totalExpenses)}</p>
+                             <p className="font-semibold text-lg text-orange-400">{formatCurrency(results.totalExpenses)}</p>
                         </div>
                         <div className="text-center">
                             <p className="text-xs text-slate-400">Recaudado</p>
-                            <p className="font-semibold text-lg text-slate-300">{formatCurrency(results.totalRevenue)}</p>
+                            <p className="font-semibold text-lg text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-blue-500">{formatCurrency(results.totalRevenue)}</p>
                         </div>
                     </div>
                 </div>
@@ -1065,13 +1065,13 @@ const App: React.FC = () => {
                             </div>
                             <div>
                                 <p className="text-sm text-slate-400">Gastos Totales</p>
-                                <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-red-500">
+                                <p className="text-xl font-bold text-orange-400">
                                     {formatCurrency(historyTotals.totalExpenses)}
                                 </p>
                             </div>
                             <div>
                                 <p className="text-sm text-slate-400">Recaudado</p>
-                                <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-fuchsia-400">
+                                <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-blue-500">
                                     {formatCurrency(historyTotals.totalDeliveredAmount)}
                                 </p>
                             </div>
@@ -1223,7 +1223,7 @@ const App: React.FC = () => {
                 className={`py-2 px-4 text-white rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ease-in-out focus:outline-none focus:ring-4 text-sm font-semibold ${
                     showSaveSuccessAnim 
                     ? 'bg-green-500 scale-110' 
-                    : 'bg-gradient-to-br from-cyan-500 to-teal-600 hover:from-cyan-600 hover:to-teal-700 hover:scale-105 focus:ring-teal-500/50'
+                    : 'bg-gradient-to-br from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 hover:scale-105 focus:ring-purple-500/50'
                 }`}
                 title={editingId ? 'Actualizar Datos' : 'Guardar Datos'}
                 aria-label={editingId ? 'Actualizar Datos' : 'Guardar Datos'}
@@ -1233,7 +1233,7 @@ const App: React.FC = () => {
             <button 
                 onClick={handleClearForm} 
                 disabled={showSaveSuccessAnim}
-                className="py-2 px-4 bg-slate-600 hover:bg-slate-700 text-white rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-4 focus:ring-slate-500/50 text-sm font-semibold disabled:opacity-50"
+                className="py-2 px-4 bg-slate-700 hover:bg-slate-600 text-white rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-4 focus:ring-slate-600/50 text-sm font-semibold disabled:opacity-50"
                 title={editingId ? 'Cancelar Edición' : 'Limpiar Formulario'}
                 aria-label={editingId ? 'Cancelar Edición' : 'Limpiar Formulario'}
             >
