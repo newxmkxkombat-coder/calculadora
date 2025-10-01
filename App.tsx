@@ -29,6 +29,9 @@ interface HistoryEntry {
   results: CalculationResults;
 }
 
+type ArchivedHistory = Record<string, HistoryEntry[]>;
+
+
 const INITIAL_FORM_DATA: Omit<FormData, 'administrativeExpenses' | 'route' | 'commissionPerPassenger'> = {
   numPassengers: '',
   fareValue: '3.000',
@@ -81,6 +84,16 @@ const formatTimestamp = (isoString: string): string => {
   }
 };
 
+const formatMonthYear = (monthKey: string): string => {
+  const [year, month] = monthKey.split('-');
+  const date = new Date(parseInt(year), parseInt(month) - 1);
+  return date.toLocaleDateString('es-CO', {
+    month: 'long',
+    year: 'numeric',
+  });
+};
+
+
 const formatNumberWithDots = (value: string): string => {
   if (!value) return '';
   const cleanValue = value.replace(/[^\d]/g, '');
@@ -109,6 +122,25 @@ const loadHistoryFromLocalStorage = (): HistoryEntry[] => {
     return [];
   }
 };
+
+const saveArchivedHistoryToLocalStorage = (archives: ArchivedHistory) => {
+  try {
+    localStorage.setItem('archivedEarningsHistory', JSON.stringify(archives));
+  } catch (error) {
+    console.error("Error saving archived history:", error);
+  }
+};
+
+const loadArchivedHistoryFromLocalStorage = (): ArchivedHistory => {
+  try {
+    const savedArchives = localStorage.getItem('archivedEarningsHistory');
+    return savedArchives ? JSON.parse(savedArchives) : {};
+  } catch (error) {
+    console.error("Error loading archived history:", error);
+    return {};
+  }
+};
+
 
 const COMMISSION_STORAGE_KEY = 'earningsCalculatorCommission';
 
@@ -264,6 +296,12 @@ const CalendarIcon = () => (
     </svg>
 );
 
+const ArchiveBoxIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4-8-4V7m8 4v10M5 7l8 4 8-4" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 7l0 10 8 4 8-4 0-10" />
+    </svg>
+);
 
 // --- REUSABLE UI COMPONENTS ---
 interface InputControlProps {
@@ -275,11 +313,12 @@ interface InputControlProps {
     placeholder?: string;
     icon: React.ReactNode;
     unit?: string;
+    disabled?: boolean;
   }
   
   const InputControl = React.forwardRef<HTMLInputElement, InputControlProps>(
-    ({ label, name, value, onChange, onFocus, placeholder = '0', icon, unit }, ref) => (
-      <div className="bg-slate-800/70 p-3 rounded-xl flex items-center gap-4 border border-slate-700 transition-all duration-300 focus-within:border-teal-400 focus-within:shadow-[0_0_20px_rgba(20,184,166,0.4)]">
+    ({ label, name, value, onChange, onFocus, placeholder = '0', icon, unit, disabled = false }, ref) => (
+      <div className={`bg-slate-800/70 p-3 rounded-xl flex items-center gap-4 border border-slate-700 transition-all duration-300 ${!disabled && 'focus-within:border-teal-400 focus-within:shadow-[0_0_20px_rgba(20,184,166,0.4)]'}`}>
         <div className="text-teal-400">{icon}</div>
         <div className="flex-grow">
           <label htmlFor={name} className="block text-xs font-medium text-slate-400 mb-1">
@@ -295,12 +334,13 @@ interface InputControlProps {
               value={value}
               onChange={onChange}
               placeholder={placeholder}
-              className="w-full bg-transparent text-white placeholder-slate-500 focus:outline-none text-lg font-semibold"
+              className="w-full bg-transparent text-white placeholder-slate-500 focus:outline-none text-lg font-semibold disabled:text-slate-400"
               onFocus={(e) => {
                 e.target.select();
                 if (onFocus) onFocus(e);
               }}
               aria-label={label}
+              disabled={disabled}
             />
             {unit && (
               <span className="absolute inset-y-0 right-0 flex items-center text-slate-400 pointer-events-none text-base">
@@ -320,20 +360,21 @@ interface InputControlProps {
     onChange: (e: { target: { name: keyof FormData; value: string } }) => void;
     icon: React.ReactNode;
     options: string[];
+    disabled?: boolean;
   }
   
-  const CheckboxControlGroup: React.FC<CheckboxControlGroupProps> = ({ label, name, value, onChange, icon, options }) => {
+  const CheckboxControlGroup: React.FC<CheckboxControlGroupProps> = ({ label, name, value, onChange, icon, options, disabled = false }) => {
     const handleCheckboxChange = (optionValue: string) => {
       onChange({ target: { name, value: optionValue } });
     };
   
     return (
-      <div className="p-3 rounded-xl border border-slate-700 bg-slate-800/70">
+      <div className={`p-3 rounded-xl border border-slate-700 bg-slate-800/70 ${disabled ? 'opacity-70' : ''}`}>
         <div className="flex items-center gap-3 mb-3">
           <div className="text-teal-400">{icon}</div>
           <label className="block text-xs font-medium text-slate-400">{label}</label>
         </div>
-        <div className="grid grid-cols-4 gap-2">
+        <fieldset disabled={disabled} className="grid grid-cols-4 gap-2">
           {options.map(option => (
             <div key={option}>
               <input
@@ -349,13 +390,13 @@ interface InputControlProps {
               <label
                 id={`label-${name}-${option}`}
                 htmlFor={`${name}-${option}`}
-                className="w-full block text-center py-2 px-2 border-2 border-slate-700 rounded-lg cursor-pointer transition-all duration-300 font-semibold bg-slate-800 text-slate-300 peer-checked:bg-gradient-to-br peer-checked:from-cyan-500 peer-checked:to-teal-600 peer-checked:text-white peer-checked:border-teal-400 hover:border-slate-500 peer-checked:hover:from-cyan-600 peer-checked:hover:to-teal-700 text-sm"
+                className={`w-full block text-center py-2 px-2 border-2 border-slate-700 rounded-lg transition-all duration-300 font-semibold bg-slate-800 text-slate-300 ${!disabled ? 'cursor-pointer peer-checked:bg-gradient-to-br peer-checked:from-cyan-500 peer-checked:to-teal-600 peer-checked:text-white peer-checked:border-teal-400 hover:border-slate-500 peer-checked:hover:from-cyan-600 peer-checked:hover:to-teal-700' : 'cursor-not-allowed'} text-sm`}
               >
                 {option}
               </label>
             </div>
           ))}
-        </div>
+        </fieldset>
       </div>
     );
   };
@@ -519,6 +560,8 @@ const DigitalClock: React.FC = () => {
 // --- MAIN APP COMPONENT ---
 const App: React.FC = () => {
   const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistoryFromLocalStorage());
+  const [archivedHistory, setArchivedHistory] = useState<ArchivedHistory>(() => loadArchivedHistoryFromLocalStorage());
+  const [viewingMonth, setViewingMonth] = useState<string>('current');
   
   const getInitialFormData = useCallback((): FormData => {
     const routeSequence = ['60', '9', '11', '29'];
@@ -536,15 +579,15 @@ const App: React.FC = () => {
     // Use modulo to cycle through the sequence. Ensure the index is positive.
     const todayIndex = (dayDiff % routeSequence.length + routeSequence.length) % routeSequence.length;
     const dailyDefaultRoute = routeSequence[todayIndex];
-
-    const isPastAdminLimit = history.length >= ADMIN_EXPENSE_DAYS_LIMIT;
+    const currentHistory = viewingMonth === 'current' ? history : [];
+    const isPastAdminLimit = currentHistory.length >= ADMIN_EXPENSE_DAYS_LIMIT;
     return {
       ...INITIAL_FORM_DATA,
       commissionPerPassenger: loadCommissionFromLocalStorage(),
       route: dailyDefaultRoute,
       administrativeExpenses: isPastAdminLimit ? '0' : ADMIN_EXPENSE_VALUE,
     };
-  }, [history.length]);
+  }, [history, viewingMonth]);
 
   const [formData, setFormData] = useState<FormData>(getInitialFormData);
   const [results, setResults] = useState<CalculationResults>({ totalRevenue: 0, myEarnings: 0, totalExpenses: 0, amountToSettle: 0, fixedCommissionValue: 0, perPassengerCommissionValue: 0 });
@@ -566,8 +609,10 @@ const App: React.FC = () => {
   const focusedElementRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    saveHistoryToLocalStorage(history);
-  }, [history]);
+    if (viewingMonth === 'current') {
+      saveHistoryToLocalStorage(history);
+    }
+  }, [history, viewingMonth]);
   
     useEffect(() => {
         const visualViewport = window.visualViewport;
@@ -835,12 +880,52 @@ const App: React.FC = () => {
   
   const handleClearAllHistory = () => {
     const isConfirmed = window.confirm(
-      "¿Estás seguro de que quieres borrar todo el historial? Esta acción no se puede deshacer."
+      "¿Estás seguro de que quieres borrar todo el historial del mes actual? Esta acción no se puede deshacer."
     );
     if (isConfirmed) {
       setHistory([]);
       handleClearForm(); // Also reset the form
     }
+  };
+
+  const handleArchiveMonth = () => {
+    if (history.length === 0) {
+        alert("No hay registros en el mes actual para archivar.");
+        return;
+    }
+
+    const firstEntryDate = new Date(history[history.length - 1].timestamp);
+    const year = firstEntryDate.getFullYear();
+    const month = String(firstEntryDate.getMonth() + 1).padStart(2, '0');
+    const archiveKey = `${year}-${month}`;
+
+    let confirmationMessage = `¿Estás seguro de que quieres archivar y cerrar el mes de ${formatMonthYear(archiveKey)}? Esto guardará los ${history.length} registros actuales y limpiará la vista para un nuevo mes.`;
+
+    if (archivedHistory[archiveKey]) {
+        confirmationMessage += "\n\nADVERTENCIA: Ya existe un archivo para este mes. Si continúas, se sobrescribirá.";
+    }
+
+    if (window.confirm(confirmationMessage)) {
+        const newArchives = { ...archivedHistory, [archiveKey]: history };
+        setArchivedHistory(newArchives);
+        saveArchivedHistoryToLocalStorage(newArchives);
+
+        setHistory([]);
+        handleClearForm();
+        setToastMessage(`Mes de ${formatMonthYear(archiveKey)} archivado exitosamente.`);
+    }
+};
+
+  const handleViewMonthChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const selectedMonth = e.target.value;
+      setViewingMonth(selectedMonth);
+
+      if (selectedMonth === 'current') {
+          setHistory(loadHistoryFromLocalStorage());
+      } else {
+          setHistory(archivedHistory[selectedMonth] || []);
+      }
+      handleClearForm(); // Clear form when switching views
   };
 
   const handleMoveEntryUp = (id: string) => {
@@ -944,6 +1029,8 @@ const App: React.FC = () => {
         totalPerPassengerCommission: 0,
     });
   }, [history]);
+  
+  const isViewingArchive = viewingMonth !== 'current';
 
   const HistoryTableHeader = () => (
     <div className="sticky top-0 z-10 bg-slate-800/95 backdrop-blur-sm p-4 hidden md:grid grid-cols-9 gap-x-4 text-sm font-bold text-slate-400 border-b border-slate-700">
@@ -962,7 +1049,7 @@ const App: React.FC = () => {
     const target = event.target as HTMLElement;
     // Do nothing if an interactive element like an input, button, a, label was clicked.
     // This allows for normal interaction without dismissing the keyboard unexpectedly.
-    if (target.closest('input, button, a, label')) {
+    if (target.closest('input, button, a, label, select')) {
         return;
     }
 
@@ -1016,50 +1103,64 @@ const App: React.FC = () => {
         </header>
 
         <main>
-            <div className="bg-slate-800/60 rounded-2xl shadow-2xl border border-slate-700 p-4 sm:p-6 space-y-6">
-                <div>
-                     <div className="flex justify-between items-center mb-3">
-                        <h3 className="text-base font-semibold text-teal-300 ml-1">DATOS DEL DÍA</h3>
-                    </div>
-                    <div className="space-y-3">
-                        <InputControl label="Número de Pasajeros" name="numPassengers" value={formData.numPassengers} onChange={handleChange} onFocus={handleInputFocus} icon={<UsersIcon />} />
-                        <div className="grid grid-cols-2 gap-3">
-                            <InputControl label="Valor Pasaje" name="fareValue" value={formData.fareValue} onChange={handleChange} onFocus={handleInputFocus} icon={<MoneyIcon />} unit="$" />
-                            <InputControl label="Comisión Fija" name="fixedCommission" value={formData.fixedCommission} onChange={handleChange} onFocus={handleInputFocus} icon={<PercentageIcon />} unit="%" />
-                        </div>
-                        <InputControl label="Comisión por Pasajero" name="commissionPerPassenger" value={formData.commissionPerPassenger} onChange={handleChange} onFocus={handleInputFocus} icon={<MoneyIcon />} unit="$" />
-                        <CheckboxControlGroup label="Ruta" name="route" value={formData.route} onChange={handleChange} icon={<RouteIcon />} options={['9', '11', '29', '60']} />
-                    </div>
-                </div>
-                <div>
-                    <h3 className="text-base font-semibold text-amber-400 mb-3 ml-1">GASTOS DEL DÍA</h3>
-                    <div className="space-y-3">
-                        <InputControl ref={fuelInputRef} label="Combustible" name="fuelExpenses" value={formData.fuelExpenses} onChange={handleChange} onFocus={handleInputFocus} icon={<FuelIcon />} unit="$" />
-                        <InputControl label="Taller (Lavada, Engrase, etc.)" name="variableExpenses" value={formData.variableExpenses} onChange={handleChange} onFocus={handleInputFocus} icon={<WrenchIcon />} unit="$" placeholder="Valor Total" />
-                        <InputControl label="Gastos Administrativos" name="administrativeExpenses" value={formData.administrativeExpenses} onChange={handleChange} onFocus={handleInputFocus} icon={<BriefcaseIcon />} unit="$" />
-                    </div>
-                </div>
-            </div>
+          <fieldset
+            disabled={isViewingArchive}
+            className="bg-slate-800/60 rounded-2xl shadow-2xl border border-slate-700 p-4 sm:p-6 space-y-6 disabled:opacity-70 disabled:pointer-events-none transition-opacity"
+          >
+              <div>
+                   <div className="flex justify-between items-center mb-3">
+                      <h3 className="text-base font-semibold text-teal-300 ml-1">DATOS DEL DÍA</h3>
+                  </div>
+                  <div className="space-y-3">
+                      <InputControl label="Número de Pasajeros" name="numPassengers" value={formData.numPassengers} onChange={handleChange} onFocus={handleInputFocus} icon={<UsersIcon />} disabled={isViewingArchive} />
+                      <div className="grid grid-cols-2 gap-3">
+                          <InputControl label="Valor Pasaje" name="fareValue" value={formData.fareValue} onChange={handleChange} onFocus={handleInputFocus} icon={<MoneyIcon />} unit="$" disabled={isViewingArchive} />
+                          <InputControl label="Comisión Fija" name="fixedCommission" value={formData.fixedCommission} onChange={handleChange} onFocus={handleInputFocus} icon={<PercentageIcon />} unit="%" disabled={isViewingArchive} />
+                      </div>
+                      <InputControl label="Comisión por Pasajero" name="commissionPerPassenger" value={formData.commissionPerPassenger} onChange={handleChange} onFocus={handleInputFocus} icon={<MoneyIcon />} unit="$" disabled={isViewingArchive} />
+                      <CheckboxControlGroup label="Ruta" name="route" value={formData.route} onChange={handleChange} icon={<RouteIcon />} options={['9', '11', '29', '60']} disabled={isViewingArchive} />
+                  </div>
+              </div>
+              <div>
+                  <h3 className="text-base font-semibold text-amber-400 mb-3 ml-1">GASTOS DEL DÍA</h3>
+                  <div className="space-y-3">
+                      <InputControl ref={fuelInputRef} label="Combustible" name="fuelExpenses" value={formData.fuelExpenses} onChange={handleChange} onFocus={handleInputFocus} icon={<FuelIcon />} unit="$" disabled={isViewingArchive} />
+                      <InputControl label="Taller (Lavada, Engrase, etc.)" name="variableExpenses" value={formData.variableExpenses} onChange={handleChange} onFocus={handleInputFocus} icon={<WrenchIcon />} unit="$" placeholder="Valor Total" disabled={isViewingArchive} />
+                      <InputControl label="Gastos Administrativos" name="administrativeExpenses" value={formData.administrativeExpenses} onChange={handleChange} onFocus={handleInputFocus} icon={<BriefcaseIcon />} unit="$" disabled={isViewingArchive} />
+                  </div>
+              </div>
+          </fieldset>
         </main>
         
         {/* History Section */}
         <section className="mt-12">
             <div className="bg-slate-800/60 p-4 sm:p-6 rounded-2xl shadow-2xl border border-slate-700">
-                <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-6">
-                    <div className="flex items-center gap-3 mb-4 sm:mb-0">
-                        <h2 className="text-2xl font-bold text-teal-300">Historial</h2>
-                        {history.length > 0 && (
-                            <span className="bg-teal-600/80 text-teal-100 text-sm font-bold px-3 py-1 rounded-full">
-                                {history.length} {history.length === 1 ? 'día laborado' : 'días laborados'}
-                            </span>
-                        )}
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-6 gap-4">
+                    <div className="flex items-center gap-3">
+                        <h2 className="text-2xl font-bold text-teal-300 whitespace-nowrap">Historial</h2>
+                        <span className="text-slate-400 font-medium">{isViewingArchive ? `(Viendo ${formatMonthYear(viewingMonth)})` : '(Mes Actual)'}</span>
                     </div>
-                     {history.length > 0 && (
-                        <button onClick={handleClearAllHistory} className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-all duration-300 flex items-center justify-center text-sm hover:scale-105">
+                     <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+                        <select
+                          value={viewingMonth}
+                          onChange={handleViewMonthChange}
+                          className="bg-slate-700 border border-slate-600 rounded-lg py-2 px-3 text-white text-sm focus:ring-teal-500 focus:border-teal-500"
+                          aria-label="Seleccionar mes para ver"
+                        >
+                            <option value="current">Mes Actual</option>
+                            {Object.keys(archivedHistory).sort((a,b) => b.localeCompare(a)).map(monthKey => (
+                                <option key={monthKey} value={monthKey}>{formatMonthYear(monthKey)}</option>
+                            ))}
+                        </select>
+                         <button onClick={handleArchiveMonth} disabled={isViewingArchive || history.length === 0} className="bg-sky-600 hover:bg-sky-700 text-white font-bold py-2 px-4 rounded-lg transition-all duration-300 flex items-center justify-center text-sm hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:bg-sky-600">
+                             <ArchiveBoxIcon />
+                             <span className="ml-2">Archivar Mes</span>
+                         </button>
+                        <button onClick={handleClearAllHistory} disabled={isViewingArchive || history.length === 0} className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-all duration-300 flex items-center justify-center text-sm hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:bg-red-600">
                             <TrashIcon />
-                            <span className="ml-2">Borrar Historial</span>
+                            <span className="ml-2">Borrar Mes</span>
                         </button>
-                    )}
+                    </div>
                 </div>
 
                 {history.length > 0 && (
@@ -1113,13 +1214,13 @@ const App: React.FC = () => {
                 )}
 
                 {history.length === 0 ? (
-                    <p className="text-slate-500 text-center py-8">No hay cálculos guardados.</p>
+                    <p className="text-slate-500 text-center py-8">No hay cálculos guardados para este período.</p>
                 ) : (
                     <div className="mt-6 md:border md:border-slate-700 md:rounded-lg md:max-h-[70vh] md:overflow-y-auto md:relative">
                         <HistoryTableHeader />
                         <ul className="space-y-4 md:space-y-0">
                             {history.map((entry, index) => {
-                               const isEditable = !isNaN(new Date(entry.timestamp).getTime());
+                               const isEditable = !isNaN(new Date(entry.timestamp).getTime()) && !isViewingArchive;
                                const isExpanded = expandedId === entry.id;
                                return (
                                 <li key={entry.id} className="md:border-b md:border-slate-700 last:md:border-b-0">
@@ -1177,12 +1278,14 @@ const App: React.FC = () => {
                                                 <div className="col-span-2"><p className="text-slate-400">En Empresa</p><p className="font-bold text-blue-400 text-base">{formatCurrency(entry.results.amountToSettle)}</p></div>
                                             </div>
                                              {/* Actions */}
+                                            {!isViewingArchive && (
                                             <div className="flex items-center space-x-2 mt-4 justify-start border-t border-slate-700 pt-3">
                                                 <button onClick={() => handleMoveEntryUp(entry.id)} title="Mover hacia arriba" aria-label="Mover hacia arriba" disabled={index === 0} className="p-2 rounded-full bg-slate-700 hover:bg-sky-600 text-slate-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowUpIcon /></button>
                                                 <button onClick={() => handleMoveEntryDown(entry.id)} title="Mover hacia abajo" aria-label="Mover hacia abajo" disabled={index === history.length - 1} className="p-2 rounded-full bg-slate-700 hover:bg-sky-600 text-slate-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowDownIcon /></button>
                                                 <button onClick={() => handleLoadEntry(entry.id)} title="Cargar este cálculo" aria-label="Cargar este cálculo" className="p-2 rounded-full bg-slate-700 hover:bg-cyan-600 text-slate-300 hover:text-white transition-colors duration-200"><LoadIcon /></button>
                                                 <button onClick={() => handleDeleteEntry(entry.id)} title="Borrar este cálculo" aria-label="Borrar este cálculo" className="p-2 rounded-full bg-slate-700 hover:bg-red-600 text-slate-300 hover:text-white transition-colors duration-200"><TrashIcon /></button>
                                             </div>
+                                            )}
                                         </div>
                                       </div>
                                   </div>
@@ -1216,10 +1319,16 @@ const App: React.FC = () => {
                                       <div className="font-bold text-indigo-400 text-base text-center">{formatCurrency(entry.results.totalDeliveredAmount || 0)}</div>
                                       <div className="font-bold text-blue-400 text-base text-center">{formatCurrency(entry.results.amountToSettle)}</div>
                                       <div className="flex items-center space-x-2 justify-end">
-                                          <button onClick={() => handleMoveEntryUp(entry.id)} title="Mover hacia arriba" aria-label="Mover hacia arriba" disabled={index === 0} className="p-2 rounded-full bg-slate-700 hover:bg-sky-600 text-slate-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowUpIcon /></button>
-                                          <button onClick={() => handleMoveEntryDown(entry.id)} title="Mover hacia abajo" aria-label="Mover hacia abajo" disabled={index === history.length - 1} className="p-2 rounded-full bg-slate-700 hover:bg-sky-600 text-slate-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowDownIcon /></button>
-                                          <button onClick={() => handleLoadEntry(entry.id)} title="Cargar este cálculo" aria-label="Cargar este cálculo" className="p-2 rounded-full bg-slate-700 hover:bg-cyan-600 text-slate-300 hover:text-white transition-colors duration-200"><LoadIcon /></button>
-                                          <button onClick={() => handleDeleteEntry(entry.id)} title="Borrar este cálculo" aria-label="Borrar este cálculo" className="p-2 rounded-full bg-slate-700 hover:bg-red-600 text-slate-300 hover:text-white transition-colors duration-200"><TrashIcon /></button>
+                                        {!isViewingArchive ? (
+                                          <>
+                                            <button onClick={() => handleMoveEntryUp(entry.id)} title="Mover hacia arriba" aria-label="Mover hacia arriba" disabled={index === 0} className="p-2 rounded-full bg-slate-700 hover:bg-sky-600 text-slate-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowUpIcon /></button>
+                                            <button onClick={() => handleMoveEntryDown(entry.id)} title="Mover hacia abajo" aria-label="Mover hacia abajo" disabled={index === history.length - 1} className="p-2 rounded-full bg-slate-700 hover:bg-sky-600 text-slate-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowDownIcon /></button>
+                                            <button onClick={() => handleLoadEntry(entry.id)} title="Cargar este cálculo" aria-label="Cargar este cálculo" className="p-2 rounded-full bg-slate-700 hover:bg-cyan-600 text-slate-300 hover:text-white transition-colors duration-200"><LoadIcon /></button>
+                                            <button onClick={() => handleDeleteEntry(entry.id)} title="Borrar este cálculo" aria-label="Borrar este cálculo" className="p-2 rounded-full bg-slate-700 hover:bg-red-600 text-slate-300 hover:text-white transition-colors duration-200"><TrashIcon /></button>
+                                          </>
+                                        ) : (
+                                          <span className="text-xs text-slate-500 italic">Archivado</span>
+                                        )}
                                       </div>
                                   </div>
                                 </li>
@@ -1231,41 +1340,43 @@ const App: React.FC = () => {
         </section>
 
         {/* Floating Action Buttons */}
-        <div
-          className="fixed right-6 sm:right-8 z-40 flex flex-col items-end gap-3 transition-[bottom] duration-300 ease-in-out"
-          onMouseDown={handleDragStart}
-          onTouchStart={handleDragStart}
-          style={{ 
-              bottom: fabBottom,
-              transform: `translate(${position.x}px, ${position.y}px)`,
-              cursor: isDragging ? 'grabbing' : 'grab',
-              touchAction: 'none',
-              userSelect: 'none',
-          }}
-        >
-            <button 
-                onClick={handleSaveCalculation} 
-                disabled={showSaveSuccessAnim}
-                className={`py-2 px-4 text-white rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ease-in-out focus:outline-none focus:ring-4 text-sm font-semibold ${
-                    showSaveSuccessAnim 
-                    ? 'bg-green-500 scale-110' 
-                    : 'bg-gradient-to-br from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 hover:scale-105 focus:ring-purple-500/50'
-                }`}
-                title={editingId ? 'Actualizar Datos' : 'Guardar Datos'}
-                aria-label={editingId ? 'Actualizar Datos' : 'Guardar Datos'}
-            >
-              {showSaveSuccessAnim ? <CheckIcon /> : (editingId ? 'Actualizar' : 'Guardar')}
-            </button>
-            <button 
-                onClick={handleClearForm} 
-                disabled={showSaveSuccessAnim}
-                className="py-2 px-4 bg-slate-700 hover:bg-slate-600 text-white rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-4 focus:ring-slate-600/50 text-sm font-semibold disabled:opacity-50"
-                title={editingId ? 'Cancelar Edición' : 'Limpiar Formulario'}
-                aria-label={editingId ? 'Cancelar Edición' : 'Limpiar Formulario'}
-            >
-                {editingId ? 'Cancelar' : 'Limpiar'}
-            </button>
-        </div>
+        {!isViewingArchive && (
+          <div
+            className="fixed right-6 sm:right-8 z-40 flex flex-col items-end gap-3 transition-[bottom] duration-300 ease-in-out"
+            onMouseDown={handleDragStart}
+            onTouchStart={handleDragStart}
+            style={{ 
+                bottom: fabBottom,
+                transform: `translate(${position.x}px, ${position.y}px)`,
+                cursor: isDragging ? 'grabbing' : 'grab',
+                touchAction: 'none',
+                userSelect: 'none',
+            }}
+          >
+              <button 
+                  onClick={handleSaveCalculation} 
+                  disabled={showSaveSuccessAnim}
+                  className={`py-2 px-4 text-white rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ease-in-out focus:outline-none focus:ring-4 text-sm font-semibold ${
+                      showSaveSuccessAnim 
+                      ? 'bg-green-500 scale-110' 
+                      : 'bg-gradient-to-br from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 hover:scale-105 focus:ring-purple-500/50'
+                  }`}
+                  title={editingId ? 'Actualizar Datos' : 'Guardar Datos'}
+                  aria-label={editingId ? 'Actualizar Datos' : 'Guardar Datos'}
+              >
+                {showSaveSuccessAnim ? <CheckIcon /> : (editingId ? 'Actualizar' : 'Guardar')}
+              </button>
+              <button 
+                  onClick={handleClearForm} 
+                  disabled={showSaveSuccessAnim}
+                  className="py-2 px-4 bg-slate-700 hover:bg-slate-600 text-white rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-4 focus:ring-slate-600/50 text-sm font-semibold disabled:opacity-50"
+                  title={editingId ? 'Cancelar Edición' : 'Limpiar Formulario'}
+                  aria-label={editingId ? 'Cancelar Edición' : 'Limpiar Formulario'}
+              >
+                  {editingId ? 'Cancelar' : 'Limpiar'}
+              </button>
+          </div>
+        )}
 
       </div>
     </div>
