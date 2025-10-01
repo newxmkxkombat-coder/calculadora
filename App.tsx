@@ -654,26 +654,38 @@ const DocumentAlerts: React.FC<{ documents: ManagedDocument[] }> = ({ documents 
     };
 
     return (
-        <div className="mb-4 p-4 rounded-lg border bg-slate-800/80 backdrop-blur-sm shadow-lg border-amber-500/40 text-amber-300">
-            <div className="flex justify-between items-start">
-                <div className="flex items-start">
-                    <BellIcon className="h-6 w-6 text-amber-400 mr-3 mt-1 flex-shrink-0" />
-                    <div>
-                        <h3 className="font-bold text-white">Alertas de Documentos</h3>
-                        <ul className="mt-1 list-disc list-inside text-sm">
-                            {alerts.map(doc => (
-                                <li key={doc.id}>
-                                    <span className="font-semibold">{doc.name}</span>
-                                    {doc.statusInfo.status === 'expired'
-                                        ? ` venció hace ${Math.abs(doc.statusInfo.daysRemaining)} días.`
-                                        : ` vence en ${doc.statusInfo.daysRemaining} días.`}
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
+        <div 
+            className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in-backdrop"
+            aria-modal="true"
+            role="dialog"
+        >
+            <div className="bg-slate-800 border-2 border-amber-500/60 rounded-2xl w-full max-w-lg p-6 shadow-2xl text-center animate-fade-in-scale">
+                <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-amber-500/20 mb-4 border-2 border-amber-500/50">
+                    <BellIcon className="h-8 w-8 text-amber-400" />
                 </div>
-                <button onClick={handleDismiss} className="p-1 -mt-1 -mr-1 rounded-full hover:bg-slate-700" title="Cerrar alerta" aria-label="Cerrar alerta">
-                    <XIcon />
+                <h3 className="text-2xl font-bold text-amber-300 mb-2">¡Atención! Documentos Importantes</h3>
+                <p className="text-slate-400 mb-6">Los siguientes documentos requieren tu atención inmediata:</p>
+                
+                <ul className="space-y-3 text-left">
+                    {alerts.map(doc => (
+                        <li key={doc.id} className="p-3 rounded-lg flex items-center justify-between gap-4 border border-slate-700 bg-slate-900/50">
+                             <div>
+                                <p className="font-bold text-white">{doc.name}</p>
+                                <p className={`text-sm font-semibold ${doc.statusInfo.status === 'expired' ? 'text-red-400' : 'text-amber-400'}`}>
+                                    {doc.statusInfo.status === 'expired'
+                                        ? `Venció hace ${Math.abs(doc.statusInfo.daysRemaining)} días.`
+                                        : `Vence en ${doc.statusInfo.daysRemaining} días.`}
+                                </p>
+                            </div>
+                        </li>
+                    ))}
+                </ul>
+
+                <button 
+                    onClick={handleDismiss} 
+                    className="mt-8 w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 px-4 rounded-lg transition-all duration-300 text-base"
+                >
+                    Entendido, revisar más tarde
                 </button>
             </div>
         </div>
