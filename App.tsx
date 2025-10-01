@@ -29,6 +29,14 @@ interface HistoryEntry {
   results: CalculationResults;
 }
 
+interface ManagedDocument {
+  id: string;
+  name: string;
+  expiryDate: string; // YYYY-MM-DD
+  alertThresholdDays: string;
+  imageSrc?: string; // Base64 data URL
+}
+
 type ArchivedHistory = Record<string, HistoryEntry[]>;
 
 
@@ -159,6 +167,27 @@ const loadCommissionFromLocalStorage = (): string => {
   } catch (error) {
     console.error("Error loading commission from localStorage:", error);
     return '100';
+  }
+};
+
+
+const DOCUMENT_STORAGE_KEY = 'driverAppDocuments';
+
+const saveDocumentsToLocalStorage = (documents: ManagedDocument[]) => {
+  try {
+    localStorage.setItem(DOCUMENT_STORAGE_KEY, JSON.stringify(documents));
+  } catch (error) {
+    console.error("Error saving documents to localStorage:", error);
+  }
+};
+
+const loadDocumentsFromLocalStorage = (): ManagedDocument[] => {
+  try {
+    const savedDocuments = localStorage.getItem(DOCUMENT_STORAGE_KEY);
+    return savedDocuments ? JSON.parse(savedDocuments) : [];
+  } catch (error) {
+    console.error("Error loading documents from localStorage:", error);
+    return [];
   }
 };
 
@@ -300,6 +329,31 @@ const ArchiveBoxIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4-8-4V7m8 4v10M5 7l8 4 8-4" />
         <path strokeLinecap="round" strokeLinejoin="round" d="M5 7l0 10 8 4 8-4 0-10" />
+    </svg>
+);
+
+const IdCardIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className || "h-6 w-6"} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 012-2h2a2 2 0 012 2v1m-4 0h4m-9 4h1.01M15 11h.01M10 15h.01M15 15h.01" />
+    </svg>
+);
+
+const BellIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className || "h-6 w-6"} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+    </svg>
+);
+
+const CameraIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+    </svg>
+);
+
+const PlusCircleIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>
 );
 
@@ -523,7 +577,6 @@ const Toast: React.FC<ToastProps> = ({ message, show, onClose }) => {
   );
 };
 
-
 // --- DIGITAL CLOCK COMPONENT ---
 const DigitalClock: React.FC = () => {
     const [time, setTime] = useState(new Date());
@@ -557,11 +610,260 @@ const DigitalClock: React.FC = () => {
 };
 
 
+// --- DOCUMENT MANAGER COMPONENTS ---
+const getDocumentStatus = (expiryDate: string, alertThresholdDays: string) => {
+    if (!expiryDate) return { status: 'valid' as const, daysRemaining: Infinity };
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const expiry = new Date(expiryDate);
+    const expiryLocal = new Date(expiry.getTime() + expiry.getTimezoneOffset() * 60000);
+    expiryLocal.setHours(0, 0, 0, 0);
+
+    const diffTime = expiryLocal.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    const threshold = parseInt(alertThresholdDays, 10) || 30;
+
+    if (diffDays < 0) return { status: 'expired' as const, daysRemaining: diffDays };
+    if (diffDays <= threshold) return { status: 'expiring' as const, daysRemaining: diffDays };
+    return { status: 'valid' as const, daysRemaining: diffDays };
+};
+
+const DocumentAlerts: React.FC<{ documents: ManagedDocument[] }> = ({ documents }) => {
+    const [isDismissed, setIsDismissed] = useState(() => sessionStorage.getItem('docAlertsDismissed') === 'true');
+
+    const alerts = useMemo(() => {
+        return documents
+            .map(doc => ({ ...doc, statusInfo: getDocumentStatus(doc.expiryDate, doc.alertThresholdDays) }))
+            .filter(doc => doc.statusInfo.status === 'expired' || doc.statusInfo.status === 'expiring');
+    }, [documents]);
+
+    if (isDismissed || alerts.length === 0) return null;
+
+    const handleDismiss = () => {
+        setIsDismissed(true);
+        sessionStorage.setItem('docAlertsDismissed', 'true');
+    };
+
+    return (
+        <div className="mb-4 p-4 rounded-lg border bg-slate-800/80 backdrop-blur-sm shadow-lg border-amber-500/40 text-amber-300">
+            <div className="flex justify-between items-start">
+                <div className="flex items-start">
+                    <BellIcon className="h-6 w-6 text-amber-400 mr-3 mt-1 flex-shrink-0" />
+                    <div>
+                        <h3 className="font-bold text-white">Alertas de Documentos</h3>
+                        <ul className="mt-1 list-disc list-inside text-sm">
+                            {alerts.map(doc => (
+                                <li key={doc.id}>
+                                    <span className="font-semibold">{doc.name}</span>
+                                    {doc.statusInfo.status === 'expired'
+                                        ? ` venció hace ${Math.abs(doc.statusInfo.daysRemaining)} días.`
+                                        : ` vence en ${doc.statusInfo.daysRemaining} días.`}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                </div>
+                <button onClick={handleDismiss} className="p-1 -mt-1 -mr-1 rounded-full hover:bg-slate-700" title="Cerrar alerta" aria-label="Cerrar alerta">
+                    <XIcon />
+                </button>
+            </div>
+        </div>
+    );
+};
+
+const DocumentManager: React.FC<{ documents: ManagedDocument[]; setDocuments: React.Dispatch<React.SetStateAction<ManagedDocument[]>> }> = ({ documents, setDocuments }) => {
+    const [isSectionOpen, setIsSectionOpen] = useState(false);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editingDoc, setEditingDoc] = useState<ManagedDocument | null>(null);
+
+    const handleAddNew = () => {
+        setEditingDoc(null);
+        setIsModalOpen(true);
+    };
+
+    const handleEdit = (doc: ManagedDocument) => {
+        setEditingDoc(doc);
+        setIsModalOpen(true);
+    };
+
+    const handleDelete = (id: string) => {
+        if (window.confirm("¿Estás seguro de que quieres eliminar este documento?")) {
+            setDocuments(docs => docs.filter(d => d.id !== id));
+        }
+    };
+
+    const handleSave = (doc: ManagedDocument) => {
+        if (editingDoc) {
+            setDocuments(docs => docs.map(d => (d.id === doc.id ? doc : d)));
+        } else {
+            setDocuments(docs => [...docs, { ...doc, id: Date.now().toString() }]);
+        }
+        setIsModalOpen(false);
+    };
+    
+    const formatDateForDisplay = (dateString: string) => {
+        if (!dateString) return 'N/A';
+        const date = new Date(dateString);
+        const localDate = new Date(date.getTime() + date.getTimezoneOffset() * 60000);
+        return localDate.toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
+    };
+
+    return (
+        <>
+            <section className="mt-12">
+                <div className="bg-slate-800/60 p-4 sm:p-6 rounded-2xl shadow-2xl border border-slate-700">
+                    <button onClick={() => setIsSectionOpen(!isSectionOpen)} className="w-full flex justify-between items-center text-left">
+                        <div className="flex items-center gap-3">
+                            <IdCardIcon className="h-6 w-6 text-teal-300" />
+                            <h2 className="text-xl font-bold text-teal-300">Documentos</h2>
+                        </div>
+                        <ChevronDownIcon className={`transform transition-transform duration-300 ${isSectionOpen ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isSectionOpen ? 'max-h-[1000px] mt-6' : 'max-h-0'}`}>
+                         <div className="border-t border-slate-700 pt-6 space-y-3">
+                            {documents.length === 0 ? (
+                                <p className="text-slate-500 text-center py-4">No has añadido ningún documento.</p>
+                            ) : (
+                                documents.map(doc => {
+                                    const { status, daysRemaining } = getDocumentStatus(doc.expiryDate, doc.alertThresholdDays);
+                                    const statusStyles = {
+                                        valid: { bg: 'bg-green-500/20', text: 'text-green-400', label: 'Vigente' },
+                                        expiring: { bg: 'bg-amber-500/20', text: 'text-amber-400', label: `Vence en ${daysRemaining} días` },
+                                        expired: { bg: 'bg-red-500/20', text: 'text-red-400', label: 'Vencido' },
+                                    };
+                                    const currentStatus = statusStyles[status];
+
+                                    return (
+                                        <div key={doc.id} className={`p-3 rounded-lg flex items-center justify-between gap-4 border border-slate-700 ${currentStatus.bg}`}>
+                                            <div className="flex-grow">
+                                                <p className="font-bold text-white">{doc.name}</p>
+                                                <p className="text-sm text-slate-400">Vence: {formatDateForDisplay(doc.expiryDate)}</p>
+                                                <p className={`text-xs font-semibold ${currentStatus.text}`}>{currentStatus.label}</p>
+                                            </div>
+                                            <div className="flex items-center gap-2 flex-shrink-0">
+                                                <button onClick={() => handleEdit(doc)} className="p-2 rounded-full bg-slate-700 hover:bg-cyan-600 text-slate-300 hover:text-white transition-colors duration-200" title="Editar"><EditIcon /></button>
+                                                <button onClick={() => handleDelete(doc.id)} className="p-2 rounded-full bg-slate-700 hover:bg-red-600 text-slate-300 hover:text-white transition-colors duration-200" title="Eliminar"><TrashIcon /></button>
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
+                            <button onClick={handleAddNew} className="w-full mt-4 bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg transition-all duration-300 flex items-center justify-center text-sm gap-2 hover:scale-105">
+                                <PlusCircleIcon /> Añadir Nuevo Documento
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            {isModalOpen && <DocumentModal doc={editingDoc} onSave={handleSave} onClose={() => setIsModalOpen(false)} />}
+        </>
+    );
+};
+
+const DocumentModal: React.FC<{ doc: ManagedDocument | null; onSave: (doc: ManagedDocument) => void; onClose: () => void; }> = ({ doc, onSave, onClose }) => {
+    const [formData, setFormData] = useState<Omit<ManagedDocument, 'id'>>({
+        name: doc?.name || '',
+        expiryDate: doc?.expiryDate || '',
+        alertThresholdDays: doc?.alertThresholdDays || '30',
+        imageSrc: doc?.imageSrc || '',
+    });
+    const [customName, setCustomName] = useState('');
+
+    useEffect(() => {
+        const commonNames = ["Licencia de Conducir", "SOAT", "Revisión Técnico-Mecánica"];
+        if (doc && !commonNames.includes(doc.name)) {
+            setFormData(prev => ({ ...prev, name: 'Otro' }));
+            setCustomName(doc.name);
+        }
+    }, [doc]);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setFormData(prev => ({ ...prev, imageSrc: reader.result as string }));
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const finalName = formData.name === 'Otro' ? customName : formData.name;
+        if (!finalName || !formData.expiryDate) {
+            alert("El nombre y la fecha de vencimiento son obligatorios.");
+            return;
+        }
+        onSave({ ...formData, name: finalName, id: doc?.id || '' });
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose} aria-modal="true" role="dialog">
+            <div className="bg-slate-800 border border-slate-600 rounded-2xl w-full max-w-md p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+                <h3 className="text-xl font-bold text-teal-300 mb-4">{doc ? 'Editar' : 'Añadir'} Documento</h3>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="text-sm font-medium text-slate-400 block mb-1">Nombre del Documento</label>
+                        <select name="name" value={formData.name} onChange={handleChange} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-white">
+                            <option value="" disabled>Selecciona uno...</option>
+                            <option value="Licencia de Conducir">Licencia de Conducir</option>
+                            <option value="SOAT">SOAT</option>
+                            <option value="Revisión Técnico-Mecánica">Revisión Técnico-Mecánica</option>
+                            <option value="Otro">Otro</option>
+                        </select>
+                    </div>
+                    {formData.name === 'Otro' && (
+                        <div>
+                            <label className="text-sm font-medium text-slate-400 block mb-1">Especifica el nombre</label>
+                            <input type="text" value={customName} onChange={e => setCustomName(e.target.value)} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-white" required />
+                        </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-sm font-medium text-slate-400 block mb-1">Fecha de Vencimiento</label>
+                            <input type="date" name="expiryDate" value={formData.expiryDate} onChange={handleChange} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-white" required />
+                        </div>
+                        <div>
+                            <label className="text-sm font-medium text-slate-400 block mb-1">Alerta (días antes)</label>
+                            <input type="number" name="alertThresholdDays" value={formData.alertThresholdDays} onChange={handleChange} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-white" />
+                        </div>
+                    </div>
+                     <div>
+                        <label className="text-sm font-medium text-slate-400 block mb-1">Foto del Documento (Opcional)</label>
+                        <div className="flex items-center gap-4">
+                            <label htmlFor="file-upload" className="cursor-pointer bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2">
+                                <CameraIcon /> Subir Foto
+                            </label>
+                            <input id="file-upload" name="file-upload" type="file" className="hidden" accept="image/*" onChange={handleFileChange} />
+                            {formData.imageSrc && <img src={formData.imageSrc} alt="Vista previa" className="h-10 w-10 object-cover rounded-md" />}
+                        </div>
+                    </div>
+                    <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
+                        <button type="button" onClick={onClose} className="py-2 px-4 bg-slate-600 hover:bg-slate-500 text-white rounded-lg font-semibold">Cancelar</button>
+                        <button type="submit" className="py-2 px-4 bg-teal-600 hover:bg-teal-500 text-white rounded-lg font-semibold">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+
 // --- MAIN APP COMPONENT ---
 const App: React.FC = () => {
   const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistoryFromLocalStorage());
   const [archivedHistory, setArchivedHistory] = useState<ArchivedHistory>(() => loadArchivedHistoryFromLocalStorage());
   const [viewingMonth, setViewingMonth] = useState<string>('current');
+  const [documents, setDocuments] = useState<ManagedDocument[]>(() => loadDocumentsFromLocalStorage());
   
   const getInitialFormData = useCallback((): FormData => {
     const routeSequence = ['60', '9', '11', '29'];
@@ -613,6 +915,10 @@ const App: React.FC = () => {
       saveHistoryToLocalStorage(history);
     }
   }, [history, viewingMonth]);
+
+  useEffect(() => {
+    saveDocumentsToLocalStorage(documents);
+  }, [documents]);
   
     useEffect(() => {
         const visualViewport = window.visualViewport;
@@ -1067,6 +1373,7 @@ const App: React.FC = () => {
         onClose={() => setToastMessage('')} 
       />
       <div className="max-w-6xl mx-auto">
+        <DocumentAlerts documents={documents} />
         <header className="mb-6">
             <div className="bg-gradient-to-b from-slate-800/60 to-slate-900/40 backdrop-blur-sm p-4 rounded-xl border border-cyan-500/20 shadow-lg">
                 <div className="flex justify-between items-center text-xs text-slate-400 mb-3">
@@ -1338,6 +1645,8 @@ const App: React.FC = () => {
                 )}
             </div>
         </section>
+
+        <DocumentManager documents={documents} setDocuments={setDocuments} />
 
         {/* Floating Action Buttons */}
         {!isViewingArchive && (
