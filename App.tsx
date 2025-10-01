@@ -29,11 +29,10 @@ interface HistoryEntry {
   results: CalculationResults;
 }
 
-const INITIAL_FORM_DATA: Omit<FormData, 'administrativeExpenses' | 'route'> = {
+const INITIAL_FORM_DATA: Omit<FormData, 'administrativeExpenses' | 'route' | 'commissionPerPassenger'> = {
   numPassengers: '',
   fareValue: '3.000',
   fixedCommission: '15',
-  commissionPerPassenger: '100',
   fuelExpenses: '',
   variableExpenses: '20.000',
 };
@@ -108,6 +107,26 @@ const loadHistoryFromLocalStorage = (): HistoryEntry[] => {
   } catch (error) {
     console.error("Error loading history from localStorage:", error);
     return [];
+  }
+};
+
+const COMMISSION_STORAGE_KEY = 'earningsCalculatorCommission';
+
+const saveCommissionToLocalStorage = (commission: string) => {
+  try {
+    localStorage.setItem(COMMISSION_STORAGE_KEY, commission);
+  } catch (error) {
+    console.error("Error saving commission to localStorage:", error);
+  }
+};
+
+const loadCommissionFromLocalStorage = (): string => {
+  try {
+    const savedCommission = localStorage.getItem(COMMISSION_STORAGE_KEY);
+    return savedCommission !== null ? savedCommission : '100'; // Default to '100'
+  } catch (error) {
+    console.error("Error loading commission from localStorage:", error);
+    return '100';
   }
 };
 
@@ -260,10 +279,10 @@ interface InputControlProps {
   
   const InputControl = React.forwardRef<HTMLInputElement, InputControlProps>(
     ({ label, name, value, onChange, onFocus, placeholder = '0', icon, unit }, ref) => (
-      <div className="bg-gray-800 p-3 rounded-lg flex items-center gap-4 border border-gray-700 transition-colors duration-300 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500">
-        <div className="text-gray-400">{icon}</div>
+      <div className="bg-slate-800/70 p-3 rounded-xl flex items-center gap-4 border border-slate-700 transition-all duration-300 focus-within:border-teal-400 focus-within:shadow-[0_0_20px_rgba(20,184,166,0.4)]">
+        <div className="text-teal-400">{icon}</div>
         <div className="flex-grow">
-          <label htmlFor={name} className="block text-xs font-medium text-gray-400 mb-1">
+          <label htmlFor={name} className="block text-xs font-medium text-slate-400 mb-1">
             {label}
           </label>
           <div className="relative">
@@ -276,7 +295,7 @@ interface InputControlProps {
               value={value}
               onChange={onChange}
               placeholder={placeholder}
-              className="w-full bg-transparent text-gray-100 placeholder-gray-500 focus:outline-none text-lg font-semibold"
+              className="w-full bg-transparent text-white placeholder-slate-500 focus:outline-none text-lg font-semibold"
               onFocus={(e) => {
                 e.target.select();
                 if (onFocus) onFocus(e);
@@ -284,7 +303,7 @@ interface InputControlProps {
               aria-label={label}
             />
             {unit && (
-              <span className="absolute inset-y-0 right-0 flex items-center text-gray-400 pointer-events-none text-base">
+              <span className="absolute inset-y-0 right-0 flex items-center text-slate-400 pointer-events-none text-base">
                 {unit}
               </span>
             )}
@@ -309,10 +328,10 @@ interface InputControlProps {
     };
   
     return (
-      <div className="p-3 rounded-lg border border-gray-700 bg-gray-800">
+      <div className="p-3 rounded-xl border border-slate-700 bg-slate-800/70">
         <div className="flex items-center gap-3 mb-3">
-          <div className="text-gray-400">{icon}</div>
-          <label className="block text-xs font-medium text-gray-400">{label}</label>
+          <div className="text-teal-400">{icon}</div>
+          <label className="block text-xs font-medium text-slate-400">{label}</label>
         </div>
         <div className="grid grid-cols-4 gap-2">
           {options.map(option => (
@@ -330,7 +349,7 @@ interface InputControlProps {
               <label
                 id={`label-${name}-${option}`}
                 htmlFor={`${name}-${option}`}
-                className="w-full block text-center py-2 px-2 border-2 border-gray-600 rounded-lg cursor-pointer transition-colors duration-300 font-semibold bg-gray-700 text-gray-300 peer-checked:bg-blue-600 peer-checked:text-white peer-checked:border-blue-500 hover:border-gray-500 text-sm"
+                className="w-full block text-center py-2 px-2 border-2 border-slate-700 rounded-lg cursor-pointer transition-all duration-300 font-semibold bg-slate-800 text-slate-300 peer-checked:bg-gradient-to-br peer-checked:from-cyan-500 peer-checked:to-teal-600 peer-checked:text-white peer-checked:border-teal-400 hover:border-slate-500 peer-checked:hover:from-cyan-600 peer-checked:hover:to-teal-700 text-sm"
               >
                 {option}
               </label>
@@ -360,9 +379,11 @@ const PassengerGoalProgress: React.FC<PassengerGoalProgressProps> = ({ totalPass
     let daysLeft = totalDaysInMonth - currentDayOfMonth + 1;
 
     // --- Workday Logic ---
-    // A workday is from 4:00 AM to 8:00 PM (20:00)
-    const isAfterWorkday = currentHour >= 20;
-    const isBeforeWorkday = currentHour < 4;
+    const WORKDAY_START_HOUR = 4;  // 4:00 AM
+    const WORKDAY_END_HOUR = 20;   // 8:00 PM
+    
+    const isBeforeWorkday = currentHour < WORKDAY_START_HOUR;
+    const isAfterWorkday = currentHour >= WORKDAY_END_HOUR;
 
     // If it's outside working hours, the current day doesn't count for making progress.
     if (isAfterWorkday || isBeforeWorkday) {
@@ -385,18 +406,18 @@ const PassengerGoalProgress: React.FC<PassengerGoalProgressProps> = ({ totalPass
   };
 
   return (
-    <div className="mb-6 p-5 bg-gray-800/50 rounded-lg border border-gray-700">
+    <div className="mb-6 p-5 bg-slate-900/50 rounded-lg border border-slate-700">
       <div className="flex items-center justify-between mb-3">
-         <h3 className="text-lg font-bold text-gray-200 flex items-center">
+         <h3 className="text-lg font-bold text-slate-300 flex items-center">
             <UsersIcon />
             <span className="ml-2">Meta Mensual de Pasajeros</span>
          </h3>
-         <span className="font-bold text-lg text-blue-300">{percentage.toFixed(1)}%</span>
+         <span className="font-bold text-lg text-teal-300">{percentage.toFixed(1)}%</span>
       </div>
 
-      <div className="w-full bg-gray-700 rounded-full h-4 mb-3 overflow-hidden">
+      <div className="w-full bg-slate-700 rounded-full h-4 mb-3 overflow-hidden">
         <div
-          className="bg-blue-600 h-4 rounded-full transition-all duration-500 ease-out"
+          className="bg-gradient-to-r from-teal-400 to-cyan-500 h-4 rounded-full transition-all duration-500 ease-out"
           style={{ width: `${percentage}%` }}
           role="progressbar"
           aria-valuenow={percentage}
@@ -405,24 +426,24 @@ const PassengerGoalProgress: React.FC<PassengerGoalProgressProps> = ({ totalPass
         ></div>
       </div>
 
-      <div className="flex justify-between text-sm text-gray-400 font-medium">
+      <div className="flex justify-between text-sm text-slate-400 font-medium">
         <span>Actual: <span className="text-white font-bold">{totalPassengers.toLocaleString('es-CO')}</span></span>
-        <span>Faltan: <span className="text-yellow-400 font-bold">{remaining.toLocaleString('es-CO')}</span></span>
+        <span>Faltan: <span className="text-amber-400 font-bold">{remaining.toLocaleString('es-CO')}</span></span>
         <span>Meta: <span className="text-green-400 font-bold">{goal.toLocaleString('es-CO')}</span></span>
       </div>
 
       {dailyGoal > 0 && (
-        <div className="text-center mt-5 pt-4 border-t border-gray-700/60">
-          <p className="text-sm text-gray-400">Para cumplir, necesitas un promedio de:</p>
-          <p className="text-2xl font-extrabold text-blue-300 my-1">
+        <div className="text-center mt-5 pt-4 border-t border-slate-700/60">
+          <p className="text-sm text-slate-400">Para cumplir, necesitas un promedio de:</p>
+          <p className="text-2xl font-extrabold text-teal-300 my-1">
             {dailyGoal.toLocaleString('es-CO')}
-            <span className="text-base font-medium text-gray-400 ml-1">pasajeros / día</span>
+            <span className="text-base font-medium text-slate-400 ml-1">pasajeros / día</span>
           </p>
-          <p className="text-xs text-gray-500">(Quedan {daysRemaining} días para finalizar el mes)</p>
+          <p className="text-xs text-slate-500">(Quedan {daysRemaining} días para finalizar el mes)</p>
         </div>
       )}
 
-       <p className="text-center text-sm text-gray-400 mt-4 italic">{getMotivationalMessage()}</p>
+       <p className="text-center text-sm text-slate-400 mt-4 italic">{getMotivationalMessage()}</p>
     </div>
   );
 };
@@ -452,7 +473,7 @@ const Toast: React.FC<ToastProps> = ({ message, show, onClose }) => {
       }`}
     >
       {show && (
-        <div role="alert" className="flex items-center p-4 max-w-sm bg-gray-800 text-white rounded-lg shadow-lg border border-gray-700">
+        <div role="alert" className="flex items-center p-4 max-w-sm bg-slate-800 text-white rounded-lg shadow-lg border border-teal-500/50">
           <CheckCircleIcon />
           <div className="ml-3 text-sm font-normal">{message}</div>
         </div>
@@ -519,6 +540,7 @@ const App: React.FC = () => {
     const isPastAdminLimit = history.length >= ADMIN_EXPENSE_DAYS_LIMIT;
     return {
       ...INITIAL_FORM_DATA,
+      commissionPerPassenger: loadCommissionFromLocalStorage(),
       route: dailyDefaultRoute,
       administrativeExpenses: isPastAdminLimit ? '0' : ADMIN_EXPENSE_VALUE,
     };
@@ -616,6 +638,10 @@ const App: React.FC = () => {
       }
     
       processedValue = formatNumberWithDots(cleanValue);
+
+      if (name === 'commissionPerPassenger') {
+        saveCommissionToLocalStorage(processedValue);
+      }
 
     } else if (numericOnlyFields.includes(name as keyof FormData)) {
       processedValue = value.replace(/[^\d]/g, '');
@@ -920,7 +946,7 @@ const App: React.FC = () => {
   }, [history]);
 
   const HistoryTableHeader = () => (
-    <div className="sticky top-0 z-10 bg-gray-800 p-4 hidden md:grid grid-cols-9 gap-x-4 text-sm font-bold text-gray-400 border-b border-gray-700">
+    <div className="sticky top-0 z-10 bg-slate-800/95 backdrop-blur-sm p-4 hidden md:grid grid-cols-9 gap-x-4 text-sm font-bold text-slate-400 border-b border-slate-700">
       <div className="col-span-2">Fecha</div>
       <div>Ruta</div>
       <div>Pasajeros</div>
@@ -947,7 +973,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-gray-200 p-4 sm:p-6 lg:p-8" onClick={handleBackgroundClick}>
+    <div className="min-h-screen bg-slate-900 text-white p-4 sm:p-6 lg:p-8" onClick={handleBackgroundClick}>
       <Toast 
         message={toastMessage} 
         show={!!toastMessage} 
@@ -955,34 +981,34 @@ const App: React.FC = () => {
       />
       <div className="max-w-6xl mx-auto">
         <header className="mb-6">
-            <div className="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-lg">
-                <div className="flex justify-between items-center text-xs text-gray-400 mb-3">
+            <div className="bg-gradient-to-b from-slate-800/60 to-slate-900/40 backdrop-blur-sm p-4 rounded-xl border border-cyan-500/20 shadow-lg">
+                <div className="flex justify-between items-center text-xs text-slate-400 mb-3">
                     <div className="flex items-center gap-1.5">
                         <CalendarIcon />
                         <span>{new Date().toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
                     </div>
                     <DigitalClock />
                 </div>
-                <div className="border-t border-gray-700 pt-3">
-                    <div className="text-center mb-4 pb-4 border-b border-gray-700">
-                        <div className="flex items-center justify-center gap-2 text-sm text-gray-300 mb-1">
+                <div className="border-t border-slate-700/60 pt-3">
+                    <div className="text-center mb-4 pb-4 border-b border-slate-700/60">
+                        <div className="flex items-center justify-center gap-2 text-sm text-slate-300 mb-1">
                             <ClipboardCheckIcon />
                             <span className="font-medium">Entrega</span>
                         </div>
-                        <p className="font-bold text-4xl text-blue-400 tracking-tight">{formatCurrency(results.amountToSettle)}</p>
+                        <p className="font-bold text-4xl text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-cyan-300 tracking-tight">{formatCurrency(results.amountToSettle)}</p>
                     </div>
                     <div className="grid grid-cols-3 gap-2">
                         <div className="text-center">
-                            <p className="text-xs text-gray-400">Mi Sueldo</p>
-                            <p className="font-semibold text-lg text-green-400">{formatCurrency(results.myEarnings)}</p>
+                            <p className="text-xs text-slate-400">Mi Sueldo</p>
+                            <p className="font-semibold text-lg text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-green-400">{formatCurrency(results.myEarnings)}</p>
                         </div>
                         <div className="text-center">
-                            <p className="text-xs text-gray-400">Gastos</p>
+                            <p className="text-xs text-slate-400">Gastos</p>
                              <p className="font-semibold text-lg text-orange-400">{formatCurrency(results.totalExpenses)}</p>
                         </div>
                         <div className="text-center">
-                            <p className="text-xs text-gray-400">Recaudado</p>
-                            <p className="font-semibold text-lg text-blue-400">{formatCurrency(results.totalRevenue)}</p>
+                            <p className="text-xs text-slate-400">Recaudado</p>
+                            <p className="font-semibold text-lg text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-blue-500">{formatCurrency(results.totalRevenue)}</p>
                         </div>
                     </div>
                 </div>
@@ -990,10 +1016,10 @@ const App: React.FC = () => {
         </header>
 
         <main>
-            <div className="bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 p-4 sm:p-6 space-y-6">
+            <div className="bg-slate-800/60 rounded-2xl shadow-2xl border border-slate-700 p-4 sm:p-6 space-y-6">
                 <div>
                      <div className="flex justify-between items-center mb-3">
-                        <h3 className="text-base font-semibold text-gray-200 ml-1">DATOS DEL DÍA</h3>
+                        <h3 className="text-base font-semibold text-teal-300 ml-1">DATOS DEL DÍA</h3>
                     </div>
                     <div className="space-y-3">
                         <InputControl label="Número de Pasajeros" name="numPassengers" value={formData.numPassengers} onChange={handleChange} onFocus={handleInputFocus} icon={<UsersIcon />} />
@@ -1006,7 +1032,7 @@ const App: React.FC = () => {
                     </div>
                 </div>
                 <div>
-                    <h3 className="text-base font-semibold text-orange-400 mb-3 ml-1">GASTOS DEL DÍA</h3>
+                    <h3 className="text-base font-semibold text-amber-400 mb-3 ml-1">GASTOS DEL DÍA</h3>
                     <div className="space-y-3">
                         <InputControl ref={fuelInputRef} label="Combustible" name="fuelExpenses" value={formData.fuelExpenses} onChange={handleChange} onFocus={handleInputFocus} icon={<FuelIcon />} unit="$" />
                         <InputControl label="Taller (Lavada, Engrase, etc.)" name="variableExpenses" value={formData.variableExpenses} onChange={handleChange} onFocus={handleInputFocus} icon={<WrenchIcon />} unit="$" placeholder="Valor Total" />
@@ -1018,12 +1044,12 @@ const App: React.FC = () => {
         
         {/* History Section */}
         <section className="mt-12">
-            <div className="bg-gray-800 p-4 sm:p-6 rounded-2xl shadow-2xl border border-gray-700">
+            <div className="bg-slate-800/60 p-4 sm:p-6 rounded-2xl shadow-2xl border border-slate-700">
                 <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-6">
                     <div className="flex items-center gap-3 mb-4 sm:mb-0">
-                        <h2 className="text-2xl font-bold text-gray-100">Historial</h2>
+                        <h2 className="text-2xl font-bold text-teal-300">Historial</h2>
                         {history.length > 0 && (
-                            <span className="bg-blue-600 text-blue-100 text-sm font-bold px-3 py-1 rounded-full">
+                            <span className="bg-teal-600/80 text-teal-100 text-sm font-bold px-3 py-1 rounded-full">
                                 {history.length} {history.length === 1 ? 'día laborado' : 'días laborados'}
                             </span>
                         )}
@@ -1042,42 +1068,42 @@ const App: React.FC = () => {
                       totalPassengers={historyTotals.totalPassengers} 
                       goal={PASSENGER_GOAL} 
                     />
-                    <div className="p-4 mt-6 bg-gray-900/50 rounded-lg border border-gray-700">
-                        <h3 className="text-lg font-bold text-gray-300 mb-3 text-center">Resumen Total del Historial</h3>
+                    <div className="p-4 mt-6 bg-slate-900/50 rounded-lg border border-slate-700">
+                        <h3 className="text-lg font-bold text-slate-300 mb-3 text-center">Resumen Total del Historial</h3>
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
                             <div>
-                                <p className="text-sm text-gray-400">Pasajeros Totales</p>
-                                <p className="text-xl font-bold text-blue-300">
+                                <p className="text-sm text-slate-400">Pasajeros Totales</p>
+                                <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-teal-400">
                                     {historyTotals.totalPassengers.toLocaleString('es-CO')}
                                 </p>
                             </div>
                              <div>
-                                <p className="text-sm text-gray-400">Ganancia Total</p>
-                                <p className="text-xl font-bold text-green-400">
+                                <p className="text-sm text-slate-400">Ganancia Total</p>
+                                <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-cyan-400">
                                     {formatCurrency(historyTotals.totalEarnings)}
                                 </p>
                                  <div className="mt-2 text-center">
-                                    <span className="text-sm font-bold text-blue-400">{formatCurrency(historyTotals.totalFixedCommission)}</span>
-                                    <p className="text-xs text-gray-400">15%</p>
-                                    <span className="text-sm font-bold text-green-400 mt-1 block">{formatCurrency(historyTotals.totalPerPassengerCommission)}</span>
-                                    <p className="text-xs text-gray-400">Comisión</p>
+                                    <span className="text-sm font-bold text-sky-400">{formatCurrency(historyTotals.totalFixedCommission)}</span>
+                                    <p className="text-xs text-slate-400">15%</p>
+                                    <span className="text-sm font-bold text-teal-400 mt-1 block">{formatCurrency(historyTotals.totalPerPassengerCommission)}</span>
+                                    <p className="text-xs text-slate-400">Comisión</p>
                                  </div>
                             </div>
                             <div>
-                                <p className="text-sm text-gray-400">Gastos Totales</p>
+                                <p className="text-sm text-slate-400">Gastos Totales</p>
                                 <p className="text-xl font-bold text-orange-400">
                                     {formatCurrency(historyTotals.totalExpenses)}
                                 </p>
                             </div>
                             <div>
-                                <p className="text-sm text-gray-400">Recaudado</p>
-                                <p className="text-xl font-bold text-blue-400">
+                                <p className="text-sm text-slate-400">Recaudado</p>
+                                <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-blue-500">
                                     {formatCurrency(historyTotals.totalDeliveredAmount)}
                                 </p>
                             </div>
                              <div>
-                                <p className="text-sm text-gray-400">En Empresa</p>
-                                <p className="text-xl font-bold text-indigo-400">
+                                <p className="text-sm text-slate-400">En Empresa</p>
+                                <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">
                                     {formatCurrency(historyTotals.totalAmountSettled)}
                                 </p>
                             </div>
@@ -1087,51 +1113,51 @@ const App: React.FC = () => {
                 )}
 
                 {history.length === 0 ? (
-                    <p className="text-gray-500 text-center py-8">No hay cálculos guardados.</p>
+                    <p className="text-slate-500 text-center py-8">No hay cálculos guardados.</p>
                 ) : (
-                    <div className="mt-6 md:border md:border-gray-700 md:rounded-lg md:max-h-[70vh] md:overflow-y-auto md:relative">
+                    <div className="mt-6 md:border md:border-slate-700 md:rounded-lg md:max-h-[70vh] md:overflow-y-auto md:relative">
                         <HistoryTableHeader />
                         <ul className="space-y-4 md:space-y-0">
                             {history.map((entry, index) => {
                                const isEditable = !isNaN(new Date(entry.timestamp).getTime());
                                const isExpanded = expandedId === entry.id;
                                return (
-                                <li key={entry.id} className="md:border-b md:border-gray-700 last:md:border-b-0">
+                                <li key={entry.id} className="md:border-b md:border-slate-700 last:md:border-b-0">
                                   {/* --- Mobile Card --- */}
-                                  <div className="md:hidden bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
-                                      <button onClick={() => handleToggleExpand(entry.id)} className="w-full p-4 text-left bg-gray-800 hover:bg-gray-700/50 transition-colors duration-200">
+                                  <div className="md:hidden bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+                                      <button onClick={() => handleToggleExpand(entry.id)} className="w-full p-4 text-left bg-slate-800 hover:bg-teal-500/10 transition-colors duration-200">
                                         <div className="flex justify-between items-start gap-4">
                                             <div>
-                                                <p className="font-semibold text-gray-300">{formatTimestamp(entry.timestamp)}</p>
-                                                <p className="text-sm text-gray-400">Ruta {entry.formData.route}</p>
+                                                <p className="font-semibold text-slate-300">{formatTimestamp(entry.timestamp)}</p>
+                                                <p className="text-sm text-slate-400">Ruta {entry.formData.route}</p>
                                             </div>
                                             <ChevronDownIcon className={`transform transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''} flex-shrink-0 mt-1`} />
                                         </div>
-                                        <div className="mt-3 pt-3 border-t border-gray-700/50 flex justify-between items-end">
+                                        <div className="mt-3 pt-3 border-t border-slate-700/50 flex justify-between items-end">
                                             <div>
-                                                <p className="text-xs text-gray-400">Ganancia</p>
+                                                <p className="text-xs text-slate-400">Ganancia</p>
                                                 <p className="font-bold text-green-400 text-lg leading-tight">{formatCurrency(entry.results.myEarnings)}</p>
                                             </div>
                                             <div className="text-right">
-                                                <p className="text-xs text-gray-400">Recaudado</p>
-                                                <p className="font-semibold text-blue-400 text-base leading-tight">{formatCurrency(entry.results.totalDeliveredAmount || 0)}</p>
+                                                <p className="text-xs text-slate-400">Recaudado</p>
+                                                <p className="font-semibold text-indigo-400 text-base leading-tight">{formatCurrency(entry.results.totalDeliveredAmount || 0)}</p>
                                             </div>
                                         </div>
                                       </button>
                                       
                                       <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isExpanded ? 'max-h-[500px]' : 'max-h-0'}`}>
-                                          <div className="px-4 pb-4 border-t border-gray-700/50">
+                                          <div className="px-4 pb-4 border-t border-teal-500/20">
                                             {/* Date Editing */}
                                             {editingTimestampId === entry.id ? (
                                                 <div className="flex items-center gap-2 my-3">
-                                                    <input type="datetime-local" value={tempTimestamp} onChange={(e) => setTempTimestamp(e.target.value)} className="bg-gray-700 border border-gray-600 rounded-md p-1 text-white focus:ring-blue-500 focus:border-blue-500 w-full" aria-label="Editar fecha y hora" />
-                                                    <button onClick={() => handleEditTimestampSave(entry.id)} title="Guardar" aria-label="Guardar fecha y hora" className="p-2 rounded-full bg-gray-700 hover:bg-green-600 text-gray-300 hover:text-white transition-colors duration-200"><CheckIcon /></button>
-                                                    <button onClick={handleEditTimestampCancel} title="Cancelar" aria-label="Cancelar edición" className="p-2 rounded-full bg-gray-700 hover:bg-red-600 text-gray-300 hover:text-white transition-colors duration-200"><XIcon /></button>
+                                                    <input type="datetime-local" value={tempTimestamp} onChange={(e) => setTempTimestamp(e.target.value)} className="bg-slate-700 border border-slate-600 rounded-md p-1 text-white focus:ring-teal-500 focus:border-teal-500 w-full" aria-label="Editar fecha y hora" />
+                                                    <button onClick={() => handleEditTimestampSave(entry.id)} title="Guardar" aria-label="Guardar fecha y hora" className="p-2 rounded-full bg-slate-700 hover:bg-green-600 text-slate-300 hover:text-white transition-colors duration-200"><CheckIcon /></button>
+                                                    <button onClick={handleEditTimestampCancel} title="Cancelar" aria-label="Cancelar edición" className="p-2 rounded-full bg-slate-700 hover:bg-red-600 text-slate-300 hover:text-white transition-colors duration-200"><XIcon /></button>
                                                 </div>
                                             ) : (
                                                 isEditable && (
                                                     <div className="flex justify-end pt-2">
-                                                        <button onClick={() => handleEditTimestampStart(entry.id, entry.timestamp)} title="Editar fecha" aria-label="Editar fecha" className="p-1 rounded-full text-gray-500 hover:bg-gray-700 hover:text-white transition-colors duration-200 flex items-center text-xs">
+                                                        <button onClick={() => handleEditTimestampStart(entry.id, entry.timestamp)} title="Editar fecha" aria-label="Editar fecha" className="p-1 rounded-full text-slate-500 hover:bg-slate-700 hover:text-white transition-colors duration-200 flex items-center text-xs">
                                                             <EditIcon /> <span className="ml-1">Editar Fecha</span>
                                                         </button>
                                                     </div>
@@ -1139,61 +1165,61 @@ const App: React.FC = () => {
                                             )}
                                              {/* Details Grid */}
                                             <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm mt-3">
-                                                <div><p className="text-gray-400">Pasajeros</p><p className="font-bold text-white text-base">{parseFormattedNumber(entry.formData.numPassengers)}</p></div>
-                                                <div><p className="text-gray-400">Gastos</p><p className="font-bold text-orange-400 text-base">{formatCurrency(entry.results.totalExpenses)}</p></div>
+                                                <div><p className="text-slate-400">Pasajeros</p><p className="font-bold text-white text-base">{parseFormattedNumber(entry.formData.numPassengers)}</p></div>
+                                                <div><p className="text-slate-400">Gastos</p><p className="font-bold text-amber-400 text-base">{formatCurrency(entry.results.totalExpenses)}</p></div>
                                                 <div className="col-span-2">
-                                                    <p className="text-gray-400">Desglose Ganancia</p>
-                                                    <div className="text-xs mt-1 text-gray-400 grid grid-cols-[auto_1fr] gap-x-4">
-                                                        <span>↳ Fija ({entry.formData.fixedCommission}%):</span><span className="font-medium text-blue-300 text-right">{formatCurrency(entry.results.fixedCommissionValue)}</span>
-                                                        <span>↳ Pasajeros:</span><span className="font-medium text-green-300 text-right">{formatCurrency(entry.results.perPassengerCommissionValue)}</span>
+                                                    <p className="text-slate-400">Desglose Ganancia</p>
+                                                    <div className="text-xs mt-1 text-slate-400 grid grid-cols-[auto_1fr] gap-x-4">
+                                                        <span>↳ Fija ({entry.formData.fixedCommission}%):</span><span className="font-medium text-sky-300 text-right">{formatCurrency(entry.results.fixedCommissionValue)}</span>
+                                                        <span>↳ Pasajeros:</span><span className="font-medium text-teal-300 text-right">{formatCurrency(entry.results.perPassengerCommissionValue)}</span>
                                                     </div>
                                                 </div>
-                                                <div className="col-span-2"><p className="text-gray-400">En Empresa</p><p className="font-bold text-blue-400 text-base">{formatCurrency(entry.results.amountToSettle)}</p></div>
+                                                <div className="col-span-2"><p className="text-slate-400">En Empresa</p><p className="font-bold text-blue-400 text-base">{formatCurrency(entry.results.amountToSettle)}</p></div>
                                             </div>
                                              {/* Actions */}
-                                            <div className="flex items-center space-x-2 mt-4 justify-start border-t border-gray-700 pt-3">
-                                                <button onClick={() => handleMoveEntryUp(entry.id)} title="Mover hacia arriba" aria-label="Mover hacia arriba" disabled={index === 0} className="p-2 rounded-full bg-gray-700 hover:bg-blue-600 text-gray-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowUpIcon /></button>
-                                                <button onClick={() => handleMoveEntryDown(entry.id)} title="Mover hacia abajo" aria-label="Mover hacia abajo" disabled={index === history.length - 1} className="p-2 rounded-full bg-gray-700 hover:bg-blue-600 text-gray-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowDownIcon /></button>
-                                                <button onClick={() => handleLoadEntry(entry.id)} title="Cargar este cálculo" aria-label="Cargar este cálculo" className="p-2 rounded-full bg-gray-700 hover:bg-blue-600 text-gray-300 hover:text-white transition-colors duration-200"><LoadIcon /></button>
-                                                <button onClick={() => handleDeleteEntry(entry.id)} title="Borrar este cálculo" aria-label="Borrar este cálculo" className="p-2 rounded-full bg-gray-700 hover:bg-red-600 text-gray-300 hover:text-white transition-colors duration-200"><TrashIcon /></button>
+                                            <div className="flex items-center space-x-2 mt-4 justify-start border-t border-slate-700 pt-3">
+                                                <button onClick={() => handleMoveEntryUp(entry.id)} title="Mover hacia arriba" aria-label="Mover hacia arriba" disabled={index === 0} className="p-2 rounded-full bg-slate-700 hover:bg-sky-600 text-slate-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowUpIcon /></button>
+                                                <button onClick={() => handleMoveEntryDown(entry.id)} title="Mover hacia abajo" aria-label="Mover hacia abajo" disabled={index === history.length - 1} className="p-2 rounded-full bg-slate-700 hover:bg-sky-600 text-slate-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowDownIcon /></button>
+                                                <button onClick={() => handleLoadEntry(entry.id)} title="Cargar este cálculo" aria-label="Cargar este cálculo" className="p-2 rounded-full bg-slate-700 hover:bg-cyan-600 text-slate-300 hover:text-white transition-colors duration-200"><LoadIcon /></button>
+                                                <button onClick={() => handleDeleteEntry(entry.id)} title="Borrar este cálculo" aria-label="Borrar este cálculo" className="p-2 rounded-full bg-slate-700 hover:bg-red-600 text-slate-300 hover:text-white transition-colors duration-200"><TrashIcon /></button>
                                             </div>
                                         </div>
                                       </div>
                                   </div>
 
                                   {/* --- Desktop Table Row --- */}
-                                  <div className="hidden md:p-4 md:grid md:grid-cols-9 md:gap-x-4 md:items-center bg-transparent even:bg-gray-800/60 odd:bg-transparent hover:bg-gray-700/50 transition-colors duration-200 group">
+                                  <div className="hidden md:p-4 md:grid md:grid-cols-9 md:gap-x-4 md:items-center bg-transparent even:bg-slate-900/60 odd:bg-transparent hover:bg-teal-500/10 transition-colors duration-200 group">
                                       <div className="md:col-span-2">
                                           {editingTimestampId === entry.id ? (
                                               <div className="flex items-center gap-2">
-                                                  <input type="datetime-local" value={tempTimestamp} onChange={(e) => setTempTimestamp(e.target.value)} className="bg-gray-700 border border-gray-600 rounded-md p-1 text-white focus:ring-blue-500 focus:border-blue-500 w-full" aria-label="Editar fecha y hora" />
-                                                  <button onClick={() => handleEditTimestampSave(entry.id)} title="Guardar" aria-label="Guardar fecha y hora" className="p-2 rounded-full bg-gray-700 hover:bg-green-600 text-gray-300 hover:text-white transition-colors duration-200"><CheckIcon /></button>
-                                                  <button onClick={handleEditTimestampCancel} title="Cancelar" aria-label="Cancelar edición" className="p-2 rounded-full bg-gray-700 hover:bg-red-600 text-gray-300 hover:text-white transition-colors duration-200"><XIcon /></button>
+                                                  <input type="datetime-local" value={tempTimestamp} onChange={(e) => setTempTimestamp(e.target.value)} className="bg-slate-700 border border-slate-600 rounded-md p-1 text-white focus:ring-teal-500 focus:border-teal-500 w-full" aria-label="Editar fecha y hora" />
+                                                  <button onClick={() => handleEditTimestampSave(entry.id)} title="Guardar" aria-label="Guardar fecha y hora" className="p-2 rounded-full bg-slate-700 hover:bg-green-600 text-slate-300 hover:text-white transition-colors duration-200"><CheckIcon /></button>
+                                                  <button onClick={handleEditTimestampCancel} title="Cancelar" aria-label="Cancelar edición" className="p-2 rounded-full bg-slate-700 hover:bg-red-600 text-slate-300 hover:text-white transition-colors duration-200"><XIcon /></button>
                                               </div>
                                           ) : (
                                               <div className="flex items-center gap-2">
-                                                  <p className="font-semibold text-gray-300 group-hover:text-white">{formatTimestamp(entry.timestamp)}</p>
+                                                  <p className="font-semibold text-slate-300 group-hover:text-white">{formatTimestamp(entry.timestamp)}</p>
                                                   {isEditable && (
-                                                      <button onClick={() => handleEditTimestampStart(entry.id, entry.timestamp)} title="Editar fecha" aria-label="Editar fecha" className="p-1 rounded-full text-gray-500 hover:bg-gray-700 hover:text-white transition-colors duration-200 opacity-0 group-hover:opacity-100 focus:opacity-100"><EditIcon /></button>
+                                                      <button onClick={() => handleEditTimestampStart(entry.id, entry.timestamp)} title="Editar fecha" aria-label="Editar fecha" className="p-1 rounded-full text-slate-500 hover:bg-slate-700 hover:text-white transition-colors duration-200 opacity-0 group-hover:opacity-100 focus:opacity-100"><EditIcon /></button>
                                                   )}
                                               </div>
                                           )}
                                       </div>
-                                      <div className="font-bold text-blue-400 text-base">{entry.formData.route}</div>
+                                      <div className="font-bold text-teal-400 text-base">{entry.formData.route}</div>
                                       <div className="font-bold text-white text-base">{parseFormattedNumber(entry.formData.numPassengers)}</div>
                                       <div className="text-center text-sm">
                                           <p className="font-bold text-green-400 text-base">{formatCurrency(entry.results.myEarnings)}</p>
-                                          <p className="text-xs text-blue-300">{formatCurrency(entry.results.fixedCommissionValue)} ({entry.formData.fixedCommission}%)</p>
-                                          <p className="text-xs text-green-300">{formatCurrency(entry.results.perPassengerCommissionValue)} (Pasajeros)</p>
+                                          <p className="text-xs text-sky-300">{formatCurrency(entry.results.fixedCommissionValue)} ({entry.formData.fixedCommission}%)</p>
+                                          <p className="text-xs text-teal-300">{formatCurrency(entry.results.perPassengerCommissionValue)} (Pasajeros)</p>
                                       </div>
-                                      <div className="font-bold text-orange-400 text-base text-center">{formatCurrency(entry.results.totalExpenses)}</div>
-                                      <div className="font-bold text-blue-400 text-base text-center">{formatCurrency(entry.results.totalDeliveredAmount || 0)}</div>
-                                      <div className="font-bold text-indigo-400 text-base text-center">{formatCurrency(entry.results.amountToSettle)}</div>
+                                      <div className="font-bold text-amber-400 text-base text-center">{formatCurrency(entry.results.totalExpenses)}</div>
+                                      <div className="font-bold text-indigo-400 text-base text-center">{formatCurrency(entry.results.totalDeliveredAmount || 0)}</div>
+                                      <div className="font-bold text-blue-400 text-base text-center">{formatCurrency(entry.results.amountToSettle)}</div>
                                       <div className="flex items-center space-x-2 justify-end">
-                                          <button onClick={() => handleMoveEntryUp(entry.id)} title="Mover hacia arriba" aria-label="Mover hacia arriba" disabled={index === 0} className="p-2 rounded-full bg-gray-700 hover:bg-blue-600 text-gray-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowUpIcon /></button>
-                                          <button onClick={() => handleMoveEntryDown(entry.id)} title="Mover hacia abajo" aria-label="Mover hacia abajo" disabled={index === history.length - 1} className="p-2 rounded-full bg-gray-700 hover:bg-blue-600 text-gray-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowDownIcon /></button>
-                                          <button onClick={() => handleLoadEntry(entry.id)} title="Cargar este cálculo" aria-label="Cargar este cálculo" className="p-2 rounded-full bg-gray-700 hover:bg-blue-600 text-gray-300 hover:text-white transition-colors duration-200"><LoadIcon /></button>
-                                          <button onClick={() => handleDeleteEntry(entry.id)} title="Borrar este cálculo" aria-label="Borrar este cálculo" className="p-2 rounded-full bg-gray-700 hover:bg-red-600 text-gray-300 hover:text-white transition-colors duration-200"><TrashIcon /></button>
+                                          <button onClick={() => handleMoveEntryUp(entry.id)} title="Mover hacia arriba" aria-label="Mover hacia arriba" disabled={index === 0} className="p-2 rounded-full bg-slate-700 hover:bg-sky-600 text-slate-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowUpIcon /></button>
+                                          <button onClick={() => handleMoveEntryDown(entry.id)} title="Mover hacia abajo" aria-label="Mover hacia abajo" disabled={index === history.length - 1} className="p-2 rounded-full bg-slate-700 hover:bg-sky-600 text-slate-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowDownIcon /></button>
+                                          <button onClick={() => handleLoadEntry(entry.id)} title="Cargar este cálculo" aria-label="Cargar este cálculo" className="p-2 rounded-full bg-slate-700 hover:bg-cyan-600 text-slate-300 hover:text-white transition-colors duration-200"><LoadIcon /></button>
+                                          <button onClick={() => handleDeleteEntry(entry.id)} title="Borrar este cálculo" aria-label="Borrar este cálculo" className="p-2 rounded-full bg-slate-700 hover:bg-red-600 text-slate-300 hover:text-white transition-colors duration-200"><TrashIcon /></button>
                                       </div>
                                   </div>
                                 </li>
@@ -1223,7 +1249,7 @@ const App: React.FC = () => {
                 className={`py-2 px-4 text-white rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ease-in-out focus:outline-none focus:ring-4 text-sm font-semibold ${
                     showSaveSuccessAnim 
                     ? 'bg-green-500 scale-110' 
-                    : 'bg-blue-600 hover:bg-blue-700 hover:scale-105 focus:ring-blue-500/50'
+                    : 'bg-gradient-to-br from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 hover:scale-105 focus:ring-purple-500/50'
                 }`}
                 title={editingId ? 'Actualizar Datos' : 'Guardar Datos'}
                 aria-label={editingId ? 'Actualizar Datos' : 'Guardar Datos'}
@@ -1233,7 +1259,7 @@ const App: React.FC = () => {
             <button 
                 onClick={handleClearForm} 
                 disabled={showSaveSuccessAnim}
-                className="py-2 px-4 bg-gray-700 hover:bg-gray-600 text-white rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-4 focus:ring-gray-600/50 text-sm font-semibold disabled:opacity-50"
+                className="py-2 px-4 bg-slate-700 hover:bg-slate-600 text-white rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-4 focus:ring-slate-600/50 text-sm font-semibold disabled:opacity-50"
                 title={editingId ? 'Cancelar Edición' : 'Limpiar Formulario'}
                 aria-label={editingId ? 'Cancelar Edición' : 'Limpiar Formulario'}
             >
