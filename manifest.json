@@ -1,0 +1,22 @@
+{
+  "name": "Calculadora de Ganancias para Conductor",
+  "short_name": "Control Conductor",
+  "description": "Una aplicación web para que los conductores de autobús calculen sus ganancias diarias, gastos y el monto a liquidar al propietario del vehículo.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
