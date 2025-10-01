@@ -4,16 +4,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Control Diario de Conductor</title>
-
-    <!-- PWA Meta Tags -->
-    <link rel="manifest" href="manifest.json" />
-    <meta name="theme-color" content="#0f172a" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Control Conductor" />
-    <link rel="apple-touch-icon" href="icon-192.png" />
-    <!-- End PWA Meta Tags -->
-
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,15 +11,7 @@
     <style>
       body {
         font-family: 'Inter', sans-serif;
-        background-color: #0f172a; /* bg-slate-900 */
-        background-image: radial-gradient(circle at top, rgba(34, 211, 238, 0.15) 0%, transparent 40%);
-      }
-      @keyframes pulse-glow {
-        0%, 100% { box-shadow: 0 0 15px rgba(20, 184, 166, 0.5); }
-        50% { box-shadow: 0 0 25px rgba(20, 184, 166, 0.7); }
-      }
-      .route-checkbox:checked + label {
-        animation: pulse-glow 2.5s infinite ease-in-out;
+        background-color: #111827; /* bg-gray-900 */
       }
     </style>
   <script type="importmap">
@@ -44,21 +26,8 @@
 </script>
 
 </head>
-  <body class="bg-slate-900">
+  <body class="bg-gray-900">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/service-worker.js')
-            .then(registration => {
-              console.log('ServiceWorker registration successful with scope: ', registration.scope);
-            })
-            .catch(err => {
-              console.log('ServiceWorker registration failed: ', err);
-            });
-        });
-      }
-    </script>
   </body>
 </html>
