@@ -33,7 +33,7 @@ interface ManagedDocument {
   id: string;
   name: string;
   expiryDate: string; // YYYY-MM-DD
-  alertThresholdDays: string;
+  alertDateTime?: string; // ISO string for exact alert time
   imageSrc?: string; // Base64 data URL
 }
 
@@ -611,9 +611,10 @@ const DigitalClock: React.FC = () => {
 
 
 // --- DOCUMENT MANAGER COMPONENTS ---
-const getDocumentStatus = (expiryDate: string, alertThresholdDays: string) => {
+const getDocumentStatus = (expiryDate: string, alertDateTime: string | undefined) => {
     if (!expiryDate) return { status: 'valid' as const, daysRemaining: Infinity };
 
+    const now = new Date();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -624,10 +625,15 @@ const getDocumentStatus = (expiryDate: string, alertThresholdDays: string) => {
     const diffTime = expiryLocal.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-    const threshold = parseInt(alertThresholdDays, 10) || 30;
-
     if (diffDays < 0) return { status: 'expired' as const, daysRemaining: diffDays };
-    if (diffDays <= threshold) return { status: 'expiring' as const, daysRemaining: diffDays };
+
+    if (alertDateTime) {
+        const alertD = new Date(alertDateTime);
+        if (now.getTime() >= alertD.getTime()) {
+            return { status: 'expiring' as const, daysRemaining: diffDays };
+        }
+    }
+    
     return { status: 'valid' as const, daysRemaining: diffDays };
 };
 
@@ -636,7 +642,7 @@ const DocumentAlerts: React.FC<{ documents: ManagedDocument[] }> = ({ documents 
 
     const alerts = useMemo(() => {
         return documents
-            .map(doc => ({ ...doc, statusInfo: getDocumentStatus(doc.expiryDate, doc.alertThresholdDays) }))
+            .map(doc => ({ ...doc, statusInfo: getDocumentStatus(doc.expiryDate, doc.alertDateTime) }))
             .filter(doc => doc.statusInfo.status === 'expired' || doc.statusInfo.status === 'expiring');
     }, [documents]);
 
@@ -729,7 +735,7 @@ const DocumentManager: React.FC<{ documents: ManagedDocument[]; setDocuments: Re
                                 <p className="text-slate-500 text-center py-4">No has añadido ningún documento.</p>
                             ) : (
                                 documents.map(doc => {
-                                    const { status, daysRemaining } = getDocumentStatus(doc.expiryDate, doc.alertThresholdDays);
+                                    const { status, daysRemaining } = getDocumentStatus(doc.expiryDate, doc.alertDateTime);
                                     const statusStyles = {
                                         valid: { bg: 'bg-green-500/20', text: 'text-green-400', label: 'Vigente' },
                                         expiring: { bg: 'bg-amber-500/20', text: 'text-amber-400', label: `Vence en ${daysRemaining} días` },
@@ -768,7 +774,7 @@ const DocumentModal: React.FC<{ doc: ManagedDocument | null; onSave: (doc: Manag
     const [formData, setFormData] = useState<Omit<ManagedDocument, 'id'>>({
         name: doc?.name || '',
         expiryDate: doc?.expiryDate || '',
-        alertThresholdDays: doc?.alertThresholdDays || '30',
+        alertDateTime: doc?.alertDateTime || '',
         imageSrc: doc?.imageSrc || '',
     });
     const [customName, setCustomName] = useState('');
@@ -827,14 +833,14 @@ const DocumentModal: React.FC<{ doc: ManagedDocument | null; onSave: (doc: Manag
                             <input type="text" value={customName} onChange={e => setCustomName(e.target.value)} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-white" required />
                         </div>
                     )}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label className="text-sm font-medium text-slate-400 block mb-1">Fecha de Vencimiento</label>
                             <input type="date" name="expiryDate" value={formData.expiryDate} onChange={handleChange} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-white" required />
                         </div>
                         <div>
-                            <label className="text-sm font-medium text-slate-400 block mb-1">Alerta (días antes)</label>
-                            <input type="number" name="alertThresholdDays" value={formData.alertThresholdDays} onChange={handleChange} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-white" />
+                            <label className="text-sm font-medium text-slate-400 block mb-1">Fecha y Hora de Alerta</label>
+                            <input type="datetime-local" name="alertDateTime" value={formData.alertDateTime} onChange={handleChange} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-white" />
                         </div>
                     </div>
                      <div>
