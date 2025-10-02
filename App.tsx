@@ -37,6 +37,16 @@ interface ManagedDocument {
   imageSrc?: string; // Base64 data URL
 }
 
+interface MaintenanceRecord {
+  id: string;
+  type: string;
+  cost: string; // Formatted number
+  date: string; // YYYY-MM-DD
+  mileage?: string; // Optional, formatted number
+  notes?: string;
+}
+
+
 type ArchivedHistory = Record<string, HistoryEntry[]>;
 
 
@@ -191,6 +201,27 @@ const loadDocumentsFromLocalStorage = (): ManagedDocument[] => {
   }
 };
 
+const MAINTENANCE_STORAGE_KEY = 'driverAppMaintenance';
+
+const saveMaintenanceToLocalStorage = (records: MaintenanceRecord[]) => {
+  try {
+    localStorage.setItem(MAINTENANCE_STORAGE_KEY, JSON.stringify(records));
+  } catch (error) {
+    console.error("Error saving maintenance records:", error);
+  }
+};
+
+const loadMaintenanceFromLocalStorage = (): MaintenanceRecord[] => {
+  try {
+    const savedRecords = localStorage.getItem(MAINTENANCE_STORAGE_KEY);
+    return savedRecords ? JSON.parse(savedRecords) : [];
+  } catch (error) {
+    console.error("Error loading maintenance records:", error);
+    return [];
+  }
+};
+
+
 // --- SVG ICONS ---
 const UsersIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -222,8 +253,8 @@ const FuelIcon = () => (
     </svg>
 );
 
-const WrenchIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+const WrenchIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className || "h-5 w-5"} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066 2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
         <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
     </svg>
@@ -611,6 +642,25 @@ const DigitalClock: React.FC = () => {
 
 
 // --- DOCUMENT MANAGER COMPONENTS ---
+const playNotificationSound = () => {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    if (!audioContext) return; 
+
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(880, audioContext.currentTime); 
+    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+
+    gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.5);
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.5);
+};
+
 const getDocumentStatus = (expiryDate: string, alertDateTime: string | undefined) => {
     if (!expiryDate) return { status: 'valid' as const, daysRemaining: Infinity };
 
@@ -646,6 +696,16 @@ const DocumentAlerts: React.FC<{ documents: ManagedDocument[] }> = ({ documents 
             .filter(doc => doc.statusInfo.status === 'expired' || doc.statusInfo.status === 'expiring');
     }, [documents]);
 
+    useEffect(() => {
+        if (alerts.length > 0 && !isDismissed) {
+            try {
+                playNotificationSound();
+            } catch (e) {
+                console.warn("Could not play notification sound due to browser policy:", e);
+            }
+        }
+    }, [alerts, isDismissed]);
+
     if (isDismissed || alerts.length === 0) return null;
 
     const handleDismiss = () => {
@@ -660,16 +720,16 @@ const DocumentAlerts: React.FC<{ documents: ManagedDocument[] }> = ({ documents 
             role="dialog"
         >
             <div className="bg-slate-800 border-2 border-amber-500/60 rounded-2xl w-full max-w-lg p-6 shadow-2xl text-center animate-fade-in-scale">
-                <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-amber-500/20 mb-4 border-2 border-amber-500/50">
+                <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-amber-500/20 mb-4 border-2 border-amber-500/50 animate-pulse-bell">
                     <BellIcon className="h-8 w-8 text-amber-400" />
                 </div>
                 <h3 className="text-2xl font-bold text-amber-300 mb-2">¡Atención! Documentos Importantes</h3>
-                <p className="text-slate-400 mb-6">Los siguientes documentos requieren tu atención inmediata:</p>
+                <p className="text-slate-400 mb-6 leading-relaxed">Los siguientes documentos requieren tu atención inmediata:</p>
                 
                 <ul className="space-y-3 text-left">
                     {alerts.map(doc => (
-                        <li key={doc.id} className="p-3 rounded-lg flex items-center justify-between gap-4 border border-slate-700 bg-slate-900/50">
-                             <div>
+                        <li key={doc.id} className="p-3 rounded-lg flex items-center justify-between gap-4 border border-amber-500/20 bg-gradient-to-r from-amber-500/10 to-transparent">
+                             <div className="leading-relaxed">
                                 <p className="font-bold text-white">{doc.name}</p>
                                 <p className={`text-sm font-semibold ${doc.statusInfo.status === 'expired' ? 'text-red-400' : 'text-amber-400'}`}>
                                     {doc.statusInfo.status === 'expired'
@@ -875,6 +935,190 @@ const DocumentModal: React.FC<{ doc: ManagedDocument | null; onSave: (doc: Manag
     );
 };
 
+// --- MAINTENANCE MANAGER COMPONENTS ---
+const MaintenanceModal: React.FC<{ record: MaintenanceRecord | null; onSave: (record: MaintenanceRecord) => void; onClose: () => void; }> = ({ record, onSave, onClose }) => {
+    const [formData, setFormData] = useState<Omit<MaintenanceRecord, 'id'>>({
+        type: record?.type || '',
+        cost: record?.cost || '',
+        date: record?.date || new Date().toISOString().split('T')[0],
+        mileage: record?.mileage || '',
+        notes: record?.notes || '',
+    });
+    const [customType, setCustomType] = useState('');
+
+    useEffect(() => {
+        const commonTypes = ["Cambio de Aceite", "Frenos", "Llantas", "Revisión General"];
+        if (record && !commonTypes.includes(record.type)) {
+            setFormData(prev => ({ ...prev, type: 'Otro' }));
+            setCustomType(record.type);
+        }
+    }, [record]);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+        const { name, value } = e.target;
+        if (name === 'cost' || name === 'mileage') {
+            setFormData({ ...formData, [name]: formatNumberWithDots(value) });
+        } else {
+            setFormData({ ...formData, [name]: value });
+        }
+    };
+    
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const finalType = formData.type === 'Otro' ? customType : formData.type;
+        if (!finalType || !formData.cost || !formData.date) {
+            alert("El tipo, costo y fecha del mantenimiento son obligatorios.");
+            return;
+        }
+        onSave({ ...formData, type: finalType, id: record?.id || '' });
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose} aria-modal="true" role="dialog">
+            <div className="bg-slate-800 border border-slate-600 rounded-2xl w-full max-w-md p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+                <h3 className="text-xl font-bold text-teal-300 mb-4">{record ? 'Editar' : 'Añadir'} Mantenimiento</h3>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="text-sm font-medium text-slate-400 block mb-1">Tipo de Mantenimiento</label>
+                        <select name="type" value={formData.type} onChange={handleChange} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-white">
+                            <option value="" disabled>Selecciona uno...</option>
+                            <option value="Cambio de Aceite">Cambio de Aceite</option>
+                            <option value="Frenos">Frenos</option>
+                            <option value="Llantas">Llantas</option>
+                            <option value="Revisión General">Revisión General</option>
+                            <option value="Otro">Otro...</option>
+                        </select>
+                    </div>
+                    {formData.type === 'Otro' && (
+                        <div>
+                            <label className="text-sm font-medium text-slate-400 block mb-1">Especifica el tipo</label>
+                            <input type="text" value={customType} onChange={e => setCustomType(e.target.value)} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-white" required />
+                        </div>
+                    )}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-sm font-medium text-slate-400 block mb-1">Costo</label>
+                            <input type="text" inputMode="numeric" name="cost" value={formData.cost} onChange={handleChange} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-white" required />
+                        </div>
+                        <div>
+                            <label className="text-sm font-medium text-slate-400 block mb-1">Fecha</label>
+                            <input type="date" name="date" value={formData.date} onChange={handleChange} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-white" required />
+                        </div>
+                    </div>
+                     <div>
+                        <label className="text-sm font-medium text-slate-400 block mb-1">Kilometraje (Opcional)</label>
+                        <input type="text" inputMode="numeric" name="mileage" value={formData.mileage} onChange={handleChange} placeholder="Ej: 123.456" className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-white" />
+                    </div>
+                     <div>
+                        <label className="text-sm font-medium text-slate-400 block mb-1">Notas (Opcional)</label>
+                        <textarea name="notes" value={formData.notes} onChange={handleChange} rows={2} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-white"></textarea>
+                    </div>
+                    <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
+                        <button type="button" onClick={onClose} className="py-2 px-4 bg-slate-600 hover:bg-slate-500 text-white rounded-lg font-semibold">Cancelar</button>
+                        <button type="submit" className="py-2 px-4 bg-teal-600 hover:bg-teal-500 text-white rounded-lg font-semibold">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+const VehicleMaintenanceManager: React.FC<{ records: MaintenanceRecord[]; setRecords: React.Dispatch<React.SetStateAction<MaintenanceRecord[]>> }> = ({ records, setRecords }) => {
+    const [isSectionOpen, setIsSectionOpen] = useState(false);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editingRecord, setEditingRecord] = useState<MaintenanceRecord | null>(null);
+
+    const sortedRecords = useMemo(() => {
+        return [...records].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }, [records]);
+
+    const totalCost = useMemo(() => {
+        return records.reduce((sum, record) => sum + (parseFloat(parseFormattedNumber(record.cost)) || 0), 0);
+    }, [records]);
+
+    const handleAddNew = () => {
+        setEditingRecord(null);
+        setIsModalOpen(true);
+    };
+
+    const handleEdit = (record: MaintenanceRecord) => {
+        setEditingRecord(record);
+        setIsModalOpen(true);
+    };
+
+    const handleDelete = (id: string) => {
+        if (window.confirm("¿Estás seguro de que quieres eliminar este registro de mantenimiento?")) {
+            setRecords(prev => prev.filter(r => r.id !== id));
+        }
+    };
+
+    const handleSave = (record: MaintenanceRecord) => {
+        if (editingRecord) {
+            setRecords(prev => prev.map(r => (r.id === record.id ? record : r)));
+        } else {
+            setRecords(prev => [...prev, { ...record, id: Date.now().toString() }]);
+        }
+        setIsModalOpen(false);
+    };
+    
+    const formatDateForDisplay = (dateString: string) => {
+        if (!dateString) return 'N/A';
+        const date = new Date(dateString);
+        const localDate = new Date(date.getTime() + date.getTimezoneOffset() * 60000);
+        return localDate.toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
+    };
+
+    return (
+        <>
+            <section className="mt-12">
+                <div className="bg-slate-800/60 p-4 sm:p-6 rounded-2xl shadow-2xl border border-slate-700">
+                    <button onClick={() => setIsSectionOpen(!isSectionOpen)} className="w-full flex justify-between items-center text-left">
+                        <div className="flex items-center gap-3">
+                            <WrenchIcon className="h-6 w-6 text-teal-300" />
+                            <h2 className="text-xl font-bold text-teal-300">Mantenimiento del Vehículo</h2>
+                        </div>
+                        <ChevronDownIcon className={`transform transition-transform duration-300 ${isSectionOpen ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isSectionOpen ? 'max-h-[2000px] mt-6' : 'max-h-0'}`}>
+                         <div className="border-t border-slate-700 pt-6 space-y-3">
+                            {sortedRecords.length === 0 ? (
+                                <p className="text-slate-500 text-center py-4">No has añadido ningún registro de mantenimiento.</p>
+                            ) : (
+                                <>
+                                <div className="p-3 mb-4 bg-slate-900/50 rounded-lg border border-slate-700 text-center">
+                                    <p className="text-sm text-slate-400">Costo Total en Mantenimientos</p>
+                                    <p className="text-2xl font-bold text-amber-400">{formatCurrency(totalCost)}</p>
+                                </div>
+                                {sortedRecords.map(record => (
+                                    <div key={record.id} className="p-3 rounded-lg flex items-start justify-between gap-4 border border-slate-700 bg-slate-800/50">
+                                        <div className="flex-grow">
+                                            <p className="font-bold text-white">{record.type}</p>
+                                            <p className="text-sm text-slate-400">{formatDateForDisplay(record.date)}</p>
+                                            <p className="font-semibold text-amber-300 text-base">{formatCurrency(parseFloat(parseFormattedNumber(record.cost)))}</p>
+                                            {record.mileage && <p className="text-xs text-slate-500 mt-1">Kilometraje: {record.mileage} km</p>}
+                                            {record.notes && <p className="text-xs text-slate-400 mt-1 italic">Nota: {record.notes}</p>}
+                                        </div>
+                                        <div className="flex items-center gap-2 flex-shrink-0">
+                                            <button onClick={() => handleEdit(record)} className="p-2 rounded-full bg-slate-700 hover:bg-cyan-600 text-slate-300 hover:text-white transition-colors duration-200" title="Editar"><EditIcon /></button>
+                                            <button onClick={() => handleDelete(record.id)} className="p-2 rounded-full bg-slate-700 hover:bg-red-600 text-slate-300 hover:text-white transition-colors duration-200" title="Eliminar"><TrashIcon /></button>
+                                        </div>
+                                    </div>
+                                ))}
+                                </>
+                            )}
+                            <button onClick={handleAddNew} className="w-full mt-4 bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg transition-all duration-300 flex items-center justify-center text-sm gap-2 hover:scale-105">
+                                <PlusCircleIcon /> Añadir Mantenimiento
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            {isModalOpen && <MaintenanceModal record={editingRecord} onSave={handleSave} onClose={() => setIsModalOpen(false)} />}
+        </>
+    );
+};
+
 
 // --- MAIN APP COMPONENT ---
 const App: React.FC = () => {
@@ -882,7 +1126,8 @@ const App: React.FC = () => {
   const [archivedHistory, setArchivedHistory] = useState<ArchivedHistory>(() => loadArchivedHistoryFromLocalStorage());
   const [viewingMonth, setViewingMonth] = useState<string>('current');
   const [documents, setDocuments] = useState<ManagedDocument[]>(() => loadDocumentsFromLocalStorage());
-  
+  const [maintenanceRecords, setMaintenanceRecords] = useState<MaintenanceRecord[]>(() => loadMaintenanceFromLocalStorage());
+
   const getInitialFormData = useCallback((): FormData => {
     const routeSequence = ['60', '9', '11', '29'];
     // Anchor date: A day known to correspond to the start of the sequence ('60').
@@ -937,7 +1182,11 @@ const App: React.FC = () => {
   useEffect(() => {
     saveDocumentsToLocalStorage(documents);
   }, [documents]);
-  
+
+  useEffect(() => {
+    saveMaintenanceToLocalStorage(maintenanceRecords);
+  }, [maintenanceRecords]);
+
     useEffect(() => {
         const visualViewport = window.visualViewport;
         if (!visualViewport) return;
@@ -1664,6 +1913,8 @@ const App: React.FC = () => {
             </div>
         </section>
 
+        <VehicleMaintenanceManager records={maintenanceRecords} setRecords={setMaintenanceRecords} />
+        
         <DocumentManager documents={documents} setDocuments={setDocuments} />
 
         {/* Floating Action Buttons */}
