@@ -1,4 +1,51 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { GoogleGenAI, FunctionDeclaration, Type } from "@google/genai";
+
+// Fix: Add types for Web Speech API which are missing from default TypeScript DOM typings.
+// This is necessary for the voice assistant feature to compile.
+interface SpeechRecognitionEvent extends Event {
+  readonly resultIndex: number;
+  readonly results: SpeechRecognitionResultList;
+}
+interface SpeechRecognitionResultList {
+  readonly length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+interface SpeechRecognitionResult {
+  readonly isFinal: boolean;
+  readonly length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
+}
+interface SpeechRecognitionAlternative {
+  readonly transcript: string;
+  readonly confidence: number;
+}
+interface SpeechRecognitionErrorEvent extends Event {
+  readonly error: string;
+}
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start(): void;
+  stop(): void;
+  onresult: (event: SpeechRecognitionEvent) => void;
+  onerror: (event: SpeechRecognitionErrorEvent) => void;
+  onend: () => void;
+}
+declare var SpeechRecognition: {
+  prototype: SpeechRecognition;
+  new(): SpeechRecognition;
+};
+declare global {
+  interface Window {
+    SpeechRecognition: typeof SpeechRecognition;
+    webkitSpeechRecognition: typeof SpeechRecognition;
+  }
+}
+
 
 // --- TYPE DEFINITIONS ---
 interface FormData {
@@ -30,7 +77,7 @@ interface HistoryEntry {
 }
 
 interface ManagedDocument {
-  id: string;
+  id:string;
   name: string;
   expiryDate: string; // YYYY-MM-DD
   alertDateTime?: string; // ISO string for exact alert time
@@ -46,6 +93,8 @@ interface MaintenanceRecord {
   filterChangeMileage?: string; // for oil changes
   notes?: string;
 }
+
+type AssistantStatus = 'idle' | 'listening' | 'processing' | 'success' | 'error';
 
 
 const INITIAL_FORM_DATA: Omit<FormData, 'administrativeExpenses' | 'route' | 'commissionPerPassenger'> = {
@@ -356,6 +405,12 @@ const SearchIcon: React.FC = () => (
     </svg>
 );
 
+const MicrophoneIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className || "h-6 w-6"} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+    </svg>
+);
+
 // --- REUSABLE UI COMPONENTS ---
 interface InputControlProps {
     label: string;
@@ -367,11 +422,12 @@ interface InputControlProps {
     icon: React.ReactNode;
     unit?: string;
     disabled?: boolean;
+    isHighlighted?: boolean;
   }
   
   const InputControl = React.forwardRef<HTMLInputElement, InputControlProps>(
-    ({ label, name, value, onChange, onFocus, placeholder = '0', icon, unit, disabled = false }, ref) => (
-      <div className={`bg-slate-800/70 p-3 rounded-xl flex items-center gap-4 border border-slate-700 transition-all duration-300 ${!disabled && 'focus-within:border-teal-400 focus-within:shadow-[0_0_20px_rgba(20,184,166,0.4)]'}`}>
+    ({ label, name, value, onChange, onFocus, placeholder = '0', icon, unit, disabled = false, isHighlighted = false }, ref) => (
+      <div className={`bg-slate-800/70 p-3 rounded-xl flex items-center gap-4 border border-slate-700 transition-all duration-300 ${!disabled && 'focus-within:border-teal-400 focus-within:shadow-[0_0_20px_rgba(20,184,166,0.4)]'} ${isHighlighted ? 'border-green-400 shadow-[0_0_20px_rgba(74,222,128,0.5)]' : ''}`}>
         <div className="text-teal-400">{icon}</div>
         <div className="flex-grow">
           <label htmlFor={name} className="block text-xs font-medium text-slate-400 mb-1">
@@ -1040,9 +1096,8 @@ const MaintenanceModal: React.FC<{ record: MaintenanceRecord | null; onSave: (re
     );
 };
 
-const VehicleMaintenanceManager: React.FC<{ records: MaintenanceRecord[]; setRecords: React.Dispatch<React.SetStateAction<MaintenanceRecord[]>> }> = ({ records, setRecords }) => {
+const VehicleMaintenanceManager: React.FC<{ records: MaintenanceRecord[]; setRecords: React.Dispatch<React.SetStateAction<MaintenanceRecord[]>>; openModalWithRecord: (record: MaintenanceRecord) => void; }> = ({ records, setRecords, openModalWithRecord }) => {
     const [isSectionOpen, setIsSectionOpen] = useState(false);
-    const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingRecord, setEditingRecord] = useState<MaintenanceRecord | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -1084,28 +1139,17 @@ const VehicleMaintenanceManager: React.FC<{ records: MaintenanceRecord[]; setRec
 
 
     const handleAddNew = () => {
-        setEditingRecord(null);
-        setIsModalOpen(true);
+        openModalWithRecord(null);
     };
 
     const handleEdit = (record: MaintenanceRecord) => {
-        setEditingRecord(record);
-        setIsModalOpen(true);
+        openModalWithRecord(record);
     };
 
     const handleDelete = (id: string) => {
         if (window.confirm("¿Estás seguro de que quieres eliminar este registro de mantenimiento?")) {
             setRecords(prev => prev.filter(r => r.id !== id));
         }
-    };
-
-    const handleSave = (record: MaintenanceRecord) => {
-        if (editingRecord) {
-            setRecords(prev => prev.map(r => (r.id === record.id ? record : r)));
-        } else {
-            setRecords(prev => [...prev, { ...record, id: Date.now().toString() }]);
-        }
-        setIsModalOpen(false);
     };
 
     return (
@@ -1174,7 +1218,6 @@ const VehicleMaintenanceManager: React.FC<{ records: MaintenanceRecord[]; setRec
                     </div>
                 </div>
             </section>
-            {isModalOpen && <MaintenanceModal record={editingRecord} onSave={handleSave} onClose={() => setIsModalOpen(false)} />}
         </>
     );
 };
@@ -1222,6 +1265,17 @@ const App: React.FC = () => {
   const [fabBottom, setFabBottom] = useState('1.5rem');
   const [showSaveSuccessAnim, setShowSaveSuccessAnim] = useState(false);
   
+  // Voice Assistant State
+  const [isAssistantModalOpen, setIsAssistantModalOpen] = useState(false);
+  const [assistantStatus, setAssistantStatus] = useState<AssistantStatus>('idle');
+  const [transcript, setTranscript] = useState('');
+  const [lastUpdatedFields, setLastUpdatedFields] = useState<string[]>([]);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+
+  // Maintenance Modal State
+  const [isMaintenanceModalOpen, setIsMaintenanceModalOpen] = useState(false);
+  const [editingMaintenanceRecord, setEditingMaintenanceRecord] = useState<MaintenanceRecord | null>(null);
+
   const fuelInputRef = useRef<HTMLInputElement>(null);
 
   // State for draggable FAB
@@ -1617,6 +1671,162 @@ const App: React.FC = () => {
         totalPerPassengerCommission: 0,
     });
   }, [history]);
+
+    // --- Voice Assistant ---
+  const processVoiceCommand = useCallback(async (text: string) => {
+    setAssistantStatus('processing');
+    try {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const updateFieldDeclaration: FunctionDeclaration = {
+            name: 'update_day_fields',
+            description: 'Updates one or more fields for the daily driving record.',
+            parameters: {
+                type: Type.OBJECT,
+                properties: {
+                    numPassengers: { type: Type.INTEGER, description: 'The number of passengers.' },
+                    fuelExpenses: { type: Type.INTEGER, description: 'The total cost of fuel.' },
+                    variableExpenses: { type: Type.INTEGER, description: 'Variable expenses like workshop, washing, etc.' },
+                    route: { type: Type.STRING, description: 'The route number, must be one of [9, 11, 29, 60].' },
+                },
+            },
+        };
+        const createMaintenanceDeclaration: FunctionDeclaration = {
+            name: 'create_maintenance_record',
+            description: 'Creates a new maintenance record for the vehicle.',
+            parameters: {
+                type: Type.OBJECT,
+                properties: {
+                    type: { type: Type.STRING, description: 'The type of maintenance performed (e.g., "Cambio de Aceite", "Frenos").' },
+                    mileage: { type: Type.INTEGER, description: 'The vehicle mileage when the maintenance was done.' },
+                    notes: { type: Type.STRING, description: 'Any additional notes about the maintenance.' },
+                },
+                required: ['type'],
+            },
+        };
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: `Entendido, procesa este comando de voz de un conductor de bus: "${text}"`,
+            config: {
+                tools: [{ functionDeclarations: [updateFieldDeclaration, createMaintenanceDeclaration] }],
+            },
+        });
+        
+        const functionCalls = response.functionCalls;
+        if (!functionCalls || functionCalls.length === 0) {
+            throw new Error("No pude entender el comando. Inténtalo de nuevo.");
+        }
+
+        const call = functionCalls[0];
+        const updatedFields: string[] = [];
+
+        if (call.name === 'update_day_fields') {
+            const { numPassengers, fuelExpenses, variableExpenses, route } = call.args;
+            setFormData(prev => {
+                const newState = { ...prev };
+                if (numPassengers !== undefined) {
+                    newState.numPassengers = numPassengers.toString();
+                    updatedFields.push('numPassengers');
+                }
+                if (fuelExpenses !== undefined) {
+                    newState.fuelExpenses = formatNumberWithDots(fuelExpenses.toString());
+                    updatedFields.push('fuelExpenses');
+                }
+                if (variableExpenses !== undefined) {
+                    newState.variableExpenses = formatNumberWithDots(variableExpenses.toString());
+                    updatedFields.push('variableExpenses');
+                }
+                if (route !== undefined) {
+                    newState.route = route.toString();
+                }
+                return newState;
+            });
+            setLastUpdatedFields(updatedFields);
+            setTimeout(() => setLastUpdatedFields([]), 2000); // Clear highlight after 2s
+        } else if (call.name === 'create_maintenance_record') {
+            const { type, mileage, notes } = call.args;
+            const newRecord: Omit<MaintenanceRecord, 'id'> = {
+                type: type,
+                date: new Date().toISOString().split('T')[0],
+                mileage: mileage ? formatNumberWithDots(mileage.toString()) : '',
+                notes: notes || '',
+            };
+             // Open modal with pre-filled data
+            setEditingMaintenanceRecord({ ...newRecord, id: '' });
+            setIsMaintenanceModalOpen(true);
+        }
+
+        setAssistantStatus('success');
+    } catch (error) {
+        console.error("Error processing voice command:", error);
+        setAssistantStatus('error');
+    } finally {
+        setTimeout(() => {
+            setIsAssistantModalOpen(false);
+            setAssistantStatus('idle');
+        }, 1500);
+    }
+}, []);
+
+const startListening = useCallback(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        alert("Tu navegador no soporta el reconocimiento de voz.");
+        return;
+    }
+    if (!recognitionRef.current) {
+        recognitionRef.current = new SpeechRecognition();
+        recognitionRef.current.continuous = false;
+        recognitionRef.current.lang = 'es-CO';
+        recognitionRef.current.interimResults = true;
+
+        recognitionRef.current.onresult = (event) => {
+            let interimTranscript = '';
+            let finalTranscript = '';
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                    finalTranscript += event.results[i][0].transcript;
+                } else {
+                    interimTranscript += event.results[i][0].transcript;
+                }
+            }
+            setTranscript(finalTranscript || interimTranscript);
+            if (finalTranscript) {
+                processVoiceCommand(finalTranscript);
+            }
+        };
+        recognitionRef.current.onerror = (event) => {
+            console.error('Speech recognition error', event.error);
+            setAssistantStatus('error');
+             setTimeout(() => setIsAssistantModalOpen(false), 2000);
+        };
+        recognitionRef.current.onend = () => {
+             if (assistantStatus === 'listening') { // Only transition if it was actively listening
+                setAssistantStatus('processing');
+            }
+        };
+    }
+
+    setTranscript('');
+    setAssistantStatus('listening');
+    setIsAssistantModalOpen(true);
+    recognitionRef.current.start();
+}, [processVoiceCommand, assistantStatus]);
+  
+  const handleOpenMaintenanceModal = (record: MaintenanceRecord | null) => {
+    setEditingMaintenanceRecord(record);
+    setIsMaintenanceModalOpen(true);
+  };
+
+  const handleSaveMaintenanceRecord = (record: MaintenanceRecord) => {
+    if (editingMaintenanceRecord) { // Editing existing
+      setMaintenanceRecords(prev => prev.map(r => (r.id === record.id ? record : r)));
+    } else { // Adding new
+      setMaintenanceRecords(prev => [...prev, { ...record, id: Date.now().toString() }]);
+    }
+    setIsMaintenanceModalOpen(false);
+    setEditingMaintenanceRecord(null);
+  };
   
   const HistoryTableHeader = () => (
     <div className="sticky top-0 z-10 bg-slate-800/95 backdrop-blur-sm p-4 hidden md:grid grid-cols-9 gap-x-4 text-sm font-bold text-slate-400 border-b border-slate-700">
@@ -1645,6 +1855,39 @@ const App: React.FC = () => {
     }
   };
 
+  const VoiceAssistantModal = () => {
+    if (!isAssistantModalOpen) return null;
+
+    const statusInfo = {
+        listening: { icon: <MicrophoneIcon className="h-16 w-16 text-cyan-400 animate-pulse" />, text: "Escuchando..." },
+        processing: { icon: <div className="h-16 w-16 border-4 border-t-cyan-400 border-slate-600 rounded-full animate-spin"></div>, text: "Procesando..." },
+        success: { icon: <CheckCircleIcon />, text: "¡Listo! Datos actualizados." },
+        error: { icon: <XIcon />, text: "No te entendí bien. Inténtalo de nuevo." },
+        idle: { icon: null, text: "" },
+    };
+
+    return (
+        <div className="fixed inset-0 z-[100] bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center p-4 animate-fade-in-backdrop">
+            <div className="flex flex-col items-center justify-center gap-8">
+                <div className="flex items-center justify-center h-24 w-24">
+                  {statusInfo[assistantStatus].icon}
+                </div>
+                <h3 className="text-2xl font-bold text-slate-200">{statusInfo[assistantStatus].text}</h3>
+                <p className="text-slate-400 text-lg min-h-[2.5em] text-center italic">"{transcript}"</p>
+            </div>
+            <button 
+                onClick={() => {
+                    recognitionRef.current?.stop();
+                    setIsAssistantModalOpen(false);
+                }}
+                className="absolute bottom-10 py-2 px-6 bg-slate-700 hover:bg-slate-600 text-white rounded-full font-semibold"
+            >
+                Cancelar
+            </button>
+        </div>
+    );
+};
+
   return (
     <div className="min-h-screen bg-slate-900 text-white p-4 sm:p-6 lg:p-8" onClick={handleBackgroundClick}>
       <Toast 
@@ -1652,6 +1895,8 @@ const App: React.FC = () => {
         show={!!toastMessage} 
         onClose={() => setToastMessage('')} 
       />
+      <VoiceAssistantModal />
+      {isMaintenanceModalOpen && <MaintenanceModal record={editingMaintenanceRecord} onSave={handleSaveMaintenanceRecord} onClose={() => setIsMaintenanceModalOpen(false)} />}
       <div className="max-w-6xl mx-auto">
         <DocumentAlerts documents={documents} />
         <header className="mb-6">
@@ -1698,7 +1943,7 @@ const App: React.FC = () => {
                       <h3 className="text-base font-semibold text-teal-300 ml-1">DATOS DEL DÍA</h3>
                   </div>
                   <div className="space-y-3">
-                      <InputControl label="Número de Pasajeros" name="numPassengers" value={formData.numPassengers} onChange={handleChange} onFocus={handleInputFocus} icon={<UsersIcon />} />
+                      <InputControl label="Número de Pasajeros" name="numPassengers" value={formData.numPassengers} onChange={handleChange} onFocus={handleInputFocus} icon={<UsersIcon />} isHighlighted={lastUpdatedFields.includes('numPassengers')} />
                       <div className="grid grid-cols-2 gap-3">
                           <InputControl label="Valor Pasaje" name="fareValue" value={formData.fareValue} onChange={handleChange} onFocus={handleInputFocus} icon={<MoneyIcon />} unit="$" />
                           <InputControl label="Comisión Fija" name="fixedCommission" value={formData.fixedCommission} onChange={handleChange} onFocus={handleInputFocus} icon={<PercentageIcon />} unit="%" />
@@ -1710,8 +1955,8 @@ const App: React.FC = () => {
               <div>
                   <h3 className="text-base font-semibold text-amber-400 mb-3 ml-1">GASTOS DEL DÍA</h3>
                   <div className="space-y-3">
-                      <InputControl ref={fuelInputRef} label="Combustible" name="fuelExpenses" value={formData.fuelExpenses} onChange={handleChange} onFocus={handleInputFocus} icon={<FuelIcon />} unit="$" />
-                      <InputControl label="Taller (Lavada, Engrase, etc.)" name="variableExpenses" value={formData.variableExpenses} onChange={handleChange} onFocus={handleInputFocus} icon={<WrenchIcon />} unit="$" placeholder="Valor Total" />
+                      <InputControl ref={fuelInputRef} label="Combustible" name="fuelExpenses" value={formData.fuelExpenses} onChange={handleChange} onFocus={handleInputFocus} icon={<FuelIcon />} unit="$" isHighlighted={lastUpdatedFields.includes('fuelExpenses')} />
+                      <InputControl label="Taller (Lavada, Engrase, etc.)" name="variableExpenses" value={formData.variableExpenses} onChange={handleChange} onFocus={handleInputFocus} icon={<WrenchIcon />} unit="$" placeholder="Valor Total" isHighlighted={lastUpdatedFields.includes('variableExpenses')} />
                       <InputControl label="Gastos Administrativos" name="administrativeExpenses" value={formData.administrativeExpenses} onChange={handleChange} onFocus={handleInputFocus} icon={<BriefcaseIcon />} unit="$" />
                   </div>
               </div>
@@ -1898,45 +2143,59 @@ const App: React.FC = () => {
             </div>
         </section>
 
-        <VehicleMaintenanceManager records={maintenanceRecords} setRecords={setMaintenanceRecords} />
+        <VehicleMaintenanceManager records={maintenanceRecords} setRecords={setMaintenanceRecords} openModalWithRecord={handleOpenMaintenanceModal} />
         
         <DocumentManager documents={documents} setDocuments={setDocuments} />
 
         {/* Floating Action Buttons */}
         <div
           className="fixed right-6 sm:right-8 z-40 flex flex-col items-end gap-3 transition-[bottom] duration-300 ease-in-out"
-          onMouseDown={handleDragStart}
-          onTouchStart={handleDragStart}
           style={{ 
               bottom: fabBottom,
-              transform: `translate(${position.x}px, ${position.y}px)`,
-              cursor: isDragging ? 'grabbing' : 'grab',
-              touchAction: 'none',
-              userSelect: 'none',
           }}
         >
-            <button 
-                onClick={handleSaveCalculation} 
-                disabled={showSaveSuccessAnim}
-                className={`py-2 px-4 text-white rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ease-in-out focus:outline-none focus:ring-4 text-sm font-semibold ${
-                    showSaveSuccessAnim 
-                    ? 'bg-green-500 scale-110' 
-                    : 'bg-gradient-to-br from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 hover:scale-105 focus:ring-purple-500/50'
-                }`}
-                title={editingId ? 'Actualizar Datos' : 'Guardar Datos'}
-                aria-label={editingId ? 'Actualizar Datos' : 'Guardar Datos'}
+             <button
+              onClick={startListening}
+              className="w-14 h-14 rounded-full bg-gradient-to-br from-cyan-500 to-teal-500 hover:from-cyan-600 hover:to-teal-600 text-white flex items-center justify-center shadow-lg hover:scale-105 transition-transform duration-200 focus:outline-none focus:ring-4 focus:ring-cyan-500/50"
+              title="Asistente de Voz"
+              aria-label="Activar asistente de voz"
             >
-              {showSaveSuccessAnim ? <CheckIcon /> : (editingId ? 'Actualizar' : 'Guardar')}
+              <MicrophoneIcon className="w-7 h-7" />
             </button>
-            <button 
-                onClick={handleClearForm} 
-                disabled={showSaveSuccessAnim}
-                className="py-2 px-4 bg-slate-700 hover:bg-slate-600 text-white rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-4 focus:ring-slate-600/50 text-sm font-semibold disabled:opacity-50"
-                title={editingId ? 'Cancelar Edición' : 'Limpiar Formulario'}
-                aria-label={editingId ? 'Cancelar Edición' : 'Limpiar Formulario'}
-            >
-                {editingId ? 'Cancelar' : 'Limpiar'}
-            </button>
+            <div
+                onMouseDown={handleDragStart}
+                onTouchStart={handleDragStart}
+                style={{ 
+                    transform: `translate(${position.x}px, ${position.y}px)`,
+                    cursor: isDragging ? 'grabbing' : 'grab',
+                    touchAction: 'none',
+                    userSelect: 'none',
+                }}
+                className="flex flex-col items-end gap-3"
+              >
+                <button 
+                    onClick={handleSaveCalculation} 
+                    disabled={showSaveSuccessAnim}
+                    className={`py-2 px-4 text-white rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ease-in-out focus:outline-none focus:ring-4 text-sm font-semibold ${
+                        showSaveSuccessAnim 
+                        ? 'bg-green-500 scale-110' 
+                        : 'bg-gradient-to-br from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 hover:scale-105 focus:ring-purple-500/50'
+                    }`}
+                    title={editingId ? 'Actualizar Datos' : 'Guardar Datos'}
+                    aria-label={editingId ? 'Actualizar Datos' : 'Guardar Datos'}
+                >
+                  {showSaveSuccessAnim ? <CheckIcon /> : (editingId ? 'Actualizar' : 'Guardar')}
+                </button>
+                <button 
+                    onClick={handleClearForm} 
+                    disabled={showSaveSuccessAnim}
+                    className="py-2 px-4 bg-slate-700 hover:bg-slate-600 text-white rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-4 focus:ring-slate-600/50 text-sm font-semibold disabled:opacity-50"
+                    title={editingId ? 'Cancelar Edición' : 'Limpiar Formulario'}
+                    aria-label={editingId ? 'Cancelar Edición' : 'Limpiar Formulario'}
+                >
+                    {editingId ? 'Cancelar' : 'Limpiar'}
+                </button>
+            </div>
         </div>
 
       </div>
