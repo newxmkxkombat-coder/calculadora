@@ -176,7 +176,7 @@ const saveMaintenanceToLocalStorage = (records: MaintenanceRecord[]) => {
   try {
     localStorage.setItem(MAINTENANCE_STORAGE_KEY, JSON.stringify(records));
   } catch (error) {
-    console.error("Error saving maintenance records:", error);
+    console.error("Error saving maintenance records to localStorage:", error);
   }
 };
 
@@ -347,6 +347,12 @@ const CameraIcon = () => (
 const PlusCircleIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+);
+
+const SearchIcon: React.FC = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
     </svg>
 );
 
@@ -900,7 +906,7 @@ const DocumentModal: React.FC<{ doc: ManagedDocument | null; onSave: (doc: Manag
 // --- MAINTENANCE MANAGER COMPONENTS ---
 const MaintenanceModal: React.FC<{ record: MaintenanceRecord | null; onSave: (record: MaintenanceRecord) => void; onClose: () => void; }> = ({ record, onSave, onClose }) => {
     const [formData, setFormData] = useState<Omit<MaintenanceRecord, 'id'>>({
-        type: record?.type || '',
+        type: record?.type || 'Otro',
         date: record?.date || new Date().toISOString().split('T')[0],
         mileage: record?.mileage || '',
         nextChangeMileage: record?.nextChangeMileage || '',
@@ -980,7 +986,6 @@ const MaintenanceModal: React.FC<{ record: MaintenanceRecord | null; onSave: (re
                     <div>
                         <label className="text-sm font-medium text-slate-400 block mb-1">Tipo de Mantenimiento</label>
                         <select name="type" value={formData.type} onChange={handleChange} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-white">
-                            <option value="" disabled>Selecciona uno...</option>
                             <option value="Cambio de Aceite">Cambio de Aceite</option>
                             <option value="Frenos">Frenos</option>
                             <option value="Llantas">Llantas</option>
@@ -1039,23 +1044,43 @@ const VehicleMaintenanceManager: React.FC<{ records: MaintenanceRecord[]; setRec
     const [isSectionOpen, setIsSectionOpen] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingRecord, setEditingRecord] = useState<MaintenanceRecord | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
 
-    const sortedRecords = useMemo(() => {
-        return [...records].sort((a, b) => {
+    const formatDateForDisplay = useCallback((dateString: string) => {
+        if (!dateString) return 'N/A';
+        const date = new Date(dateString);
+        const localDate = new Date(date.getTime() + date.getTimezoneOffset() * 60000);
+        return localDate.toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    }, []);
+
+    const filteredRecords = useMemo(() => {
+        const lowercasedFilter = searchTerm.toLowerCase();
+
+        const filtered = records.filter(record => {
+            if (!searchTerm.trim()) return true;
+
+            const formattedDate = formatDateForDisplay(record.date).toLowerCase();
+
+            return (
+                record.type.toLowerCase().includes(lowercasedFilter) ||
+                (record.notes && record.notes.toLowerCase().includes(lowercasedFilter)) ||
+                (record.mileage && record.mileage.includes(searchTerm)) ||
+                (record.filterChangeMileage && record.filterChangeMileage.includes(searchTerm)) ||
+                (record.nextChangeMileage && record.nextChangeMileage.includes(searchTerm)) ||
+                formattedDate.includes(lowercasedFilter)
+            );
+        });
+
+        return [...filtered].sort((a, b) => {
             const isA_OilChange = a.type === 'Cambio de Aceite';
             const isB_OilChange = b.type === 'Cambio de Aceite';
 
-            if (isA_OilChange && !isB_OilChange) {
-                return -1; // a (oil change) comes before b
-            }
-            if (!isA_OilChange && isB_OilChange) {
-                return 1; // b (oil change) comes before a
-            }
+            if (isA_OilChange && !isB_OilChange) return -1;
+            if (!isA_OilChange && isB_OilChange) return 1;
 
-            // If both are oil changes or both are not, sort by date descending
             return new Date(b.date).getTime() - new Date(a.date).getTime();
         });
-    }, [records]);
+    }, [records, searchTerm, formatDateForDisplay]);
 
 
     const handleAddNew = () => {
@@ -1082,13 +1107,6 @@ const VehicleMaintenanceManager: React.FC<{ records: MaintenanceRecord[]; setRec
         }
         setIsModalOpen(false);
     };
-    
-    const formatDateForDisplay = (dateString: string) => {
-        if (!dateString) return 'N/A';
-        const date = new Date(dateString);
-        const localDate = new Date(date.getTime() + date.getTimezoneOffset() * 60000);
-        return localDate.toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    };
 
     return (
         <>
@@ -1104,10 +1122,29 @@ const VehicleMaintenanceManager: React.FC<{ records: MaintenanceRecord[]; setRec
 
                     <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isSectionOpen ? 'max-h-[2000px] mt-6' : 'max-h-0'}`}>
                          <div className="border-t border-slate-700 pt-6 space-y-3">
-                            {sortedRecords.length === 0 ? (
-                                <p className="text-slate-500 text-center py-4">No has añadido ningún registro de mantenimiento.</p>
+                            <div className="relative mb-4">
+                                <span className="absolute inset-y-0 left-0 flex items-center pl-3">
+                                    <SearchIcon />
+                                </span>
+                                <input
+                                    type="text"
+                                    placeholder="Buscar por tipo, nota, fecha, km..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-full bg-slate-700/80 border border-slate-600 rounded-lg py-2 pl-10 pr-4 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                                    aria-label="Buscar en mantenimiento"
+                                />
+                            </div>
+
+                            {filteredRecords.length === 0 ? (
+                                <p className="text-slate-500 text-center py-4">
+                                    {searchTerm 
+                                        ? `No se encontraron resultados para "${searchTerm}".` 
+                                        : "No has añadido ningún registro de mantenimiento."
+                                    }
+                                </p>
                             ) : (
-                                sortedRecords.map(record => (
+                                filteredRecords.map(record => (
                                     <div key={record.id} className="p-3 rounded-lg flex items-start justify-between gap-4 border border-slate-700 bg-slate-800/50">
                                         <div className="flex-grow">
                                             <p className="font-bold text-white">{record.type}</p>
