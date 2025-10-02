@@ -933,6 +933,17 @@ const MaintenanceModal: React.FC<{ record: MaintenanceRecord | null; onSave: (re
         }
     }, [formData.mileage, formData.type]);
 
+    useEffect(() => {
+        if (formData.type !== 'Cambio de Aceite') {
+            setFormData(prev => ({
+                ...prev,
+                mileage: '',
+                filterChangeMileage: '',
+                nextChangeMileage: '',
+            }));
+        }
+    }, [formData.type]);
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
         if (name === 'mileage' || name === 'nextChangeMileage' || name === 'filterChangeMileage') {
@@ -989,12 +1000,14 @@ const MaintenanceModal: React.FC<{ record: MaintenanceRecord | null; onSave: (re
                             <label className="text-sm font-medium text-slate-400 block mb-1">Fecha</label>
                             <input type="date" name="date" value={formData.date} onChange={handleChange} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-white" required />
                         </div>
-                        <div>
-                            <label className="text-sm font-medium text-slate-400 block mb-1">
-                                Kilometraje {formData.type !== 'Cambio de Aceite' && '(Opcional)'}
-                            </label>
-                            <input type="text" inputMode="numeric" name="mileage" value={formData.mileage} onChange={handleChange} placeholder="Ej: 123.456" className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-white" required={formData.type === 'Cambio de Aceite'} />
-                        </div>
+                        {formData.type === 'Cambio de Aceite' && (
+                            <div>
+                                <label className="text-sm font-medium text-slate-400 block mb-1">
+                                    Kilometraje
+                                </label>
+                                <input type="text" inputMode="numeric" name="mileage" value={formData.mileage} onChange={handleChange} placeholder="Ej: 123.456" className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-white" required />
+                            </div>
+                        )}
                     </div>
                     {formData.type === 'Cambio de Aceite' && (
                         <>
