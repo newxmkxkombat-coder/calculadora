@@ -185,7 +185,7 @@ const loadMaintenanceFromLocalStorage = (): MaintenanceRecord[] => {
     const savedRecords = localStorage.getItem(MAINTENANCE_STORAGE_KEY);
     return savedRecords ? JSON.parse(savedRecords) : [];
   } catch (error) {
-    console.error("Error loading maintenance records:", error);
+    console.error("Error loading maintenance records from localStorage:", error);
     return [];
   }
 };
@@ -1022,8 +1022,8 @@ const MaintenanceModal: React.FC<{ record: MaintenanceRecord | null; onSave: (re
                         </>
                     )}
                      <div>
-                        <label className="text-sm font-medium text-slate-400 block mb-1">Notas (Opcional)</label>
-                        <textarea name="notes" value={formData.notes} onChange={handleChange} rows={2} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-white"></textarea>
+                        <label className="text-sm font-medium text-slate-400 block mb-1">Notas</label>
+                        <textarea name="notes" value={formData.notes} onChange={handleChange} rows={2} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-white" placeholder="Añade una nota..."></textarea>
                     </div>
                     <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
                         <button type="button" onClick={onClose} className="py-2 px-4 bg-slate-600 hover:bg-slate-500 text-white rounded-lg font-semibold">Cancelar</button>
