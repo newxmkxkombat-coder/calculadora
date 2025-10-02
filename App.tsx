@@ -40,14 +40,12 @@ interface ManagedDocument {
 interface MaintenanceRecord {
   id: string;
   type: string;
-  cost: string; // Formatted number
   date: string; // YYYY-MM-DD
   mileage?: string; // Optional, formatted number
+  nextChangeMileage?: string; // for oil changes
+  filterChangeMileage?: string; // for oil changes
   notes?: string;
 }
-
-
-type ArchivedHistory = Record<string, HistoryEntry[]>;
 
 
 const INITIAL_FORM_DATA: Omit<FormData, 'administrativeExpenses' | 'route' | 'commissionPerPassenger'> = {
@@ -102,16 +100,6 @@ const formatTimestamp = (isoString: string): string => {
   }
 };
 
-const formatMonthYear = (monthKey: string): string => {
-  const [year, month] = monthKey.split('-');
-  const date = new Date(parseInt(year), parseInt(month) - 1);
-  return date.toLocaleDateString('es-CO', {
-    month: 'long',
-    year: 'numeric',
-  });
-};
-
-
 const formatNumberWithDots = (value: string): string => {
   if (!value) return '';
   const cleanValue = value.replace(/[^\d]/g, '');
@@ -140,25 +128,6 @@ const loadHistoryFromLocalStorage = (): HistoryEntry[] => {
     return [];
   }
 };
-
-const saveArchivedHistoryToLocalStorage = (archives: ArchivedHistory) => {
-  try {
-    localStorage.setItem('archivedEarningsHistory', JSON.stringify(archives));
-  } catch (error) {
-    console.error("Error saving archived history:", error);
-  }
-};
-
-const loadArchivedHistoryFromLocalStorage = (): ArchivedHistory => {
-  try {
-    const savedArchives = localStorage.getItem('archivedEarningsHistory');
-    return savedArchives ? JSON.parse(savedArchives) : {};
-  } catch (error) {
-    console.error("Error loading archived history:", error);
-    return {};
-  }
-};
-
 
 const COMMISSION_STORAGE_KEY = 'earningsCalculatorCommission';
 
@@ -353,13 +322,6 @@ const ClockIcon = () => (
 const CalendarIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-    </svg>
-);
-
-const ArchiveBoxIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4-8-4V7m8 4v10M5 7l8 4 8-4" />
-        <path strokeLinecap="round" strokeLinejoin="round" d="M5 7l0 10 8 4 8-4 0-10" />
     </svg>
 );
 
@@ -939,9 +901,10 @@ const DocumentModal: React.FC<{ doc: ManagedDocument | null; onSave: (doc: Manag
 const MaintenanceModal: React.FC<{ record: MaintenanceRecord | null; onSave: (record: MaintenanceRecord) => void; onClose: () => void; }> = ({ record, onSave, onClose }) => {
     const [formData, setFormData] = useState<Omit<MaintenanceRecord, 'id'>>({
         type: record?.type || '',
-        cost: record?.cost || '',
         date: record?.date || new Date().toISOString().split('T')[0],
         mileage: record?.mileage || '',
+        nextChangeMileage: record?.nextChangeMileage || '',
+        filterChangeMileage: record?.filterChangeMileage || '',
         notes: record?.notes || '',
     });
     const [customType, setCustomType] = useState('');
@@ -954,9 +917,25 @@ const MaintenanceModal: React.FC<{ record: MaintenanceRecord | null; onSave: (re
         }
     }, [record]);
 
+    // Automatic calculation for oil changes
+    useEffect(() => {
+        if (formData.type === 'Cambio de Aceite' && formData.mileage) {
+            const currentMileage = parseInt(parseFormattedNumber(formData.mileage), 10);
+            if (!isNaN(currentMileage)) {
+                const filterChange = currentMileage + 4000;
+                const nextOilChange = currentMileage + 8000;
+                setFormData(prev => ({
+                    ...prev,
+                    filterChangeMileage: formatNumberWithDots(filterChange.toString()),
+                    nextChangeMileage: formatNumberWithDots(nextOilChange.toString()),
+                }));
+            }
+        }
+    }, [formData.mileage, formData.type]);
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
-        if (name === 'cost' || name === 'mileage') {
+        if (name === 'mileage' || name === 'nextChangeMileage' || name === 'filterChangeMileage') {
             setFormData({ ...formData, [name]: formatNumberWithDots(value) });
         } else {
             setFormData({ ...formData, [name]: value });
@@ -966,10 +945,19 @@ const MaintenanceModal: React.FC<{ record: MaintenanceRecord | null; onSave: (re
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const finalType = formData.type === 'Otro' ? customType : formData.type;
-        if (!finalType || !formData.cost || !formData.date) {
-            alert("El tipo, costo y fecha del mantenimiento son obligatorios.");
-            return;
+        
+        if (finalType === 'Cambio de Aceite') {
+             if (!finalType || !formData.mileage || !formData.date) {
+                alert("Para cambio de aceite, el tipo, fecha y kilometraje actual son obligatorios.");
+                return;
+            }
+        } else {
+            if (!finalType || !formData.date) {
+                alert("El tipo y la fecha del mantenimiento son obligatorios.");
+                return;
+            }
         }
+
         onSave({ ...formData, type: finalType, id: record?.id || '' });
     };
 
@@ -995,20 +983,31 @@ const MaintenanceModal: React.FC<{ record: MaintenanceRecord | null; onSave: (re
                             <input type="text" value={customType} onChange={e => setCustomType(e.target.value)} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-white" required />
                         </div>
                     )}
+                    
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                            <label className="text-sm font-medium text-slate-400 block mb-1">Costo</label>
-                            <input type="text" inputMode="numeric" name="cost" value={formData.cost} onChange={handleChange} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-white" required />
-                        </div>
                         <div>
                             <label className="text-sm font-medium text-slate-400 block mb-1">Fecha</label>
                             <input type="date" name="date" value={formData.date} onChange={handleChange} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-white" required />
                         </div>
+                        <div>
+                            <label className="text-sm font-medium text-slate-400 block mb-1">
+                                Kilometraje {formData.type !== 'Cambio de Aceite' && '(Opcional)'}
+                            </label>
+                            <input type="text" inputMode="numeric" name="mileage" value={formData.mileage} onChange={handleChange} placeholder="Ej: 123.456" className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-white" required={formData.type === 'Cambio de Aceite'} />
+                        </div>
                     </div>
-                     <div>
-                        <label className="text-sm font-medium text-slate-400 block mb-1">Kilometraje (Opcional)</label>
-                        <input type="text" inputMode="numeric" name="mileage" value={formData.mileage} onChange={handleChange} placeholder="Ej: 123.456" className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-white" />
-                    </div>
+                    {formData.type === 'Cambio de Aceite' && (
+                        <>
+                            <div>
+                                <label className="text-sm font-medium text-slate-400 block mb-1">Cambio de Filtros (Km)</label>
+                                <input type="text" name="filterChangeMileage" value={formData.filterChangeMileage} placeholder="Automático" className="w-full bg-slate-900/50 border border-slate-700 rounded-lg p-2 text-amber-300 font-semibold" disabled />
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium text-slate-400 block mb-1">Próximo Cambio de Aceite (Km)</label>
+                                <input type="text" name="nextChangeMileage" value={formData.nextChangeMileage} placeholder="Automático" className="w-full bg-slate-900/50 border border-slate-700 rounded-lg p-2 text-teal-300 font-semibold" disabled />
+                            </div>
+                        </>
+                    )}
                      <div>
                         <label className="text-sm font-medium text-slate-400 block mb-1">Notas (Opcional)</label>
                         <textarea name="notes" value={formData.notes} onChange={handleChange} rows={2} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-white"></textarea>
@@ -1029,12 +1028,22 @@ const VehicleMaintenanceManager: React.FC<{ records: MaintenanceRecord[]; setRec
     const [editingRecord, setEditingRecord] = useState<MaintenanceRecord | null>(null);
 
     const sortedRecords = useMemo(() => {
-        return [...records].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        return [...records].sort((a, b) => {
+            const isA_OilChange = a.type === 'Cambio de Aceite';
+            const isB_OilChange = b.type === 'Cambio de Aceite';
+
+            if (isA_OilChange && !isB_OilChange) {
+                return -1; // a (oil change) comes before b
+            }
+            if (!isA_OilChange && isB_OilChange) {
+                return 1; // b (oil change) comes before a
+            }
+
+            // If both are oil changes or both are not, sort by date descending
+            return new Date(b.date).getTime() - new Date(a.date).getTime();
+        });
     }, [records]);
 
-    const totalCost = useMemo(() => {
-        return records.reduce((sum, record) => sum + (parseFloat(parseFormattedNumber(record.cost)) || 0), 0);
-    }, [records]);
 
     const handleAddNew = () => {
         setEditingRecord(null);
@@ -1065,7 +1074,7 @@ const VehicleMaintenanceManager: React.FC<{ records: MaintenanceRecord[]; setRec
         if (!dateString) return 'N/A';
         const date = new Date(dateString);
         const localDate = new Date(date.getTime() + date.getTimezoneOffset() * 60000);
-        return localDate.toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
+        return localDate.toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     };
 
     return (
@@ -1085,27 +1094,28 @@ const VehicleMaintenanceManager: React.FC<{ records: MaintenanceRecord[]; setRec
                             {sortedRecords.length === 0 ? (
                                 <p className="text-slate-500 text-center py-4">No has añadido ningún registro de mantenimiento.</p>
                             ) : (
-                                <>
-                                <div className="p-3 mb-4 bg-slate-900/50 rounded-lg border border-slate-700 text-center">
-                                    <p className="text-sm text-slate-400">Costo Total en Mantenimientos</p>
-                                    <p className="text-2xl font-bold text-amber-400">{formatCurrency(totalCost)}</p>
-                                </div>
-                                {sortedRecords.map(record => (
+                                sortedRecords.map(record => (
                                     <div key={record.id} className="p-3 rounded-lg flex items-start justify-between gap-4 border border-slate-700 bg-slate-800/50">
                                         <div className="flex-grow">
                                             <p className="font-bold text-white">{record.type}</p>
                                             <p className="text-sm text-slate-400">{formatDateForDisplay(record.date)}</p>
-                                            <p className="font-semibold text-amber-300 text-base">{formatCurrency(parseFloat(parseFormattedNumber(record.cost)))}</p>
-                                            {record.mileage && <p className="text-xs text-slate-500 mt-1">Kilometraje: {record.mileage} km</p>}
-                                            {record.notes && <p className="text-xs text-slate-400 mt-1 italic">Nota: {record.notes}</p>}
+                                            
+                                            {(record.mileage || (record.type === 'Cambio de Aceite' && record.nextChangeMileage)) && (
+                                                <div className="mt-2 text-sm space-y-1">
+                                                    {record.mileage && <p className="text-slate-300">Kilometraje: <span className="font-semibold text-white">{record.mileage} km</span></p>}
+                                                    {record.type === 'Cambio de Aceite' && record.filterChangeMileage && <p className="text-amber-300">Cambio Filtros: <span className="font-semibold text-white">{record.filterChangeMileage} km</span></p>}
+                                                    {record.type === 'Cambio de Aceite' && record.nextChangeMileage && <p className="text-teal-300">Próximo Cambio: <span className="font-semibold text-white">{record.nextChangeMileage} km</span></p>}
+                                                </div>
+                                            )}
+                                            
+                                            {record.notes && <p className="text-xs text-slate-400 mt-2 pt-2 border-t border-slate-700 italic">Nota: {record.notes}</p>}
                                         </div>
                                         <div className="flex items-center gap-2 flex-shrink-0">
                                             <button onClick={() => handleEdit(record)} className="p-2 rounded-full bg-slate-700 hover:bg-cyan-600 text-slate-300 hover:text-white transition-colors duration-200" title="Editar"><EditIcon /></button>
                                             <button onClick={() => handleDelete(record.id)} className="p-2 rounded-full bg-slate-700 hover:bg-red-600 text-slate-300 hover:text-white transition-colors duration-200" title="Eliminar"><TrashIcon /></button>
                                         </div>
                                     </div>
-                                ))}
-                                </>
+                                ))
                             )}
                             <button onClick={handleAddNew} className="w-full mt-4 bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg transition-all duration-300 flex items-center justify-center text-sm gap-2 hover:scale-105">
                                 <PlusCircleIcon /> Añadir Mantenimiento
@@ -1123,8 +1133,6 @@ const VehicleMaintenanceManager: React.FC<{ records: MaintenanceRecord[]; setRec
 // --- MAIN APP COMPONENT ---
 const App: React.FC = () => {
   const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistoryFromLocalStorage());
-  const [archivedHistory, setArchivedHistory] = useState<ArchivedHistory>(() => loadArchivedHistoryFromLocalStorage());
-  const [viewingMonth, setViewingMonth] = useState<string>('current');
   const [documents, setDocuments] = useState<ManagedDocument[]>(() => loadDocumentsFromLocalStorage());
   const [maintenanceRecords, setMaintenanceRecords] = useState<MaintenanceRecord[]>(() => loadMaintenanceFromLocalStorage());
 
@@ -1144,15 +1152,14 @@ const App: React.FC = () => {
     // Use modulo to cycle through the sequence. Ensure the index is positive.
     const todayIndex = (dayDiff % routeSequence.length + routeSequence.length) % routeSequence.length;
     const dailyDefaultRoute = routeSequence[todayIndex];
-    const currentHistory = viewingMonth === 'current' ? history : [];
-    const isPastAdminLimit = currentHistory.length >= ADMIN_EXPENSE_DAYS_LIMIT;
+    const isPastAdminLimit = history.length >= ADMIN_EXPENSE_DAYS_LIMIT;
     return {
       ...INITIAL_FORM_DATA,
       commissionPerPassenger: loadCommissionFromLocalStorage(),
       route: dailyDefaultRoute,
       administrativeExpenses: isPastAdminLimit ? '0' : ADMIN_EXPENSE_VALUE,
     };
-  }, [history, viewingMonth]);
+  }, [history]);
 
   const [formData, setFormData] = useState<FormData>(getInitialFormData);
   const [results, setResults] = useState<CalculationResults>({ totalRevenue: 0, myEarnings: 0, totalExpenses: 0, amountToSettle: 0, fixedCommissionValue: 0, perPassengerCommissionValue: 0 });
@@ -1174,10 +1181,8 @@ const App: React.FC = () => {
   const focusedElementRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    if (viewingMonth === 'current') {
-      saveHistoryToLocalStorage(history);
-    }
-  }, [history, viewingMonth]);
+    saveHistoryToLocalStorage(history);
+  }, [history]);
 
   useEffect(() => {
     saveDocumentsToLocalStorage(documents);
@@ -1453,52 +1458,12 @@ const App: React.FC = () => {
   
   const handleClearAllHistory = () => {
     const isConfirmed = window.confirm(
-      "¿Estás seguro de que quieres borrar todo el historial del mes actual? Esta acción no se puede deshacer."
+      "¿Estás seguro de que quieres borrar todo el historial? Esta acción no se puede deshacer."
     );
     if (isConfirmed) {
       setHistory([]);
       handleClearForm(); // Also reset the form
     }
-  };
-
-  const handleArchiveMonth = () => {
-    if (history.length === 0) {
-        alert("No hay registros en el mes actual para archivar.");
-        return;
-    }
-
-    const firstEntryDate = new Date(history[history.length - 1].timestamp);
-    const year = firstEntryDate.getFullYear();
-    const month = String(firstEntryDate.getMonth() + 1).padStart(2, '0');
-    const archiveKey = `${year}-${month}`;
-
-    let confirmationMessage = `¿Estás seguro de que quieres archivar y cerrar el mes de ${formatMonthYear(archiveKey)}? Esto guardará los ${history.length} registros actuales y limpiará la vista para un nuevo mes.`;
-
-    if (archivedHistory[archiveKey]) {
-        confirmationMessage += "\n\nADVERTENCIA: Ya existe un archivo para este mes. Si continúas, se sobrescribirá.";
-    }
-
-    if (window.confirm(confirmationMessage)) {
-        const newArchives = { ...archivedHistory, [archiveKey]: history };
-        setArchivedHistory(newArchives);
-        saveArchivedHistoryToLocalStorage(newArchives);
-
-        setHistory([]);
-        handleClearForm();
-        setToastMessage(`Mes de ${formatMonthYear(archiveKey)} archivado exitosamente.`);
-    }
-};
-
-  const handleViewMonthChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-      const selectedMonth = e.target.value;
-      setViewingMonth(selectedMonth);
-
-      if (selectedMonth === 'current') {
-          setHistory(loadHistoryFromLocalStorage());
-      } else {
-          setHistory(archivedHistory[selectedMonth] || []);
-      }
-      handleClearForm(); // Clear form when switching views
   };
 
   const handleMoveEntryUp = (id: string) => {
@@ -1603,8 +1568,6 @@ const App: React.FC = () => {
     });
   }, [history]);
   
-  const isViewingArchive = viewingMonth !== 'current';
-
   const HistoryTableHeader = () => (
     <div className="sticky top-0 z-10 bg-slate-800/95 backdrop-blur-sm p-4 hidden md:grid grid-cols-9 gap-x-4 text-sm font-bold text-slate-400 border-b border-slate-700">
       <div className="col-span-2">Fecha</div>
@@ -1678,29 +1641,28 @@ const App: React.FC = () => {
 
         <main>
           <fieldset
-            disabled={isViewingArchive}
-            className="bg-slate-800/60 rounded-2xl shadow-2xl border border-slate-700 p-4 sm:p-6 space-y-6 disabled:opacity-70 disabled:pointer-events-none transition-opacity"
+            className="bg-slate-800/60 rounded-2xl shadow-2xl border border-slate-700 p-4 sm:p-6 space-y-6 transition-opacity"
           >
               <div>
                    <div className="flex justify-between items-center mb-3">
                       <h3 className="text-base font-semibold text-teal-300 ml-1">DATOS DEL DÍA</h3>
                   </div>
                   <div className="space-y-3">
-                      <InputControl label="Número de Pasajeros" name="numPassengers" value={formData.numPassengers} onChange={handleChange} onFocus={handleInputFocus} icon={<UsersIcon />} disabled={isViewingArchive} />
+                      <InputControl label="Número de Pasajeros" name="numPassengers" value={formData.numPassengers} onChange={handleChange} onFocus={handleInputFocus} icon={<UsersIcon />} />
                       <div className="grid grid-cols-2 gap-3">
-                          <InputControl label="Valor Pasaje" name="fareValue" value={formData.fareValue} onChange={handleChange} onFocus={handleInputFocus} icon={<MoneyIcon />} unit="$" disabled={isViewingArchive} />
-                          <InputControl label="Comisión Fija" name="fixedCommission" value={formData.fixedCommission} onChange={handleChange} onFocus={handleInputFocus} icon={<PercentageIcon />} unit="%" disabled={isViewingArchive} />
+                          <InputControl label="Valor Pasaje" name="fareValue" value={formData.fareValue} onChange={handleChange} onFocus={handleInputFocus} icon={<MoneyIcon />} unit="$" />
+                          <InputControl label="Comisión Fija" name="fixedCommission" value={formData.fixedCommission} onChange={handleChange} onFocus={handleInputFocus} icon={<PercentageIcon />} unit="%" />
                       </div>
-                      <InputControl label="Comisión por Pasajero" name="commissionPerPassenger" value={formData.commissionPerPassenger} onChange={handleChange} onFocus={handleInputFocus} icon={<MoneyIcon />} unit="$" disabled={isViewingArchive} />
-                      <CheckboxControlGroup label="Ruta" name="route" value={formData.route} onChange={handleChange} icon={<RouteIcon />} options={['9', '11', '29', '60']} disabled={isViewingArchive} />
+                      <InputControl label="Comisión por Pasajero" name="commissionPerPassenger" value={formData.commissionPerPassenger} onChange={handleChange} onFocus={handleInputFocus} icon={<MoneyIcon />} unit="$" />
+                      <CheckboxControlGroup label="Ruta" name="route" value={formData.route} onChange={handleChange} icon={<RouteIcon />} options={['9', '11', '29', '60']} />
                   </div>
               </div>
               <div>
                   <h3 className="text-base font-semibold text-amber-400 mb-3 ml-1">GASTOS DEL DÍA</h3>
                   <div className="space-y-3">
-                      <InputControl ref={fuelInputRef} label="Combustible" name="fuelExpenses" value={formData.fuelExpenses} onChange={handleChange} onFocus={handleInputFocus} icon={<FuelIcon />} unit="$" disabled={isViewingArchive} />
-                      <InputControl label="Taller (Lavada, Engrase, etc.)" name="variableExpenses" value={formData.variableExpenses} onChange={handleChange} onFocus={handleInputFocus} icon={<WrenchIcon />} unit="$" placeholder="Valor Total" disabled={isViewingArchive} />
-                      <InputControl label="Gastos Administrativos" name="administrativeExpenses" value={formData.administrativeExpenses} onChange={handleChange} onFocus={handleInputFocus} icon={<BriefcaseIcon />} unit="$" disabled={isViewingArchive} />
+                      <InputControl ref={fuelInputRef} label="Combustible" name="fuelExpenses" value={formData.fuelExpenses} onChange={handleChange} onFocus={handleInputFocus} icon={<FuelIcon />} unit="$" />
+                      <InputControl label="Taller (Lavada, Engrase, etc.)" name="variableExpenses" value={formData.variableExpenses} onChange={handleChange} onFocus={handleInputFocus} icon={<WrenchIcon />} unit="$" placeholder="Valor Total" />
+                      <InputControl label="Gastos Administrativos" name="administrativeExpenses" value={formData.administrativeExpenses} onChange={handleChange} onFocus={handleInputFocus} icon={<BriefcaseIcon />} unit="$" />
                   </div>
               </div>
           </fieldset>
@@ -1712,27 +1674,11 @@ const App: React.FC = () => {
                 <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-6 gap-4">
                     <div className="flex items-center gap-3">
                         <h2 className="text-2xl font-bold text-teal-300 whitespace-nowrap">Historial</h2>
-                        <span className="text-slate-400 font-medium">{isViewingArchive ? `(Viendo ${formatMonthYear(viewingMonth)})` : '(Mes Actual)'}</span>
                     </div>
                      <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
-                        <select
-                          value={viewingMonth}
-                          onChange={handleViewMonthChange}
-                          className="bg-slate-700 border border-slate-600 rounded-lg py-2 px-3 text-white text-sm focus:ring-teal-500 focus:border-teal-500"
-                          aria-label="Seleccionar mes para ver"
-                        >
-                            <option value="current">Mes Actual</option>
-                            {Object.keys(archivedHistory).sort((a,b) => b.localeCompare(a)).map(monthKey => (
-                                <option key={monthKey} value={monthKey}>{formatMonthYear(monthKey)}</option>
-                            ))}
-                        </select>
-                         <button onClick={handleArchiveMonth} disabled={isViewingArchive || history.length === 0} className="bg-sky-600 hover:bg-sky-700 text-white font-bold py-2 px-4 rounded-lg transition-all duration-300 flex items-center justify-center text-sm hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:bg-sky-600">
-                             <ArchiveBoxIcon />
-                             <span className="ml-2">Archivar Mes</span>
-                         </button>
-                        <button onClick={handleClearAllHistory} disabled={isViewingArchive || history.length === 0} className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-all duration-300 flex items-center justify-center text-sm hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:bg-red-600">
+                        <button onClick={handleClearAllHistory} disabled={history.length === 0} className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-all duration-300 flex items-center justify-center text-sm hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:bg-red-600">
                             <TrashIcon />
-                            <span className="ml-2">Borrar Mes</span>
+                            <span className="ml-2">Borrar Historial</span>
                         </button>
                     </div>
                 </div>
@@ -1788,13 +1734,12 @@ const App: React.FC = () => {
                 )}
 
                 {history.length === 0 ? (
-                    <p className="text-slate-500 text-center py-8">No hay cálculos guardados para este período.</p>
+                    <p className="text-slate-500 text-center py-8">No hay cálculos guardados.</p>
                 ) : (
                     <div className="mt-6 md:border md:border-slate-700 md:rounded-lg md:max-h-[70vh] md:overflow-y-auto md:relative">
                         <HistoryTableHeader />
                         <ul className="space-y-4 md:space-y-0">
                             {history.map((entry, index) => {
-                               const isEditable = !isNaN(new Date(entry.timestamp).getTime()) && !isViewingArchive;
                                const isExpanded = expandedId === entry.id;
                                return (
                                 <li key={entry.id} className="md:border-b md:border-slate-700 last:md:border-b-0">
@@ -1830,13 +1775,11 @@ const App: React.FC = () => {
                                                     <button onClick={handleEditTimestampCancel} title="Cancelar" aria-label="Cancelar edición" className="p-2 rounded-full bg-slate-700 hover:bg-red-600 text-slate-300 hover:text-white transition-colors duration-200"><XIcon /></button>
                                                 </div>
                                             ) : (
-                                                isEditable && (
-                                                    <div className="flex justify-end pt-2">
-                                                        <button onClick={() => handleEditTimestampStart(entry.id, entry.timestamp)} title="Editar fecha" aria-label="Editar fecha" className="p-1 rounded-full text-slate-500 hover:bg-slate-700 hover:text-white transition-colors duration-200 flex items-center text-xs">
-                                                            <EditIcon /> <span className="ml-1">Editar Fecha</span>
-                                                        </button>
-                                                    </div>
-                                                )
+                                                <div className="flex justify-end pt-2">
+                                                    <button onClick={() => handleEditTimestampStart(entry.id, entry.timestamp)} title="Editar fecha" aria-label="Editar fecha" className="p-1 rounded-full text-slate-500 hover:bg-slate-700 hover:text-white transition-colors duration-200 flex items-center text-xs">
+                                                        <EditIcon /> <span className="ml-1">Editar Fecha</span>
+                                                    </button>
+                                                </div>
                                             )}
                                              {/* Details Grid */}
                                             <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm mt-3">
@@ -1852,14 +1795,12 @@ const App: React.FC = () => {
                                                 <div className="col-span-2"><p className="text-slate-400">En Empresa</p><p className="font-bold text-blue-400 text-base">{formatCurrency(entry.results.amountToSettle)}</p></div>
                                             </div>
                                              {/* Actions */}
-                                            {!isViewingArchive && (
                                             <div className="flex items-center space-x-2 mt-4 justify-start border-t border-slate-700 pt-3">
                                                 <button onClick={() => handleMoveEntryUp(entry.id)} title="Mover hacia arriba" aria-label="Mover hacia arriba" disabled={index === 0} className="p-2 rounded-full bg-slate-700 hover:bg-sky-600 text-slate-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowUpIcon /></button>
                                                 <button onClick={() => handleMoveEntryDown(entry.id)} title="Mover hacia abajo" aria-label="Mover hacia abajo" disabled={index === history.length - 1} className="p-2 rounded-full bg-slate-700 hover:bg-sky-600 text-slate-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowDownIcon /></button>
                                                 <button onClick={() => handleLoadEntry(entry.id)} title="Cargar este cálculo" aria-label="Cargar este cálculo" className="p-2 rounded-full bg-slate-700 hover:bg-cyan-600 text-slate-300 hover:text-white transition-colors duration-200"><LoadIcon /></button>
                                                 <button onClick={() => handleDeleteEntry(entry.id)} title="Borrar este cálculo" aria-label="Borrar este cálculo" className="p-2 rounded-full bg-slate-700 hover:bg-red-600 text-slate-300 hover:text-white transition-colors duration-200"><TrashIcon /></button>
                                             </div>
-                                            )}
                                         </div>
                                       </div>
                                   </div>
@@ -1876,9 +1817,7 @@ const App: React.FC = () => {
                                           ) : (
                                               <div className="flex items-center gap-2">
                                                   <p className="font-semibold text-slate-300 group-hover:text-white">{formatTimestamp(entry.timestamp)}</p>
-                                                  {isEditable && (
-                                                      <button onClick={() => handleEditTimestampStart(entry.id, entry.timestamp)} title="Editar fecha" aria-label="Editar fecha" className="p-1 rounded-full text-slate-500 hover:bg-slate-700 hover:text-white transition-colors duration-200 opacity-0 group-hover:opacity-100 focus:opacity-100"><EditIcon /></button>
-                                                  )}
+                                                  <button onClick={() => handleEditTimestampStart(entry.id, entry.timestamp)} title="Editar fecha" aria-label="Editar fecha" className="p-1 rounded-full text-slate-500 hover:bg-slate-700 hover:text-white transition-colors duration-200 opacity-0 group-hover:opacity-100 focus:opacity-100"><EditIcon /></button>
                                               </div>
                                           )}
                                       </div>
@@ -1893,16 +1832,12 @@ const App: React.FC = () => {
                                       <div className="font-bold text-indigo-400 text-base text-center">{formatCurrency(entry.results.totalDeliveredAmount || 0)}</div>
                                       <div className="font-bold text-blue-400 text-base text-center">{formatCurrency(entry.results.amountToSettle)}</div>
                                       <div className="flex items-center space-x-2 justify-end">
-                                        {!isViewingArchive ? (
                                           <>
                                             <button onClick={() => handleMoveEntryUp(entry.id)} title="Mover hacia arriba" aria-label="Mover hacia arriba" disabled={index === 0} className="p-2 rounded-full bg-slate-700 hover:bg-sky-600 text-slate-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowUpIcon /></button>
                                             <button onClick={() => handleMoveEntryDown(entry.id)} title="Mover hacia abajo" aria-label="Mover hacia abajo" disabled={index === history.length - 1} className="p-2 rounded-full bg-slate-700 hover:bg-sky-600 text-slate-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowDownIcon /></button>
                                             <button onClick={() => handleLoadEntry(entry.id)} title="Cargar este cálculo" aria-label="Cargar este cálculo" className="p-2 rounded-full bg-slate-700 hover:bg-cyan-600 text-slate-300 hover:text-white transition-colors duration-200"><LoadIcon /></button>
                                             <button onClick={() => handleDeleteEntry(entry.id)} title="Borrar este cálculo" aria-label="Borrar este cálculo" className="p-2 rounded-full bg-slate-700 hover:bg-red-600 text-slate-300 hover:text-white transition-colors duration-200"><TrashIcon /></button>
                                           </>
-                                        ) : (
-                                          <span className="text-xs text-slate-500 italic">Archivado</span>
-                                        )}
                                       </div>
                                   </div>
                                 </li>
@@ -1918,43 +1853,41 @@ const App: React.FC = () => {
         <DocumentManager documents={documents} setDocuments={setDocuments} />
 
         {/* Floating Action Buttons */}
-        {!isViewingArchive && (
-          <div
-            className="fixed right-6 sm:right-8 z-40 flex flex-col items-end gap-3 transition-[bottom] duration-300 ease-in-out"
-            onMouseDown={handleDragStart}
-            onTouchStart={handleDragStart}
-            style={{ 
-                bottom: fabBottom,
-                transform: `translate(${position.x}px, ${position.y}px)`,
-                cursor: isDragging ? 'grabbing' : 'grab',
-                touchAction: 'none',
-                userSelect: 'none',
-            }}
-          >
-              <button 
-                  onClick={handleSaveCalculation} 
-                  disabled={showSaveSuccessAnim}
-                  className={`py-2 px-4 text-white rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ease-in-out focus:outline-none focus:ring-4 text-sm font-semibold ${
-                      showSaveSuccessAnim 
-                      ? 'bg-green-500 scale-110' 
-                      : 'bg-gradient-to-br from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 hover:scale-105 focus:ring-purple-500/50'
-                  }`}
-                  title={editingId ? 'Actualizar Datos' : 'Guardar Datos'}
-                  aria-label={editingId ? 'Actualizar Datos' : 'Guardar Datos'}
-              >
-                {showSaveSuccessAnim ? <CheckIcon /> : (editingId ? 'Actualizar' : 'Guardar')}
-              </button>
-              <button 
-                  onClick={handleClearForm} 
-                  disabled={showSaveSuccessAnim}
-                  className="py-2 px-4 bg-slate-700 hover:bg-slate-600 text-white rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-4 focus:ring-slate-600/50 text-sm font-semibold disabled:opacity-50"
-                  title={editingId ? 'Cancelar Edición' : 'Limpiar Formulario'}
-                  aria-label={editingId ? 'Cancelar Edición' : 'Limpiar Formulario'}
-              >
-                  {editingId ? 'Cancelar' : 'Limpiar'}
-              </button>
-          </div>
-        )}
+        <div
+          className="fixed right-6 sm:right-8 z-40 flex flex-col items-end gap-3 transition-[bottom] duration-300 ease-in-out"
+          onMouseDown={handleDragStart}
+          onTouchStart={handleDragStart}
+          style={{ 
+              bottom: fabBottom,
+              transform: `translate(${position.x}px, ${position.y}px)`,
+              cursor: isDragging ? 'grabbing' : 'grab',
+              touchAction: 'none',
+              userSelect: 'none',
+          }}
+        >
+            <button 
+                onClick={handleSaveCalculation} 
+                disabled={showSaveSuccessAnim}
+                className={`py-2 px-4 text-white rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ease-in-out focus:outline-none focus:ring-4 text-sm font-semibold ${
+                    showSaveSuccessAnim 
+                    ? 'bg-green-500 scale-110' 
+                    : 'bg-gradient-to-br from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 hover:scale-105 focus:ring-purple-500/50'
+                }`}
+                title={editingId ? 'Actualizar Datos' : 'Guardar Datos'}
+                aria-label={editingId ? 'Actualizar Datos' : 'Guardar Datos'}
+            >
+              {showSaveSuccessAnim ? <CheckIcon /> : (editingId ? 'Actualizar' : 'Guardar')}
+            </button>
+            <button 
+                onClick={handleClearForm} 
+                disabled={showSaveSuccessAnim}
+                className="py-2 px-4 bg-slate-700 hover:bg-slate-600 text-white rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-4 focus:ring-slate-600/50 text-sm font-semibold disabled:opacity-50"
+                title={editingId ? 'Cancelar Edición' : 'Limpiar Formulario'}
+                aria-label={editingId ? 'Cancelar Edición' : 'Limpiar Formulario'}
+            >
+                {editingId ? 'Cancelar' : 'Limpiar'}
+            </button>
+        </div>
 
       </div>
     </div>
