@@ -1237,15 +1237,19 @@ const App: React.FC = () => {
   const getInitialFormData = useCallback((): FormData => {
     const config = loadConfigFromLocalStorage();
     const routeSequence = ['60', '9', '11', '29'];
+    // Anchor date: A known date when the sequence started with the first element ('60').
+    // Let's set it to Friday, July 26, 2024.
     const anchorDate = new Date('2024-07-26');
     const today = new Date();
 
+    // Normalize dates to midnight to compare days correctly
     anchorDate.setHours(0, 0, 0, 0);
     today.setHours(0, 0, 0, 0);
 
     const timeDiff = today.getTime() - anchorDate.getTime();
     const dayDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
 
+    // Use modulo to find the correct index in the sequence
     const todayIndex = (dayDiff % routeSequence.length + routeSequence.length) % routeSequence.length;
     const dailyDefaultRoute = routeSequence[todayIndex];
 
@@ -1254,7 +1258,7 @@ const App: React.FC = () => {
       fareValue: '3.000',
       fixedCommission: '15',
       fuelExpenses: '',
-      route: dailyDefaultRoute,
+      route: dailyDefaultRoute, // Set the automatically calculated route
       commissionPerPassenger: config.commissionPerPassenger,
       variableExpenses: config.variableExpenses,
       administrativeExpenses: config.administrativeExpenses,
