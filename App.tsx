@@ -47,18 +47,15 @@ interface MaintenanceRecord {
   notes?: string;
 }
 
+interface AppConfig {
+  commissionPerPassenger: string;
+  variableExpenses: string;
+  administrativeExpenses: string;
+  passengerGoal: number;
+}
 
-const INITIAL_FORM_DATA: Omit<FormData, 'administrativeExpenses' | 'route' | 'commissionPerPassenger'> = {
-  numPassengers: '',
-  fareValue: '3.000',
-  fixedCommission: '15',
-  fuelExpenses: '',
-  variableExpenses: '20.000',
-};
 
-const PASSENGER_GOAL = 5500;
-const ADMIN_EXPENSE_DAYS_LIMIT = 20;
-const ADMIN_EXPENSE_VALUE = '109.165';
+const PASSENGER_GOAL_DEFAULT = 5500;
 
 
 const MOTIVATIONAL_PHRASES = [
@@ -129,23 +126,29 @@ const loadHistoryFromLocalStorage = (): HistoryEntry[] => {
   }
 };
 
-const COMMISSION_STORAGE_KEY = 'earningsCalculatorCommission';
+const CONFIG_STORAGE_KEY = 'driverAppConfig';
 
-const saveCommissionToLocalStorage = (commission: string) => {
+const saveConfigToLocalStorage = (config: AppConfig) => {
   try {
-    localStorage.setItem(COMMISSION_STORAGE_KEY, commission);
+    localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(config));
   } catch (error) {
-    console.error("Error saving commission to localStorage:", error);
+    console.error("Error saving config to localStorage:", error);
   }
 };
 
-const loadCommissionFromLocalStorage = (): string => {
+const loadConfigFromLocalStorage = (): AppConfig => {
+  const defaultConfig: AppConfig = {
+    commissionPerPassenger: '100',
+    variableExpenses: '20.000',
+    administrativeExpenses: '109.165',
+    passengerGoal: PASSENGER_GOAL_DEFAULT,
+  };
   try {
-    const savedCommission = localStorage.getItem(COMMISSION_STORAGE_KEY);
-    return savedCommission !== null ? savedCommission : '100'; // Default to '100'
+    const savedConfig = localStorage.getItem(CONFIG_STORAGE_KEY);
+    return savedConfig ? { ...defaultConfig, ...JSON.parse(savedConfig) } : defaultConfig;
   } catch (error) {
-    console.error("Error loading commission from localStorage:", error);
-    return '100';
+    console.error("Error loading config from localStorage:", error);
+    return defaultConfig;
   }
 };
 
@@ -253,8 +256,8 @@ const CheckCircleIcon = () => (
   </svg>
 );
 
-const EditIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+const EditIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className || "h-4 w-4"} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" />
     </svg>
 );
@@ -457,11 +460,36 @@ interface InputControlProps {
 interface PassengerGoalProgressProps {
   totalPassengers: number;
   goal: number;
+  onGoalChange: (newGoal: number) => void;
 }
 
-const PassengerGoalProgress: React.FC<PassengerGoalProgressProps> = ({ totalPassengers, goal }) => {
+const PassengerGoalProgress: React.FC<PassengerGoalProgressProps> = ({ totalPassengers, goal, onGoalChange }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [tempGoal, setTempGoal] = useState(goal.toString());
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isEditing) {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+  }, [isEditing]);
+
+  const handleSave = () => {
+    const newGoal = parseInt(parseFormattedNumber(tempGoal), 10);
+    if (!isNaN(newGoal) && newGoal > 0) {
+      onGoalChange(newGoal);
+    }
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setTempGoal(goal.toString());
+    setIsEditing(false);
+  };
+
   const remaining = Math.max(0, goal - totalPassengers);
-  const percentage = Math.min(100, (totalPassengers / goal) * 100);
+  const percentage = goal > 0 ? Math.min(100, (totalPassengers / goal) * 100) : 0;
 
   const { dailyGoal, daysRemaining } = useMemo(() => {
     const now = new Date();
@@ -469,28 +497,22 @@ const PassengerGoalProgress: React.FC<PassengerGoalProgressProps> = ({ totalPass
     const currentDayOfMonth = now.getDate();
     const totalDaysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
 
-    // Calculate base days remaining including today
     let daysLeft = totalDaysInMonth - currentDayOfMonth + 1;
-
-    // --- Workday Logic ---
-    const WORKDAY_START_HOUR = 4;  // 4:00 AM
-    const WORKDAY_END_HOUR = 20;   // 8:00 PM
+    const WORKDAY_START_HOUR = 4;
+    const WORKDAY_END_HOUR = 20;
     
     const isBeforeWorkday = currentHour < WORKDAY_START_HOUR;
     const isAfterWorkday = currentHour >= WORKDAY_END_HOUR;
 
-    // If it's outside working hours, the current day doesn't count for making progress.
     if (isAfterWorkday || isBeforeWorkday) {
         daysLeft -= 1;
     }
 
     const passengersNeeded = Math.max(0, goal - totalPassengers);
-    
     const dailyTarget = daysLeft > 0 ? Math.ceil(passengersNeeded / daysLeft) : 0;
     
     return { dailyGoal: dailyTarget, daysRemaining: daysLeft };
   }, [totalPassengers, goal]);
-
 
   const getMotivationalMessage = () => {
     if (percentage >= 100) return "¡Meta cumplida y superada! ¡Excelente trabajo!";
@@ -520,10 +542,35 @@ const PassengerGoalProgress: React.FC<PassengerGoalProgressProps> = ({ totalPass
         ></div>
       </div>
 
-      <div className="flex justify-between text-sm text-slate-400 font-medium">
+      <div className="grid grid-cols-3 text-sm text-slate-400 font-medium">
         <span>Actual: <span className="text-white font-bold">{totalPassengers.toLocaleString('es-CO')}</span></span>
-        <span>Faltan: <span className="text-amber-400 font-bold">{remaining.toLocaleString('es-CO')}</span></span>
-        <span>Meta: <span className="text-green-400 font-bold">{goal.toLocaleString('es-CO')}</span></span>
+        <span className="text-center">Faltan: <span className="text-amber-400 font-bold">{remaining.toLocaleString('es-CO')}</span></span>
+        <div className="flex items-center justify-end gap-2">
+            <span>Meta:</span>
+            {isEditing ? (
+              <div className="flex items-center gap-1">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  inputMode="numeric"
+                  value={formatNumberWithDots(tempGoal)}
+                  onChange={(e) => setTempGoal(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSave();
+                    if (e.key === 'Escape') handleCancel();
+                  }}
+                  className="bg-slate-700/80 border border-slate-600 rounded-md px-2 py-0.5 text-white w-24 text-center font-bold focus:ring-teal-500 focus:border-teal-500"
+                />
+                <button onClick={handleSave} title="Guardar meta" className="p-1 rounded-full bg-slate-700 hover:bg-green-600 text-slate-300 hover:text-white transition-colors duration-200"><CheckIcon /></button>
+                <button onClick={handleCancel} title="Cancelar" className="p-1 rounded-full bg-slate-700 hover:bg-red-600 text-slate-300 hover:text-white transition-colors duration-200"><XIcon /></button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1">
+                <span className="text-green-400 font-bold">{goal.toLocaleString('es-CO')}</span>
+                <button onClick={() => setIsEditing(true)} title="Editar meta" className="p-1 rounded-full text-slate-500 hover:bg-slate-700 hover:text-white transition-colors duration-200 opacity-50 hover:opacity-100"><EditIcon className="h-4 w-4" /></button>
+              </div>
+            )}
+        </div>
       </div>
 
       {dailyGoal > 0 && (
@@ -1185,31 +1232,34 @@ const App: React.FC = () => {
   const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistoryFromLocalStorage());
   const [documents, setDocuments] = useState<ManagedDocument[]>(() => loadDocumentsFromLocalStorage());
   const [maintenanceRecords, setMaintenanceRecords] = useState<MaintenanceRecord[]>(() => loadMaintenanceFromLocalStorage());
+  const [passengerGoal, setPassengerGoal] = useState<number>(() => loadConfigFromLocalStorage().passengerGoal);
 
   const getInitialFormData = useCallback((): FormData => {
+    const config = loadConfigFromLocalStorage();
     const routeSequence = ['60', '9', '11', '29'];
-    // Anchor date: A day known to correspond to the start of the sequence ('60').
     const anchorDate = new Date('2024-07-26');
     const today = new Date();
 
-    // Set hours to 0 to avoid DST or timezone issues when calculating day difference
     anchorDate.setHours(0, 0, 0, 0);
     today.setHours(0, 0, 0, 0);
 
     const timeDiff = today.getTime() - anchorDate.getTime();
     const dayDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
 
-    // Use modulo to cycle through the sequence. Ensure the index is positive.
     const todayIndex = (dayDiff % routeSequence.length + routeSequence.length) % routeSequence.length;
     const dailyDefaultRoute = routeSequence[todayIndex];
-    const isPastAdminLimit = history.length >= ADMIN_EXPENSE_DAYS_LIMIT;
+
     return {
-      ...INITIAL_FORM_DATA,
-      commissionPerPassenger: loadCommissionFromLocalStorage(),
+      numPassengers: '',
+      fareValue: '3.000',
+      fixedCommission: '15',
+      fuelExpenses: '',
       route: dailyDefaultRoute,
-      administrativeExpenses: isPastAdminLimit ? '0' : ADMIN_EXPENSE_VALUE,
+      commissionPerPassenger: config.commissionPerPassenger,
+      variableExpenses: config.variableExpenses,
+      administrativeExpenses: config.administrativeExpenses,
     };
-  }, [history]);
+  }, []);
 
   const [formData, setFormData] = useState<FormData>(getInitialFormData);
   const [results, setResults] = useState<CalculationResults>({ totalRevenue: 0, myEarnings: 0, totalExpenses: 0, amountToSettle: 0, fixedCommissionValue: 0, perPassengerCommissionValue: 0 });
@@ -1241,6 +1291,17 @@ const App: React.FC = () => {
   useEffect(() => {
     saveMaintenanceToLocalStorage(maintenanceRecords);
   }, [maintenanceRecords]);
+
+  useEffect(() => {
+    const config: AppConfig = {
+      commissionPerPassenger: formData.commissionPerPassenger,
+      variableExpenses: formData.variableExpenses,
+      administrativeExpenses: formData.administrativeExpenses,
+      passengerGoal: passengerGoal,
+    };
+    saveConfigToLocalStorage(config);
+  }, [formData.commissionPerPassenger, formData.variableExpenses, formData.administrativeExpenses, passengerGoal]);
+
 
     useEffect(() => {
         const visualViewport = window.visualViewport;
@@ -1312,10 +1373,6 @@ const App: React.FC = () => {
     
       processedValue = formatNumberWithDots(cleanValue);
 
-      if (name === 'commissionPerPassenger') {
-        saveCommissionToLocalStorage(processedValue);
-      }
-
     } else if (numericOnlyFields.includes(name as keyof FormData)) {
       processedValue = value.replace(/[^\d]/g, '');
       if (name === 'numPassengers') {
@@ -1353,17 +1410,12 @@ const App: React.FC = () => {
     
     const driverEarnings = fixedCommissionValue + perPassengerCommissionValue;
 
-    // Separate expenses for clarity
-    const ownerExpenses = fuelExpenses + variableExpenses; // Expenses deducted from the settlement
-    const adminExpenses = administrativeExpenses; // Expenses NOT deducted from the settlement
+    const ownerExpenses = fuelExpenses + variableExpenses;
+    const adminExpenses = administrativeExpenses;
 
-    // Total expenses for the day ("Gastos Operativos") includes everything.
     const calculatedTotalExpenses = ownerExpenses + adminExpenses;
     
-    // PER USER REQUEST: For display purposes, the amount to deliver should not yet deduct the fixed commission.
-    // This makes the "Total A Entregar" higher in the summary, and the fixed commission is only applied when saving.
-    const amountToSettle = totalRevenue - perPassengerCommissionValue - ownerExpenses;
-
+    const amountToSettle = totalRevenue - driverEarnings - ownerExpenses;
 
     setResults({
       totalRevenue: isNaN(totalRevenue) ? 0 : totalRevenue,
@@ -1405,16 +1457,13 @@ const App: React.FC = () => {
       return;
     }
 
-    // PER USER REQUEST: The fixed commission is not subtracted from the gross amount delivered.
-    // It is still part of 'myEarnings', but not deducted from the daily settlement.
-    const ownerExpenses = rawData.fuelExpenses + rawData.variableExpenses;
-    const grossAmountToSettle = results.totalRevenue - results.perPassengerCommissionValue - ownerExpenses;
+    const grossAmountToSettle = results.amountToSettle;
     const netAmountToSettle = grossAmountToSettle - rawData.administrativeExpenses;
 
     const resultsForHistory: CalculationResults = {
       ...results,
-      amountToSettle: netAmountToSettle, // This is "En Empresa" (net)
-      totalDeliveredAmount: grossAmountToSettle, // This is "Recaudado" (gross)
+      amountToSettle: netAmountToSettle, // "En Empresa" (net)
+      totalDeliveredAmount: grossAmountToSettle, // "Recaudado" (gross)
     };
 
     if (editingId) {
@@ -1737,7 +1786,8 @@ const App: React.FC = () => {
                   <>
                     <PassengerGoalProgress 
                       totalPassengers={historyTotals.totalPassengers} 
-                      goal={PASSENGER_GOAL} 
+                      goal={passengerGoal} 
+                      onGoalChange={setPassengerGoal}
                     />
                     <div className="p-4 mt-6 bg-slate-900/50 rounded-lg border border-slate-700">
                         <h3 className="text-lg font-bold text-slate-300 mb-3 text-center">Resumen Total del Historial</h3>
