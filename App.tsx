@@ -1283,7 +1283,7 @@ const App: React.FC = () => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [fabBottom, setFabBottom] = useState('1.5rem');
   const [showSaveSuccessAnim, setShowSaveSuccessAnim] = useState(false);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isRecordListOpen, setIsRecordListOpen] = useState(false);
   
   const fuelInputRef = useRef<HTMLInputElement>(null);
 
@@ -1783,187 +1783,192 @@ const App: React.FC = () => {
         {/* History Section */}
         <section className="mt-12">
             <div className="bg-slate-800/60 p-4 sm:p-6 rounded-2xl shadow-2xl border border-slate-700">
-                <button onClick={() => setIsHistoryOpen(!isHistoryOpen)} className="w-full flex justify-between items-center text-left">
-                    <div className="flex items-center gap-3">
-                        <h2 className="text-2xl font-bold text-teal-300 whitespace-nowrap">Historial</h2>
-                        {history.length > 0 && <span className="text-sm bg-slate-700 text-slate-300 font-semibold px-2 py-0.5 rounded-full">{history.length} registros</span>}
-                    </div>
-                    <ChevronDownIcon className={`transform transition-transform duration-300 ${isHistoryOpen ? 'rotate-180' : ''}`} />
-                </button>
+                <div className="flex items-center gap-3">
+                    <h2 className="text-2xl font-bold text-teal-300 whitespace-nowrap">Historial</h2>
+                </div>
 
-                <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isHistoryOpen ? 'max-h-[5000px]' : 'max-h-0'}`}>
-                    <div className="border-t border-slate-700 mt-6 pt-6">
-                        <div className="flex justify-end mb-4">
-                            <button onClick={handleClearAllHistory} disabled={history.length === 0} className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-all duration-300 flex items-center justify-center text-sm hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:bg-red-600">
-                                <TrashIcon />
-                                <span className="ml-2">Borrar Historial</span>
-                            </button>
-                        </div>
-                        
-                        {history.length > 0 && (
-                          <>
-                            <PassengerGoalProgress 
-                              totalPassengers={historyTotals.totalPassengers} 
-                              goal={passengerGoal} 
-                              onGoalChange={setPassengerGoal}
-                            />
-                            <div className="p-4 mt-6 bg-slate-900/50 rounded-lg border border-slate-700">
-                                <h3 className="text-lg font-bold text-slate-300 mb-3 text-center">Resumen Total del Historial</h3>
-                                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
-                                    <div>
-                                        <p className="text-sm text-slate-400">Pasajeros Totales</p>
-                                        <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-teal-400">
-                                            {historyTotals.totalPassengers.toLocaleString('es-CO')}
-                                        </p>
-                                    </div>
-                                     <div>
-                                        <p className="text-sm text-slate-400">Ganancia Total</p>
-                                        <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-cyan-400">
-                                            {formatCurrency(historyTotals.totalEarnings)}
-                                        </p>
-                                         <div className="mt-2 text-center">
-                                            <span className="text-sm font-bold text-sky-400">{formatCurrency(historyTotals.totalFixedCommission)}</span>
-                                            <p className="text-xs text-slate-400">15%</p>
-                                            <span className="text-sm font-bold text-teal-400 mt-1 block">{formatCurrency(historyTotals.totalPerPassengerCommission)}</span>
-                                            <p className="text-xs text-slate-400">Comisión</p>
-                                         </div>
-                                    </div>
-                                    <div>
-                                        <p className="text-sm text-slate-400">Gastos Totales</p>
-                                        <p className="text-xl font-bold text-orange-400">
-                                            {formatCurrency(historyTotals.totalExpenses)}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <p className="text-sm text-slate-400">Recaudado</p>
-                                        <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-blue-500">
-                                            {formatCurrency(historyTotals.totalDeliveredAmount)}
-                                        </p>
-                                    </div>
-                                     <div>
-                                        <p className="text-sm text-slate-400">En Empresa</p>
-                                        <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">
-                                            {formatCurrency(historyTotals.totalAmountSettled)}
-                                        </p>
-                                    </div>
+                <div className="border-t border-slate-700 mt-6 pt-6">
+                    <div className="flex justify-end mb-4">
+                        <button onClick={handleClearAllHistory} disabled={history.length === 0} className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-all duration-300 flex items-center justify-center text-sm hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:bg-red-600">
+                            <TrashIcon />
+                            <span className="ml-2">Borrar Historial</span>
+                        </button>
+                    </div>
+                    
+                    {history.length > 0 && (
+                      <>
+                        <PassengerGoalProgress 
+                          totalPassengers={historyTotals.totalPassengers} 
+                          goal={passengerGoal} 
+                          onGoalChange={setPassengerGoal}
+                        />
+                        <div className="p-4 mt-6 bg-slate-900/50 rounded-lg border border-slate-700">
+                            <h3 className="text-lg font-bold text-slate-300 mb-3 text-center">Resumen Total del Historial</h3>
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
+                                <div>
+                                    <p className="text-sm text-slate-400">Pasajeros Totales</p>
+                                    <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-teal-400">
+                                        {historyTotals.totalPassengers.toLocaleString('es-CO')}
+                                    </p>
+                                </div>
+                                 <div>
+                                    <p className="text-sm text-slate-400">Ganancia Total</p>
+                                    <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-cyan-400">
+                                        {formatCurrency(historyTotals.totalEarnings)}
+                                    </p>
+                                     <div className="mt-2 text-center">
+                                        <span className="text-sm font-bold text-sky-400">{formatCurrency(historyTotals.totalFixedCommission)}</span>
+                                        <p className="text-xs text-slate-400">15%</p>
+                                        <span className="text-sm font-bold text-teal-400 mt-1 block">{formatCurrency(historyTotals.totalPerPassengerCommission)}</span>
+                                        <p className="text-xs text-slate-400">Comisión</p>
+                                     </div>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-slate-400">Gastos Totales</p>
+                                    <p className="text-xl font-bold text-orange-400">
+                                        {formatCurrency(historyTotals.totalExpenses)}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-slate-400">Recaudado</p>
+                                    <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-blue-500">
+                                        {formatCurrency(historyTotals.totalDeliveredAmount)}
+                                    </p>
+                                </div>
+                                 <div>
+                                    <p className="text-sm text-slate-400">En Empresa</p>
+                                    <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">
+                                        {formatCurrency(historyTotals.totalAmountSettled)}
+                                    </p>
                                 </div>
                             </div>
-                          </>
-                        )}
+                        </div>
+                      </>
+                    )}
 
-                        {history.length === 0 ? (
-                            <p className="text-slate-500 text-center py-8">No hay cálculos guardados.</p>
-                        ) : (
-                            <div className="mt-6 md:border md:border-slate-700 md:rounded-lg md:max-h-[70vh] md:overflow-y-auto md:relative">
-                                <HistoryTableHeader />
-                                <ul className="space-y-4 md:space-y-0">
-                                    {history.map((entry, index) => {
-                                       const isExpanded = expandedId === entry.id;
-                                       return (
-                                        <li key={entry.id} className="md:border-b md:border-slate-700 last:md:border-b-0">
-                                          {/* --- Mobile Card --- */}
-                                          <div className="md:hidden bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
-                                              <button onClick={() => handleToggleExpand(entry.id)} className="w-full p-4 text-left bg-slate-800 hover:bg-teal-500/10 transition-colors duration-200">
-                                                <div className="flex justify-between items-start gap-4">
-                                                    <div>
-                                                        <p className="font-semibold text-slate-300">{formatTimestamp(entry.timestamp)}</p>
-                                                        <p className="text-sm text-slate-400">Ruta {entry.formData.route}</p>
-                                                    </div>
-                                                    <ChevronDownIcon className={`transform transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''} flex-shrink-0 mt-1`} />
-                                                </div>
-                                                <div className="mt-3 pt-3 border-t border-slate-700/50 flex justify-between items-end">
-                                                    <div>
-                                                        <p className="text-xs text-slate-400">Ganancia</p>
-                                                        <p className="font-bold text-green-400 text-lg leading-tight">{formatCurrency(entry.results.myEarnings)}</p>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <p className="text-xs text-slate-400">Recaudado</p>
-                                                        <p className="font-semibold text-indigo-400 text-base leading-tight">{formatCurrency(entry.results.totalDeliveredAmount || 0)}</p>
-                                                    </div>
-                                                </div>
-                                              </button>
-                                              
-                                              <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isExpanded ? 'max-h-[500px]' : 'max-h-0'}`}>
-                                                  <div className="px-4 pb-4 border-t border-teal-500/20">
-                                                    {/* Date Editing */}
-                                                    {editingTimestampId === entry.id ? (
-                                                        <div className="flex items-center gap-2 my-3">
-                                                            <input type="datetime-local" value={tempTimestamp} onChange={(e) => setTempTimestamp(e.target.value)} className="bg-slate-700 border border-slate-600 rounded-md p-1 text-white focus:ring-teal-500 focus:border-teal-500 w-full" aria-label="Editar fecha y hora" />
-                                                            <button onClick={() => handleEditTimestampSave(entry.id)} title="Guardar" aria-label="Guardar fecha y hora" className="p-2 rounded-full bg-slate-700 hover:bg-green-600 text-slate-300 hover:text-white transition-colors duration-200"><CheckIcon /></button>
-                                                            <button onClick={handleEditTimestampCancel} title="Cancelar" aria-label="Cancelar edición" className="p-2 rounded-full bg-slate-700 hover:bg-red-600 text-slate-300 hover:text-white transition-colors duration-200"><XIcon /></button>
+                    {history.length === 0 ? (
+                        <p className="text-slate-500 text-center py-8">No hay cálculos guardados.</p>
+                    ) : (
+                        <div className="mt-6">
+                            <button onClick={() => setIsRecordListOpen(!isRecordListOpen)} className="w-full flex justify-between items-center text-left p-3 bg-slate-900/50 rounded-lg hover:bg-slate-700/50 transition-colors duration-200">
+                                <div className="flex items-center gap-3">
+                                    <h3 className="text-lg font-bold text-slate-300">Registros Diarios</h3>
+                                    <span className="text-sm bg-slate-700 text-slate-300 font-semibold px-2 py-0.5 rounded-full">{history.length} registros</span>
+                                </div>
+                                <ChevronDownIcon className={`transform transition-transform duration-300 ${isRecordListOpen ? 'rotate-180' : ''}`} />
+                            </button>
+                            <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isRecordListOpen ? 'max-h-[5000px] mt-4' : 'max-h-0'}`}>
+                                <div className="md:border md:border-slate-700 md:rounded-lg md:max-h-[70vh] md:overflow-y-auto md:relative">
+                                    <HistoryTableHeader />
+                                    <ul className="space-y-4 md:space-y-0">
+                                        {history.map((entry, index) => {
+                                           const isExpanded = expandedId === entry.id;
+                                           return (
+                                            <li key={entry.id} className="md:border-b md:border-slate-700 last:md:border-b-0">
+                                              {/* --- Mobile Card --- */}
+                                              <div className="md:hidden bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+                                                  <button onClick={() => handleToggleExpand(entry.id)} className="w-full p-4 text-left bg-slate-800 hover:bg-teal-500/10 transition-colors duration-200">
+                                                    <div className="flex justify-between items-start gap-4">
+                                                        <div>
+                                                            <p className="font-semibold text-slate-300">{formatTimestamp(entry.timestamp)}</p>
+                                                            <p className="text-sm text-slate-400">Ruta {entry.formData.route}</p>
                                                         </div>
-                                                    ) : (
-                                                        <div className="flex justify-end pt-2">
-                                                            <button onClick={() => handleEditTimestampStart(entry.id, entry.timestamp)} title="Editar fecha" aria-label="Editar fecha" className="p-1 rounded-full text-slate-500 hover:bg-slate-700 hover:text-white transition-colors duration-200 flex items-center text-xs">
-                                                                <EditIcon /> <span className="ml-1">Editar Fecha</span>
-                                                            </button>
+                                                        <ChevronDownIcon className={`transform transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''} flex-shrink-0 mt-1`} />
+                                                    </div>
+                                                    <div className="mt-3 pt-3 border-t border-slate-700/50 flex justify-between items-end">
+                                                        <div>
+                                                            <p className="text-xs text-slate-400">Ganancia</p>
+                                                            <p className="font-bold text-green-400 text-lg leading-tight">{formatCurrency(entry.results.myEarnings)}</p>
                                                         </div>
-                                                    )}
-                                                     {/* Details Grid */}
-                                                    <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm mt-3">
-                                                        <div><p className="text-slate-400">Pasajeros</p><p className="font-bold text-white text-base">{parseFormattedNumber(entry.formData.numPassengers)}</p></div>
-                                                        <div><p className="text-slate-400">Gastos</p><p className="font-bold text-amber-400 text-base">{formatCurrency(entry.results.totalExpenses)}</p></div>
-                                                        <div className="col-span-2">
-                                                            <p className="text-slate-400">Desglose Ganancia</p>
-                                                            <div className="text-xs mt-1 text-slate-400 grid grid-cols-[auto_1fr] gap-x-4">
-                                                                <span>↳ Fija ({entry.formData.fixedCommission}%):</span><span className="font-medium text-sky-300 text-right">{formatCurrency(entry.results.fixedCommissionValue)}</span>
-                                                                <span>↳ Pasajeros:</span><span className="font-medium text-teal-300 text-right">{formatCurrency(entry.results.perPassengerCommissionValue)}</span>
+                                                        <div className="text-right">
+                                                            <p className="text-xs text-slate-400">Recaudado</p>
+                                                            <p className="font-semibold text-indigo-400 text-base leading-tight">{formatCurrency(entry.results.totalDeliveredAmount || 0)}</p>
+                                                        </div>
+                                                    </div>
+                                                  </button>
+                                                  
+                                                  <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isExpanded ? 'max-h-[500px]' : 'max-h-0'}`}>
+                                                      <div className="px-4 pb-4 border-t border-teal-500/20">
+                                                        {/* Date Editing */}
+                                                        {editingTimestampId === entry.id ? (
+                                                            <div className="flex items-center gap-2 my-3">
+                                                                <input type="datetime-local" value={tempTimestamp} onChange={(e) => setTempTimestamp(e.target.value)} className="bg-slate-700 border border-slate-600 rounded-md p-1 text-white focus:ring-teal-500 focus:border-teal-500 w-full" aria-label="Editar fecha y hora" />
+                                                                <button onClick={() => handleEditTimestampSave(entry.id)} title="Guardar" aria-label="Guardar fecha y hora" className="p-2 rounded-full bg-slate-700 hover:bg-green-600 text-slate-300 hover:text-white transition-colors duration-200"><CheckIcon /></button>
+                                                                <button onClick={handleEditTimestampCancel} title="Cancelar" aria-label="Cancelar edición" className="p-2 rounded-full bg-slate-700 hover:bg-red-600 text-slate-300 hover:text-white transition-colors duration-200"><XIcon /></button>
                                                             </div>
+                                                        ) : (
+                                                            <div className="flex justify-end pt-2">
+                                                                <button onClick={() => handleEditTimestampStart(entry.id, entry.timestamp)} title="Editar fecha" aria-label="Editar fecha" className="p-1 rounded-full text-slate-500 hover:bg-slate-700 hover:text-white transition-colors duration-200 flex items-center text-xs">
+                                                                    <EditIcon /> <span className="ml-1">Editar Fecha</span>
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                         {/* Details Grid */}
+                                                        <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm mt-3">
+                                                            <div><p className="text-slate-400">Pasajeros</p><p className="font-bold text-white text-base">{parseFormattedNumber(entry.formData.numPassengers)}</p></div>
+                                                            <div><p className="text-slate-400">Gastos</p><p className="font-bold text-amber-400 text-base">{formatCurrency(entry.results.totalExpenses)}</p></div>
+                                                            <div className="col-span-2">
+                                                                <p className="text-slate-400">Desglose Ganancia</p>
+                                                                <div className="text-xs mt-1 text-slate-400 grid grid-cols-[auto_1fr] gap-x-4">
+                                                                    <span>↳ Fija ({entry.formData.fixedCommission}%):</span><span className="font-medium text-sky-300 text-right">{formatCurrency(entry.results.fixedCommissionValue)}</span>
+                                                                    <span>↳ Pasajeros:</span><span className="font-medium text-teal-300 text-right">{formatCurrency(entry.results.perPassengerCommissionValue)}</span>
+                                                                </div>
+                                                            </div>
+                                                            <div className="col-span-2"><p className="text-slate-400">En Empresa</p><p className="font-bold text-blue-400 text-base">{formatCurrency(entry.results.amountToSettle)}</p></div>
                                                         </div>
-                                                        <div className="col-span-2"><p className="text-slate-400">En Empresa</p><p className="font-bold text-blue-400 text-base">{formatCurrency(entry.results.amountToSettle)}</p></div>
+                                                         {/* Actions */}
+                                                        <div className="flex items-center space-x-2 mt-4 justify-start border-t border-slate-700 pt-3">
+                                                            <button onClick={() => handleMoveEntryUp(entry.id)} title="Mover hacia arriba" aria-label="Mover hacia arriba" disabled={index === 0} className="p-2 rounded-full bg-slate-700 hover:bg-sky-600 text-slate-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowUpIcon /></button>
+                                                            <button onClick={() => handleMoveEntryDown(entry.id)} title="Mover hacia abajo" aria-label="Mover hacia abajo" disabled={index === history.length - 1} className="p-2 rounded-full bg-slate-700 hover:bg-sky-600 text-slate-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowDownIcon /></button>
+                                                            <button onClick={() => handleLoadEntry(entry.id)} title="Cargar este cálculo" aria-label="Cargar este cálculo" className="p-2 rounded-full bg-slate-700 hover:bg-cyan-600 text-slate-300 hover:text-white transition-colors duration-200"><LoadIcon /></button>
+                                                            <button onClick={() => handleDeleteEntry(entry.id)} title="Borrar este cálculo" aria-label="Borrar este cálculo" className="p-2 rounded-full bg-slate-700 hover:bg-red-600 text-slate-300 hover:text-white transition-colors duration-200"><TrashIcon /></button>
+                                                        </div>
                                                     </div>
-                                                     {/* Actions */}
-                                                    <div className="flex items-center space-x-2 mt-4 justify-start border-t border-slate-700 pt-3">
+                                                  </div>
+                                              </div>
+
+                                              {/* --- Desktop Table Row --- */}
+                                              <div className="hidden md:p-4 md:grid md:grid-cols-9 md:gap-x-4 md:items-center bg-transparent even:bg-slate-900/60 odd:bg-transparent hover:bg-teal-500/10 transition-colors duration-200 group">
+                                                  <div className="md:col-span-2">
+                                                      {editingTimestampId === entry.id ? (
+                                                          <div className="flex items-center gap-2">
+                                                              <input type="datetime-local" value={tempTimestamp} onChange={(e) => setTempTimestamp(e.target.value)} className="bg-slate-700 border border-slate-600 rounded-md p-1 text-white focus:ring-teal-500 focus:border-teal-500 w-full" aria-label="Editar fecha y hora" />
+                                                              <button onClick={() => handleEditTimestampSave(entry.id)} title="Guardar" aria-label="Guardar fecha y hora" className="p-2 rounded-full bg-slate-700 hover:bg-green-600 text-slate-300 hover:text-white transition-colors duration-200"><CheckIcon /></button>
+                                                              <button onClick={handleEditTimestampCancel} title="Cancelar" aria-label="Cancelar edición" className="p-2 rounded-full bg-slate-700 hover:bg-red-600 text-slate-300 hover:text-white transition-colors duration-200"><XIcon /></button>
+                                                          </div>
+                                                      ) : (
+                                                          <div className="flex items-center gap-2">
+                                                              <p className="font-semibold text-slate-300 group-hover:text-white">{formatTimestamp(entry.timestamp)}</p>
+                                                              <button onClick={() => handleEditTimestampStart(entry.id, entry.timestamp)} title="Editar fecha" aria-label="Editar fecha" className="p-1 rounded-full text-slate-500 hover:bg-slate-700 hover:text-white transition-colors duration-200 opacity-0 group-hover:opacity-100 focus:opacity-100"><EditIcon /></button>
+                                                          </div>
+                                                      )}
+                                                  </div>
+                                                  <div className="font-bold text-teal-400 text-base">{entry.formData.route}</div>
+                                                  <div className="font-bold text-white text-base">{parseFormattedNumber(entry.formData.numPassengers)}</div>
+                                                  <div className="text-center text-sm">
+                                                      <p className="font-bold text-green-400 text-base">{formatCurrency(entry.results.myEarnings)}</p>
+                                                      <p className="text-xs text-sky-300">{formatCurrency(entry.results.fixedCommissionValue)} ({entry.formData.fixedCommission}%)</p>
+                                                      <p className="text-xs text-teal-300">{formatCurrency(entry.results.perPassengerCommissionValue)} (Pasajeros)</p>
+                                                  </div>
+                                                  <div className="font-bold text-amber-400 text-base text-center">{formatCurrency(entry.results.totalExpenses)}</div>
+                                                  <div className="font-bold text-indigo-400 text-base text-center">{formatCurrency(entry.results.totalDeliveredAmount || 0)}</div>
+                                                  <div className="font-bold text-blue-400 text-base text-center">{formatCurrency(entry.results.amountToSettle)}</div>
+                                                  <div className="flex items-center space-x-2 justify-end">
+                                                      <>
                                                         <button onClick={() => handleMoveEntryUp(entry.id)} title="Mover hacia arriba" aria-label="Mover hacia arriba" disabled={index === 0} className="p-2 rounded-full bg-slate-700 hover:bg-sky-600 text-slate-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowUpIcon /></button>
                                                         <button onClick={() => handleMoveEntryDown(entry.id)} title="Mover hacia abajo" aria-label="Mover hacia abajo" disabled={index === history.length - 1} className="p-2 rounded-full bg-slate-700 hover:bg-sky-600 text-slate-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowDownIcon /></button>
                                                         <button onClick={() => handleLoadEntry(entry.id)} title="Cargar este cálculo" aria-label="Cargar este cálculo" className="p-2 rounded-full bg-slate-700 hover:bg-cyan-600 text-slate-300 hover:text-white transition-colors duration-200"><LoadIcon /></button>
                                                         <button onClick={() => handleDeleteEntry(entry.id)} title="Borrar este cálculo" aria-label="Borrar este cálculo" className="p-2 rounded-full bg-slate-700 hover:bg-red-600 text-slate-300 hover:text-white transition-colors duration-200"><TrashIcon /></button>
-                                                    </div>
-                                                </div>
+                                                      </>
+                                                  </div>
                                               </div>
-                                          </div>
-
-                                          {/* --- Desktop Table Row --- */}
-                                          <div className="hidden md:p-4 md:grid md:grid-cols-9 md:gap-x-4 md:items-center bg-transparent even:bg-slate-900/60 odd:bg-transparent hover:bg-teal-500/10 transition-colors duration-200 group">
-                                              <div className="md:col-span-2">
-                                                  {editingTimestampId === entry.id ? (
-                                                      <div className="flex items-center gap-2">
-                                                          <input type="datetime-local" value={tempTimestamp} onChange={(e) => setTempTimestamp(e.target.value)} className="bg-slate-700 border border-slate-600 rounded-md p-1 text-white focus:ring-teal-500 focus:border-teal-500 w-full" aria-label="Editar fecha y hora" />
-                                                          <button onClick={() => handleEditTimestampSave(entry.id)} title="Guardar" aria-label="Guardar fecha y hora" className="p-2 rounded-full bg-slate-700 hover:bg-green-600 text-slate-300 hover:text-white transition-colors duration-200"><CheckIcon /></button>
-                                                          <button onClick={handleEditTimestampCancel} title="Cancelar" aria-label="Cancelar edición" className="p-2 rounded-full bg-slate-700 hover:bg-red-600 text-slate-300 hover:text-white transition-colors duration-200"><XIcon /></button>
-                                                      </div>
-                                                  ) : (
-                                                      <div className="flex items-center gap-2">
-                                                          <p className="font-semibold text-slate-300 group-hover:text-white">{formatTimestamp(entry.timestamp)}</p>
-                                                          <button onClick={() => handleEditTimestampStart(entry.id, entry.timestamp)} title="Editar fecha" aria-label="Editar fecha" className="p-1 rounded-full text-slate-500 hover:bg-slate-700 hover:text-white transition-colors duration-200 opacity-0 group-hover:opacity-100 focus:opacity-100"><EditIcon /></button>
-                                                      </div>
-                                                  )}
-                                              </div>
-                                              <div className="font-bold text-teal-400 text-base">{entry.formData.route}</div>
-                                              <div className="font-bold text-white text-base">{parseFormattedNumber(entry.formData.numPassengers)}</div>
-                                              <div className="text-center text-sm">
-                                                  <p className="font-bold text-green-400 text-base">{formatCurrency(entry.results.myEarnings)}</p>
-                                                  <p className="text-xs text-sky-300">{formatCurrency(entry.results.fixedCommissionValue)} ({entry.formData.fixedCommission}%)</p>
-                                                  <p className="text-xs text-teal-300">{formatCurrency(entry.results.perPassengerCommissionValue)} (Pasajeros)</p>
-                                              </div>
-                                              <div className="font-bold text-amber-400 text-base text-center">{formatCurrency(entry.results.totalExpenses)}</div>
-                                              <div className="font-bold text-indigo-400 text-base text-center">{formatCurrency(entry.results.totalDeliveredAmount || 0)}</div>
-                                              <div className="font-bold text-blue-400 text-base text-center">{formatCurrency(entry.results.amountToSettle)}</div>
-                                              <div className="flex items-center space-x-2 justify-end">
-                                                  <>
-                                                    <button onClick={() => handleMoveEntryUp(entry.id)} title="Mover hacia arriba" aria-label="Mover hacia arriba" disabled={index === 0} className="p-2 rounded-full bg-slate-700 hover:bg-sky-600 text-slate-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowUpIcon /></button>
-                                                    <button onClick={() => handleMoveEntryDown(entry.id)} title="Mover hacia abajo" aria-label="Mover hacia abajo" disabled={index === history.length - 1} className="p-2 rounded-full bg-slate-700 hover:bg-sky-600 text-slate-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowDownIcon /></button>
-                                                    <button onClick={() => handleLoadEntry(entry.id)} title="Cargar este cálculo" aria-label="Cargar este cálculo" className="p-2 rounded-full bg-slate-700 hover:bg-cyan-600 text-slate-300 hover:text-white transition-colors duration-200"><LoadIcon /></button>
-                                                    <button onClick={() => handleDeleteEntry(entry.id)} title="Borrar este cálculo" aria-label="Borrar este cálculo" className="p-2 rounded-full bg-slate-700 hover:bg-red-600 text-slate-300 hover:text-white transition-colors duration-200"><TrashIcon /></button>
-                                                  </>
-                                              </div>
-                                          </div>
-                                        </li>
-                                    )})}
-                                </ul>
+                                            </li>
+                                        )})}
+                                    </ul>
+                                </div>
                             </div>
-                        )}
-                    </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </section>
