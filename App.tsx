@@ -818,6 +818,11 @@ const DocumentManager: React.FC<{ documents: ManagedDocument[]; setDocuments: Re
 
                     <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isSectionOpen ? 'max-h-[1000px] mt-6' : 'max-h-0'}`}>
                          <div className="border-t border-slate-700 pt-6">
+                            <div className="flex justify-end mb-4">
+                                <button onClick={handleAddNew} className="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg transition-all duration-300 flex items-center justify-center text-sm gap-2 hover:scale-105">
+                                    <PlusCircleIcon /> Añadir Nuevo Documento
+                                </button>
+                            </div>
                             <div className="max-h-[60vh] overflow-y-auto pr-2 -mr-2 space-y-3">
                                 {documents.length === 0 ? (
                                     <p className="text-slate-500 text-center py-4">No has añadido ningún documento.</p>
@@ -847,9 +852,6 @@ const DocumentManager: React.FC<{ documents: ManagedDocument[]; setDocuments: Re
                                     })
                                 )}
                             </div>
-                            <button onClick={handleAddNew} className="w-full mt-4 bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg transition-all duration-300 flex items-center justify-center text-sm gap-2 hover:scale-105">
-                                <PlusCircleIcon /> Añadir Nuevo Documento
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -1171,18 +1173,23 @@ const VehicleMaintenanceManager: React.FC<{ records: MaintenanceRecord[]; setRec
 
                     <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isSectionOpen ? 'max-h-[2000px] mt-6' : 'max-h-0'}`}>
                          <div className="border-t border-slate-700 pt-6">
-                            <div className="relative mb-4">
-                                <span className="absolute inset-y-0 left-0 flex items-center pl-3">
-                                    <SearchIcon />
-                                </span>
-                                <input
-                                    type="text"
-                                    placeholder="Buscar por tipo, nota, fecha, km..."
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="w-full bg-slate-700/80 border border-slate-600 rounded-lg py-2 pl-10 pr-4 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                                    aria-label="Buscar en mantenimiento"
-                                />
+                            <div className="flex flex-col sm:flex-row items-center gap-4 mb-4">
+                                <div className="relative w-full sm:flex-grow">
+                                    <span className="absolute inset-y-0 left-0 flex items-center pl-3">
+                                        <SearchIcon />
+                                    </span>
+                                    <input
+                                        type="text"
+                                        placeholder="Buscar por tipo, nota, fecha, km..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="w-full bg-slate-700/80 border border-slate-600 rounded-lg py-2 pl-10 pr-4 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                                        aria-label="Buscar en mantenimiento"
+                                    />
+                                </div>
+                                <button onClick={handleAddNew} className="w-full sm:w-auto flex-shrink-0 bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg transition-all duration-300 flex items-center justify-center text-sm gap-2 hover:scale-105">
+                                    <PlusCircleIcon /> Añadir Mantenimiento
+                                </button>
                             </div>
 
                             <div className="max-h-[60vh] overflow-y-auto pr-2 -mr-2 space-y-3">
@@ -1218,9 +1225,6 @@ const VehicleMaintenanceManager: React.FC<{ records: MaintenanceRecord[]; setRec
                                     ))
                                 )}
                             </div>
-                            <button onClick={handleAddNew} className="w-full mt-4 bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg transition-all duration-300 flex items-center justify-center text-sm gap-2 hover:scale-105">
-                                <PlusCircleIcon /> Añadir Mantenimiento
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -1279,7 +1283,7 @@ const App: React.FC = () => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [fabBottom, setFabBottom] = useState('1.5rem');
   const [showSaveSuccessAnim, setShowSaveSuccessAnim] = useState(false);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(true);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   
   const fuelInputRef = useRef<HTMLInputElement>(null);
 
