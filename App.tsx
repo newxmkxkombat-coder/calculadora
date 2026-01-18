@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 
 // --- TYPE DEFINITIONS ---
@@ -48,6 +49,7 @@ interface MaintenanceRecord {
 }
 
 interface AppConfig {
+  fareValue: string;
   commissionPerPassenger: string;
   variableExpenses: string;
   administrativeExpenses: string;
@@ -138,6 +140,7 @@ const saveConfigToLocalStorage = (config: AppConfig) => {
 
 const loadConfigFromLocalStorage = (): AppConfig => {
   const defaultConfig: AppConfig = {
+    fareValue: '3.000',
     commissionPerPassenger: '100',
     variableExpenses: '20.000',
     administrativeExpenses: '109.165',
@@ -1263,7 +1266,7 @@ const App: React.FC = () => {
 
     return {
       numPassengers: '',
-      fareValue: '3.000',
+      fareValue: config.fareValue, // Load from persisted config
       fixedCommission: '15',
       fuelExpenses: '',
       route: dailyDefaultRoute, // Set the automatically calculated route
@@ -1307,13 +1310,14 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const config: AppConfig = {
+      fareValue: formData.fareValue,
       commissionPerPassenger: formData.commissionPerPassenger,
       variableExpenses: formData.variableExpenses,
       administrativeExpenses: formData.administrativeExpenses,
       passengerGoal: passengerGoal,
     };
     saveConfigToLocalStorage(config);
-  }, [formData.commissionPerPassenger, formData.variableExpenses, formData.administrativeExpenses, passengerGoal]);
+  }, [formData.fareValue, formData.commissionPerPassenger, formData.variableExpenses, formData.administrativeExpenses, passengerGoal]);
 
 
     useEffect(() => {
