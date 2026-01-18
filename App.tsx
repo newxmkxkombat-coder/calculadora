@@ -17,8 +17,8 @@ interface CalculationResults {
   totalRevenue: number;
   myEarnings: number;
   totalExpenses: number;
-  amountToSettle: number; // In history, this is NET. In main state, it's GROSS.
-  totalDeliveredAmount?: number; // Recaudado (GROSS amount), only for history.
+  amountToSettle: number; 
+  totalDeliveredAmount?: number; 
   fixedCommissionValue: number;
   perPassengerCommissionValue: number;
 }
@@ -33,18 +33,18 @@ interface HistoryEntry {
 interface ManagedDocument {
   id: string;
   name: string;
-  expiryDate: string; // YYYY-MM-DD
-  alertDateTime?: string; // ISO string for exact alert time
-  imageSrc?: string; // Base64 data URL
+  expiryDate: string; 
+  alertDateTime?: string; 
+  imageSrc?: string; 
 }
 
 interface MaintenanceRecord {
   id: string;
   type: string;
-  date: string; // YYYY-MM-DD
-  mileage?: string; // Optional, formatted number
-  nextChangeMileage?: string; // for oil changes
-  filterChangeMileage?: string; // for oil changes
+  date: string; 
+  mileage?: string; 
+  nextChangeMileage?: string; 
+  filterChangeMileage?: string; 
   notes?: string;
 }
 
@@ -87,7 +87,6 @@ const formatTimestamp = (isoString: string): string => {
   try {
     const date = new Date(isoString);
     if (isNaN(date.getTime())) {
-      // If parsing as ISO fails, it might be the old format. Return it as is.
       return isoString;
     }
     return date.toLocaleString('es-CO', {
@@ -95,7 +94,7 @@ const formatTimestamp = (isoString: string): string => {
       hour: '2-digit', minute: '2-digit'
     });
   } catch (e) {
-    return isoString; // Fallback to original string if anything goes wrong
+    return isoString; 
   }
 };
 
@@ -118,10 +117,40 @@ const saveHistoryToLocalStorage = (history: HistoryEntry[]) => {
   }
 };
 
+// Anchor Point: Sunday, May 18, 2025 = Route 60
+const ANCHOR_DATE = new Date('2025-05-18');
+const ROUTE_SEQUENCE = ['60', '29'];
+
+const calculateRouteForDate = (dateString: string): string => {
+  const date = new Date(dateString);
+  // Normalize dates to midnight
+  const anchor = new Date(ANCHOR_DATE);
+  anchor.setHours(0, 0, 0, 0);
+  const target = new Date(date);
+  target.setHours(0, 0, 0, 0);
+
+  const timeDiff = target.getTime() - anchor.getTime();
+  const dayDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+  
+  const index = (dayDiff % ROUTE_SEQUENCE.length + ROUTE_SEQUENCE.length) % ROUTE_SEQUENCE.length;
+  return ROUTE_SEQUENCE[index];
+};
+
 const loadHistoryFromLocalStorage = (): HistoryEntry[] => {
   try {
     const savedHistory = localStorage.getItem('earningsCalculatorHistory');
-    return savedHistory ? JSON.parse(savedHistory) : [];
+    if (!savedHistory) return [];
+    
+    const history: HistoryEntry[] = JSON.parse(savedHistory);
+    
+    // Auto-Repair/Sync: Ensure all records follow the 60/29 pattern based on their date
+    return history.map(entry => ({
+      ...entry,
+      formData: {
+        ...entry.formData,
+        route: calculateRouteForDate(entry.timestamp)
+      }
+    }));
   } catch (error) {
     console.error("Error loading history from localStorage:", error);
     return [];
@@ -433,7 +462,7 @@ interface InputControlProps {
           <div className="text-teal-400">{icon}</div>
           <label className="block text-xs font-medium text-slate-400">{label}</label>
         </div>
-        <fieldset disabled={disabled} className="grid grid-cols-4 gap-2">
+        <fieldset disabled={disabled} className={`grid ${options.length <= 2 ? 'grid-cols-2' : 'grid-cols-4'} gap-2`}>
           {options.map(option => (
             <div key={option}>
               <input
@@ -451,7 +480,7 @@ interface InputControlProps {
                 htmlFor={`${name}-${option}`}
                 className={`w-full block text-center py-2 px-2 border-2 border-slate-700 rounded-lg transition-all duration-300 font-semibold bg-slate-800 text-slate-300 ${!disabled ? 'cursor-pointer peer-checked:bg-gradient-to-br peer-checked:from-cyan-500 peer-checked:to-teal-600 peer-checked:text-white peer-checked:border-teal-400 hover:border-slate-500 peer-checked:hover:from-cyan-600 peer-checked:hover:to-teal-700' : 'cursor-not-allowed'} text-sm`}
               >
-                {option}
+                Ruta {option}
               </label>
             </div>
           ))}
@@ -603,7 +632,7 @@ const Toast: React.FC<ToastProps> = ({ message, show, onClose }) => {
     if (show) {
       const timer = setTimeout(() => {
         onClose();
-      }, 5000); // Auto-dismiss after 5 seconds
+      }, 5000); 
       return () => clearTimeout(timer);
     }
   }, [show, onClose]);
@@ -641,7 +670,6 @@ const DigitalClock: React.FC = () => {
     }, []);
 
     const formatTime = (date: Date) => {
-        // Use toLocaleTimeString for a 12-hour format with AM/PM
         return date.toLocaleTimeString('en-US', {
             hour: '2-digit',
             minute: '2-digit',
@@ -977,7 +1005,6 @@ const MaintenanceModal: React.FC<{ record: MaintenanceRecord | null; onSave: (re
         }
     }, [record]);
 
-    // Automatic calculation for oil changes
     useEffect(() => {
         if (formData.type === 'Cambio de Aceite' && formData.mileage) {
             const currentMileage = parseInt(parseFormattedNumber(formData.mileage), 10);
@@ -1247,29 +1274,16 @@ const App: React.FC = () => {
 
   const getInitialFormData = useCallback((): FormData => {
     const config = loadConfigFromLocalStorage();
-    const routeSequence = ['60', '9', '11', '29'];
-    // Anchor date: A known date when the sequence started with the first element ('60').
-    // Let's set it to Friday, July 26, 2024.
-    const anchorDate = new Date('2024-07-26');
     const today = new Date();
-
-    // Normalize dates to midnight to compare days correctly
-    anchorDate.setHours(0, 0, 0, 0);
     today.setHours(0, 0, 0, 0);
-
-    const timeDiff = today.getTime() - anchorDate.getTime();
-    const dayDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
-
-    // Use modulo to find the correct index in the sequence
-    const todayIndex = (dayDiff % routeSequence.length + routeSequence.length) % routeSequence.length;
-    const dailyDefaultRoute = routeSequence[todayIndex];
+    const dailyDefaultRoute = calculateRouteForDate(today.toISOString());
 
     return {
       numPassengers: '',
-      fareValue: config.fareValue, // Load from persisted config
+      fareValue: config.fareValue, 
       fixedCommission: '15',
       fuelExpenses: '',
-      route: dailyDefaultRoute, // Set the automatically calculated route
+      route: dailyDefaultRoute, 
       commissionPerPassenger: config.commissionPerPassenger,
       variableExpenses: config.variableExpenses,
       administrativeExpenses: config.administrativeExpenses,
@@ -1290,7 +1304,6 @@ const App: React.FC = () => {
   
   const fuelInputRef = useRef<HTMLInputElement>(null);
 
-  // State for draggable FAB
   const [isDragging, setIsDragging] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const dragStartRef = useRef({ x: 0, y: 0, initialX: 0, initialY: 0 });
@@ -1332,26 +1345,23 @@ const App: React.FC = () => {
 
             const keyboardHeight = window.innerHeight - visualViewport.height;
 
-            if (keyboardHeight > 50) { // Keyboard is likely open
+            if (keyboardHeight > 50) { 
                 setFabBottom(`${keyboardHeight + defaultBottomPx}px`);
 
-                // Scroll the focused input into view if it's obscured
                 if (focusedElementRef.current) {
                     setTimeout(() => {
                         if (!focusedElementRef.current) return;
                         const inputRect = focusedElementRef.current.getBoundingClientRect();
                         
-                        // If the input's bottom edge is below the visible viewport's bottom edge
                         if (inputRect.bottom > visualViewport.height) {
                             focusedElementRef.current.scrollIntoView({
                                 behavior: 'smooth',
                                 block: 'center',
                             });
                         }
-                    }, 150); // Delay to allow layout to reflow
+                    }, 150); 
                 }
             } else {
-                // Keyboard is likely closed
                 setFabBottom(`${defaultBottomRem}rem`);
             }
         };
@@ -1359,13 +1369,13 @@ const App: React.FC = () => {
         visualViewport.addEventListener('resize', handleResize);
         window.addEventListener('resize', handleResize);
         
-        handleResize(); // Initial call
+        handleResize(); 
 
         return () => {
             visualViewport.removeEventListener('resize', handleResize);
             window.removeEventListener('resize', handleResize);
         };
-    }, []); // No dependencies needed, as we're using a ref
+    }, []); 
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement> | { target: { name: string; value: string } }) => {
     const { name, value } = e.target;
@@ -1465,7 +1475,6 @@ const App: React.FC = () => {
   }, [getInitialFormData]);
 
   const handleSaveCalculation = () => {
-    // Prevent save if dragging or during animation
     if (isDragging || showSaveSuccessAnim) return;
       
     const rawData = getRawData(formData);
@@ -1479,8 +1488,8 @@ const App: React.FC = () => {
 
     const resultsForHistory: CalculationResults = {
       ...results,
-      amountToSettle: netAmountToSettle, // "En Empresa" (net)
-      totalDeliveredAmount: grossAmountToSettle, // "Recaudado" (gross)
+      amountToSettle: netAmountToSettle, 
+      totalDeliveredAmount: grossAmountToSettle, 
     };
 
     if (editingId) {
@@ -1515,10 +1524,8 @@ const App: React.FC = () => {
 
     const handleEditTimestampStart = (id: string, timestamp: string) => {
     setEditingTimestampId(id);
-    // Convert ISO string to a format datetime-local input accepts (YYYY-MM-DDTHH:MM)
     try {
       const date = new Date(timestamp);
-      // Pad month, day, hours, minutes to be 2 digits
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const day = String(date.getDate()).padStart(2, '0');
       const hours = String(date.getHours()).padStart(2, '0');
@@ -1526,7 +1533,6 @@ const App: React.FC = () => {
       const localDateTime = `${date.getFullYear()}-${month}-${day}T${hours}:${minutes}`;
       setTempTimestamp(localDateTime);
     } catch (e) {
-      // Fallback if date is invalid
       setTempTimestamp('');
     }
   };
@@ -1534,12 +1540,11 @@ const App: React.FC = () => {
   const handleEditTimestampSave = (id: string) => {
     if (!tempTimestamp) return;
 
-    // Convert local datetime string back to ISO string
     const newTimestamp = new Date(tempTimestamp).toISOString();
 
     setHistory(prev => prev.map(entry =>
-      entry.id === id ? { ...entry, timestamp: newTimestamp } : entry
-    ).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())); // Re-sort after editing
+      entry.id === id ? { ...entry, timestamp: newTimestamp, formData: { ...entry.formData, route: calculateRouteForDate(newTimestamp) } } : entry
+    ).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())); 
 
     setEditingTimestampId(null);
     setTempTimestamp('');
@@ -1562,7 +1567,6 @@ const App: React.FC = () => {
   const handleDeleteEntry = (id: string) => {
     if (window.confirm("¿Estás seguro de que quieres borrar este registro?")) {
       if (editingId) {
-          // If deleting the entry being edited, clear the form as well
           const entryToDelete = history.find(entry => entry.id === id);
           if (entryToDelete && entryToDelete.id === editingId) {
               handleClearForm();
@@ -1578,7 +1582,7 @@ const App: React.FC = () => {
     );
     if (isConfirmed) {
       setHistory([]);
-      handleClearForm(); // Also reset the form
+      handleClearForm(); 
     }
   };
 
@@ -1587,7 +1591,6 @@ const App: React.FC = () => {
       const index = prevHistory.findIndex(entry => entry.id === id);
       if (index > 0) {
         const newHistory = [...prevHistory];
-        // Swap elements
         [newHistory[index - 1], newHistory[index]] = [newHistory[index], newHistory[index - 1]];
         return newHistory;
       }
@@ -1600,7 +1603,6 @@ const App: React.FC = () => {
       const index = prevHistory.findIndex(entry => entry.id === id);
       if (index < prevHistory.length - 1 && index !== -1) {
         const newHistory = [...prevHistory];
-        // Swap elements
         [newHistory[index + 1], newHistory[index]] = [newHistory[index], newHistory[index + 1]];
         return newHistory;
       }
@@ -1616,7 +1618,6 @@ const App: React.FC = () => {
     focusedElementRef.current = e.target;
   };
 
-  // --- Draggable FAB Handlers ---
   const getClientCoords = (e: React.MouseEvent | React.TouchEvent | MouseEvent | TouchEvent) => {
       if ('touches' in e) {
         return { x: e.touches[0].clientX, y: e.touches[0].clientY };
@@ -1657,8 +1658,8 @@ const App: React.FC = () => {
     return () => {
       window.removeEventListener('mousemove', handleDragMove);
       window.removeEventListener('touchmove', handleDragMove);
-      window.addEventListener('mouseup', handleDragEnd);
-      window.addEventListener('touchend', handleDragEnd);
+      window.removeEventListener('mouseup', handleDragEnd);
+      window.removeEventListener('touchend', handleDragEnd);
     };
   }, [isDragging, handleDragMove, handleDragEnd]);
 
@@ -1667,8 +1668,8 @@ const App: React.FC = () => {
     return history.reduce((acc, entry) => {
       acc.totalEarnings += entry.results.myEarnings;
       acc.totalExpenses += entry.results.totalExpenses;
-      acc.totalAmountSettled += entry.results.amountToSettle; // Net amount
-      acc.totalDeliveredAmount += entry.results.totalDeliveredAmount || 0; // Recaudado (Gross amount)
+      acc.totalAmountSettled += entry.results.amountToSettle; 
+      acc.totalDeliveredAmount += entry.results.totalDeliveredAmount || 0; 
       acc.totalPassengers += parseFloat(parseFormattedNumber(entry.formData.numPassengers)) || 0;
       acc.totalFixedCommission += entry.results.fixedCommissionValue || 0;
       acc.totalPerPassengerCommission += entry.results.perPassengerCommissionValue || 0;
@@ -1699,13 +1700,10 @@ const App: React.FC = () => {
 
   const handleBackgroundClick = (event: React.MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
-    // Do nothing if an interactive element like an input, button, a, label was clicked.
-    // This allows for normal interaction without dismissing the keyboard unexpectedly.
     if (target.closest('input, button, a, label, select')) {
         return;
     }
 
-    // If an input element is currently focused, remove focus (blur) to dismiss the keyboard.
     if (document.activeElement instanceof HTMLInputElement) {
         document.activeElement.blur();
     }
@@ -1770,7 +1768,7 @@ const App: React.FC = () => {
                           <InputControl label="Comisión Fija" name="fixedCommission" value={formData.fixedCommission} onChange={handleChange} onFocus={handleInputFocus} icon={<PercentageIcon />} unit="%" />
                       </div>
                       <InputControl label="Comisión por Pasajero" name="commissionPerPassenger" value={formData.commissionPerPassenger} onChange={handleChange} onFocus={handleInputFocus} icon={<MoneyIcon />} unit="$" />
-                      <CheckboxControlGroup label="Ruta" name="route" value={formData.route} onChange={handleChange} icon={<RouteIcon />} options={['9', '11', '29', '60']} />
+                      <CheckboxControlGroup label="Ruta Actual" name="route" value={formData.route} onChange={handleChange} icon={<RouteIcon />} options={['60', '29']} />
                   </div>
               </div>
               <div>
@@ -1784,7 +1782,6 @@ const App: React.FC = () => {
           </fieldset>
         </main>
         
-        {/* History Section */}
         <section className="mt-12">
             <div className="bg-slate-800/60 p-4 sm:p-6 rounded-2xl shadow-2xl border border-slate-700">
                 <div className="flex items-center gap-3">
@@ -1869,7 +1866,6 @@ const App: React.FC = () => {
                                            const isExpanded = expandedId === entry.id;
                                            return (
                                             <li key={entry.id} className="md:border-b md:border-slate-700 last:md:border-b-0">
-                                              {/* --- Mobile Card --- */}
                                               <div className="md:hidden bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
                                                   <button onClick={() => handleToggleExpand(entry.id)} className="w-full p-4 text-left bg-slate-800 hover:bg-teal-500/10 transition-colors duration-200">
                                                     <div className="flex justify-between items-start gap-4">
@@ -1893,7 +1889,6 @@ const App: React.FC = () => {
                                                   
                                                   <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isExpanded ? 'max-h-[500px]' : 'max-h-0'}`}>
                                                       <div className="px-4 pb-4 border-t border-teal-500/20">
-                                                        {/* Date Editing */}
                                                         {editingTimestampId === entry.id ? (
                                                             <div className="flex items-center gap-2 my-3">
                                                                 <input type="datetime-local" value={tempTimestamp} onChange={(e) => setTempTimestamp(e.target.value)} className="bg-slate-700 border border-slate-600 rounded-md p-1 text-white focus:ring-teal-500 focus:border-teal-500 w-full" aria-label="Editar fecha y hora" />
@@ -1907,7 +1902,6 @@ const App: React.FC = () => {
                                                                 </button>
                                                             </div>
                                                         )}
-                                                         {/* Details Grid */}
                                                         <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm mt-3">
                                                             <div><p className="text-slate-400">Pasajeros</p><p className="font-bold text-white text-base">{parseFormattedNumber(entry.formData.numPassengers)}</p></div>
                                                             <div><p className="text-slate-400">Gastos</p><p className="font-bold text-amber-400 text-base">{formatCurrency(entry.results.totalExpenses)}</p></div>
@@ -1920,7 +1914,6 @@ const App: React.FC = () => {
                                                             </div>
                                                             <div className="col-span-2"><p className="text-slate-400">En Empresa</p><p className="font-bold text-blue-400 text-base">{formatCurrency(entry.results.amountToSettle)}</p></div>
                                                         </div>
-                                                         {/* Actions */}
                                                         <div className="flex items-center space-x-2 mt-4 justify-start border-t border-slate-700 pt-3">
                                                             <button onClick={() => handleMoveEntryUp(entry.id)} title="Mover hacia arriba" aria-label="Mover hacia arriba" disabled={index === 0} className="p-2 rounded-full bg-slate-700 hover:bg-sky-600 text-slate-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowUpIcon /></button>
                                                             <button onClick={() => handleMoveEntryDown(entry.id)} title="Mover hacia abajo" aria-label="Mover hacia abajo" disabled={index === history.length - 1} className="p-2 rounded-full bg-slate-700 hover:bg-sky-600 text-slate-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowDownIcon /></button>
@@ -1931,7 +1924,6 @@ const App: React.FC = () => {
                                                   </div>
                                               </div>
 
-                                              {/* --- Desktop Table Row --- */}
                                               <div className="hidden md:p-4 md:grid md:grid-cols-9 md:gap-x-4 md:items-center bg-transparent even:bg-slate-900/60 odd:bg-transparent hover:bg-teal-500/10 transition-colors duration-200 group">
                                                   <div className="md:col-span-2">
                                                       {editingTimestampId === entry.id ? (
@@ -1958,12 +1950,10 @@ const App: React.FC = () => {
                                                   <div className="font-bold text-indigo-400 text-base text-center">{formatCurrency(entry.results.totalDeliveredAmount || 0)}</div>
                                                   <div className="font-bold text-blue-400 text-base text-center">{formatCurrency(entry.results.amountToSettle)}</div>
                                                   <div className="flex items-center space-x-2 justify-end">
-                                                      <>
-                                                        <button onClick={() => handleMoveEntryUp(entry.id)} title="Mover hacia arriba" aria-label="Mover hacia arriba" disabled={index === 0} className="p-2 rounded-full bg-slate-700 hover:bg-sky-600 text-slate-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowUpIcon /></button>
-                                                        <button onClick={() => handleMoveEntryDown(entry.id)} title="Mover hacia abajo" aria-label="Mover hacia abajo" disabled={index === history.length - 1} className="p-2 rounded-full bg-slate-700 hover:bg-sky-600 text-slate-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowDownIcon /></button>
-                                                        <button onClick={() => handleLoadEntry(entry.id)} title="Cargar este cálculo" aria-label="Cargar este cálculo" className="p-2 rounded-full bg-slate-700 hover:bg-cyan-600 text-slate-300 hover:text-white transition-colors duration-200"><LoadIcon /></button>
-                                                        <button onClick={() => handleDeleteEntry(entry.id)} title="Borrar este cálculo" aria-label="Borrar este cálculo" className="p-2 rounded-full bg-slate-700 hover:bg-red-600 text-slate-300 hover:text-white transition-colors duration-200"><TrashIcon /></button>
-                                                      </>
+                                                      <button onClick={() => handleMoveEntryUp(entry.id)} title="Mover hacia arriba" aria-label="Mover hacia arriba" disabled={index === 0} className="p-2 rounded-full bg-slate-700 hover:bg-sky-600 text-slate-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowUpIcon /></button>
+                                                      <button onClick={() => handleMoveEntryDown(entry.id)} title="Mover hacia abajo" aria-label="Mover hacia abajo" disabled={index === history.length - 1} className="p-2 rounded-full bg-slate-700 hover:bg-sky-600 text-slate-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowDownIcon /></button>
+                                                      <button onClick={() => handleLoadEntry(entry.id)} title="Cargar este cálculo" aria-label="Cargar este cálculo" className="p-2 rounded-full bg-slate-700 hover:bg-cyan-600 text-slate-300 hover:text-white transition-colors duration-200"><LoadIcon /></button>
+                                                      <button onClick={() => handleDeleteEntry(entry.id)} title="Borrar este cálculo" aria-label="Borrar este cálculo" className="p-2 rounded-full bg-slate-700 hover:bg-red-600 text-slate-300 hover:text-white transition-colors duration-200"><TrashIcon /></button>
                                                   </div>
                                               </div>
                                             </li>
@@ -1981,7 +1971,6 @@ const App: React.FC = () => {
         
         <DocumentManager documents={documents} setDocuments={setDocuments} />
 
-        {/* Floating Action Buttons */}
         <div
           className="fixed right-6 sm:right-8 z-40 flex flex-col items-end gap-3 transition-[bottom] duration-300 ease-in-out"
           onMouseDown={handleDragStart}
