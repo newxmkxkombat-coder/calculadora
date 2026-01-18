@@ -1658,8 +1658,8 @@ const App: React.FC = () => {
     return () => {
       window.removeEventListener('mousemove', handleDragMove);
       window.removeEventListener('touchmove', handleDragMove);
-      window.removeEventListener('mouseup', handleDragEnd);
-      window.removeEventListener('touchend', handleDragEnd);
+      window.addEventListener('mouseup', handleDragEnd);
+      window.addEventListener('touchend', handleDragEnd);
     };
   }, [isDragging, handleDragMove, handleDragEnd]);
 
@@ -1721,9 +1721,19 @@ const App: React.FC = () => {
         <header className="mb-6">
             <div className="bg-gradient-to-b from-slate-800/60 to-slate-900/40 backdrop-blur-sm p-4 rounded-xl border border-cyan-500/20 shadow-lg">
                 <div className="flex justify-between items-center text-xs text-slate-400 mb-3">
-                    <div className="flex items-center gap-1.5">
-                        <CalendarIcon />
-                        <span>{new Date().toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+                    <div className="flex items-center gap-3">
+                        <a 
+                            href="https://newxmkxkombat-coder.github.io/calendario/" 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 px-2 py-1 rounded-lg text-teal-300 font-bold transition-all hover:scale-105 active:scale-95"
+                        >
+                            <CalendarIcon />
+                            <span>Calendario</span>
+                        </a>
+                        <div className="hidden sm:flex items-center gap-1.5 opacity-80">
+                             <span>{new Date().toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+                        </div>
                     </div>
                     <DigitalClock />
                 </div>
