@@ -11,6 +11,9 @@
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "puppeteer": "^24.36.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },
