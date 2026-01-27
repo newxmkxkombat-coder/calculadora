@@ -1279,7 +1279,7 @@ const RobotModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpe
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // URL del servidor (Local o Nube)
-  const API_URL = import.meta.env.VITE_API_URL || 'calculadora-production-fa9d.up.railway.app';
+  const API_URL = import.meta.env.VITE_API_URL || 'https://calculadora-production-fa9d.up.railway.app';
 
   const handleConnect = async (e: React.FormEvent) => {
     e.preventDefault();
