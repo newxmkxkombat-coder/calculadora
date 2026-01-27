@@ -23,7 +23,7 @@ const initBrowser = async () => {
     if (!globalBrowser) {
         console.log('Lanzando navegador global (Modo Bala de Plata)...');
         globalBrowser = await puppeteer.launch({
-            headless: 'new', // Headless real para velocidad máxima
+            headless: 'new',
             args: [
                 '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
                 '--disable-accelerated-2d-canvas', '--no-first-run', '--no-zygote',
@@ -34,7 +34,6 @@ const initBrowser = async () => {
         globalPage = await globalBrowser.newPage();
         await globalPage.setViewport({ width: 1366, height: 768 });
 
-        // Bloqueo estricto de recursos visuales (ya no necesitamos ver nada)
         await globalPage.setRequestInterception(true);
         globalPage.on('request', (req) => {
             if (['image', 'stylesheet', 'font', 'media', 'script'].includes(req.resourceType())) req.abort();
@@ -55,6 +54,7 @@ const ensureLoggedIn = async (page, username, password) => {
         let isLoginPage = content.includes('input type="text"') && content.includes('input type="password"');
         const sessionExpired = content.includes('finalizado la sesión') || content.includes('finalizado la sesion') || content.includes('Session timeout');
 
+        // Si no estamos en login, pero estamos en 'opita' y la sesión supuestamente está activa: OK
         if (!isLoginPage && currentUrl.includes('opita') && sessionActive && !sessionExpired) {
             lastInteraction = Date.now();
             return;
@@ -63,9 +63,14 @@ const ensureLoggedIn = async (page, username, password) => {
         console.log('Iniciando sesión...');
         await page.goto(TARGET_URL, { waitUntil: 'networkidle2', timeout: 45000 });
 
-        await new Promise(r => setTimeout(r, 1000));
-        if (page.url().includes('app') || page.url().includes('menu')) {
-            console.log('Redirección automática detectada. Sesión activa.');
+        // Verificación CRÍTICA MEJORADA: Redirección automática (Cookies vivas)
+        await new Promise(r => setTimeout(r, 2000)); // Un poco más de tiempo para redirigir
+        let newUrl = page.url();
+        let newContent = await page.content(); // Chequear contenido por si la URL no cambia rápido
+
+        // Si la URL dice 'app'/'menu' O si el contenido NO tiene password input pero SÍ dice 'opita'
+        if (newUrl.includes('app') || newUrl.includes('menu') || newUrl.includes('seguimiento') || (newContent.includes('opita') && !newContent.includes('input type="password"'))) {
+            console.log('Redirección automática o sesión viva detectada. Saltando login.');
             sessionActive = true;
             return;
         }
@@ -80,7 +85,9 @@ const ensureLoggedIn = async (page, username, password) => {
             sessionActive = true;
             console.log('Login exitoso.');
         } catch (e) {
+            // Última red de seguridad
             if (page.url().includes('opita') && !page.url().includes('index.jsp')) {
+                console.log('Login visual falló pero parece que estamos dentro. Continuando...');
                 sessionActive = true;
                 return;
             }
@@ -103,39 +110,28 @@ app.post('/api/scrape-passengers', async (req, res) => {
 
         console.log('Ejecutando extracción directa (API Fetch)...');
 
-        // INYECCIÓN DE CÓDIGO: Fetch directo desde el navegador
-        // Usamos las cookies de la sesión actual para pedir los datos JSON/HTML directamente
         const vehicles = await page.evaluate(async () => {
-            // 1. Calcular Fecha de Hoy (YYYY-MM-DD)
             const now = new Date();
             const year = now.getFullYear();
             const month = String(now.getMonth() + 1).padStart(2, '0');
             const day = String(now.getDate()).padStart(2, '0');
             const todayStr = `${year}-${month}-${day}`;
 
-            // 2. Construir Payload (La carta que robamos)
-            // Reemplazamos las fechas fijas por la fecha dinámica
-            // Mantenemos 'placas=0,THQ009,THQ010' según captura, probamos si '0' trae todo.
-            const payload = `fechaInicio=${todayStr}+00%3A00%3A00&fechaFinal=${todayStr}+23%3A59%3A59&verCaptura=0&verPuntoControl=0&verPasajero=0&verAlarma=0&verConsolidado=0&verOtros=0&verValidacion=0&verTablet=0&fechaPredeterminada=2&placas=0%2CTHQ009%2CTHQ010&grupos=&rutas=&empresas=35&uniSeleccion=0&page=0&maxPerPage=500&init=0&lpto=&lalm=&lcap=&lval=&ltab=&unirPuntos=false&order=fecha_gps+DESC&agrupar=true&eventosActividad=36+%2C+69+%2C+191+%2C+500&minutosActividad=15&numLocActual=20`;
+            // Experimentaremos trayendo TODOS (placas=0)
+            // Si falla, volver a: %2CTHQ009%2CTHQ010
+            const payload = `fechaInicio=${todayStr}+00%3A00%3A00&fechaFinal=${todayStr}+23%3A59%3A59&verCaptura=0&verPuntoControl=0&verPasajero=0&verAlarma=0&verConsolidado=0&verOtros=0&verValidacion=0&verTablet=0&fechaPredeterminada=2&placas=0&grupos=&rutas=&empresas=35&uniSeleccion=0&page=0&maxPerPage=500&init=0&lpto=&lalm=&lcap=&lval=&ltab=&unirPuntos=false&order=fecha_gps+DESC&agrupar=true&eventosActividad=36+%2C+69+%2C+191+%2C+500&minutosActividad=15&numLocActual=20`;
 
             try {
-                // 3. Ejecutar Petición Directa
                 const response = await fetch('https://gps3regisdataweb.com/opita/infoGPS', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-                        // Los headers de sessión se envían solos por estar en el browser
-                    },
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
                     body: payload
                 });
 
                 const htmlText = await response.text();
-
-                // 4. Parsear HTML en memoria (Virtualmente)
                 const div = document.createElement('div');
-                div.innerHTML = '<table>' + htmlText + '</table>'; // Envolvemos en table para que sea válido
+                div.innerHTML = '<table>' + htmlText + '</table>';
 
-                // 5. Usar nuestra lógica de extracción maestra (reutilizada)
                 const results = [];
                 const clean = (t) => (t || '').toLowerCase().trim();
                 const cleanNum = (t) => (t || '').replace(/\D/g, '');
@@ -145,7 +141,6 @@ app.post('/api/scrape-passengers', async (req, res) => {
                 let targetColTotal = -1;
                 let headerFound = false;
 
-                // Buscar Headers en las filas recibidas
                 for (const row of allRows) {
                     const cells = Array.from(row.querySelectorAll('td, th'));
                     const texts = cells.map(c => clean(c.innerText));
@@ -159,9 +154,7 @@ app.post('/api/scrape-passengers', async (req, res) => {
                         headerFound = true;
                     }
 
-                    // Si ya tenemos headers, extraer datos de esta fila
                     if (headerFound) {
-                        // Verificar si es fila de datos (tiene celdas en esos índices)
                         if (cells[targetColInterno] && cells[targetColTotal]) {
                             const valInterno = cells[targetColInterno].innerText.trim();
                             const valTotal = cells[targetColTotal].innerText.trim();
@@ -207,6 +200,6 @@ setInterval(() => {
 }, 300000);
 
 app.listen(PORT, () => {
-    console.log(`Robot API DIRECTA V4.0 escuchando en ${PORT}`);
+    console.log(`Robot API DIRECTA V4.1 (Login Fix + All Plates) escuchando en ${PORT}`);
     initBrowser();
 });
