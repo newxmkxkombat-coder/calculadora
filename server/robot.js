@@ -46,7 +46,7 @@ const initBrowser = async () => {
 };
 
 // --- LOGIN ---
-const ensureLoggedIn = async (page, username, password) => {
+const ensureLoggedIn = async (page, username, password, forceLogin = false) => {
     try {
         let currentUrl = page.url();
         let content = await page.content();
@@ -54,7 +54,7 @@ const ensureLoggedIn = async (page, username, password) => {
         let isLoginPage = content.includes('input type="text"') && content.includes('input type="password"');
         const sessionExpired = content.includes('finalizado la sesión') || content.includes('finalizado la sesion') || content.includes('Session timeout');
 
-        if (!isLoginPage && currentUrl.includes('opita') && sessionActive && !sessionExpired) {
+        if (!forceLogin && !isLoginPage && currentUrl.includes('opita') && sessionActive && !sessionExpired) {
             lastInteraction = Date.now();
             return;
         }
@@ -66,7 +66,8 @@ const ensureLoggedIn = async (page, username, password) => {
         let newUrl = page.url();
         let newContent = await page.content();
 
-        if (newUrl.includes('app') || newUrl.includes('menu') || newUrl.includes('seguimiento') || (newContent.includes('opita') && !newContent.includes('input type="password"'))) {
+        // Si NO estamos forzando y parece que hay sesión, aceptar
+        if (!forceLogin && (newUrl.includes('app') || newUrl.includes('menu') || newUrl.includes('seguimiento') || (newContent.includes('opita') && !newContent.includes('input type="password"')))) {
             console.log('Redirección automática o sesión viva detectada. Saltando login.');
             sessionActive = true;
             return;
@@ -100,7 +101,8 @@ const ensureLoggedIn = async (page, username, password) => {
 async function runScraper(username, password, retry = false) {
     try {
         const page = await initBrowser();
-        await ensureLoggedIn(page, username, password);
+        // En el segundo intento, FORZAR login real (ignorar sesión aparente)
+        await ensureLoggedIn(page, username, password, retry);
 
         // CORRECCIÓN REFERER: Navegar a la página del reporte
         const REPORT_URL_DIRECT = 'https://gps3regisdataweb.com/opita/app/seguimiento/infogps.jsp?v=3sobcmjas4';
