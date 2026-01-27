@@ -76,91 +76,82 @@ app.post('/api/scrape-passengers', async (req, res) => {
         await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }).catch(e => console.log("Timeout navegacion post-login ignorado."));
         await new Promise(r => setTimeout(r, 4000)); // Esperar carga extra del dashboard
 
-        // 4. Navegación Inteligente
+        // 4. Navegación Inteligente (Reforzada)
         console.log('Buscando ruta a datos...');
 
-        // ESTRATEGIA PRINCIPAL: Buscar acceso directo a "Rep. Hoy" (Reporte Hoy)
-        const reportHoyClicked = await page.evaluate(() => {
+        // Intentar expandir menús principales primero
+        await page.evaluate(() => {
+            const items = Array.from(document.querySelectorAll('a, span, div, li, b'));
+            const mainMenus = items.filter(el => {
+                const text = (el.innerText || '').toLowerCase().trim();
+                return text === 'reportes' || text === 'rastreo' || text === 'consultas';
+            });
+            mainMenus.forEach(m => m.click());
+        });
+        await new Promise(r => setTimeout(r, 2000));
+
+        // Buscar el reporte específico
+        const navSuccess = await page.evaluate(() => {
             const elements = Array.from(document.querySelectorAll('a, button, span, div, li'));
+            const keywords = ['rep. hoy', 'reporte hoy', 'móviles', 'moviles', 'reporte diario', 'actividad'];
+
             const btn = elements.find(el => {
                 const text = (el.innerText || '').toLowerCase();
-                return text.includes('rep. hoy') || (text.includes('reporte') && text.includes('hoy'));
+                return keywords.some(k => text.includes(k)) && el.offsetParent !== null;
             });
-            if (btn && btn.offsetParent !== null) {
+
+            if (btn) {
                 btn.click();
                 return true;
             }
             return false;
         });
 
-        if (reportHoyClicked) {
-            console.log('Click exitoso en "Rep. Hoy". Esperando carga de reporte (5s)...');
-            await new Promise(r => setTimeout(r, 5000));
+        if (navSuccess) {
+            console.log('Navegación a reporte exitosa. Esperando carga (6s)...');
+            await new Promise(r => setTimeout(r, 6000));
         } else {
-            console.log('"Rep. Hoy" no visible, intentando ruta clásica Rastreo -> Móviles...');
-
-            // Rastreo -> Móviles
-            await page.evaluate(() => {
-                const elements = Array.from(document.querySelectorAll('a, div[role="button"], span, div'));
-                const rastreo = elements.find(el => el.innerText && el.innerText.trim() === 'Rastreo');
-                if (rastreo) rastreo.click();
-            });
-            await new Promise(r => setTimeout(r, 2000));
-
-            const movilesClicked = await page.evaluate(() => {
-                const elements = Array.from(document.querySelectorAll('a, div[role="button"], span, div, li'));
-                const moviles = elements.find(el => (el.innerText || '').toLowerCase().includes('moviles') || (el.innerText || '').toLowerCase().includes('móviles'));
-                if (moviles) {
-                    moviles.click();
-                    return true;
-                }
-                return false;
-            });
-
-            if (!movilesClicked) {
-                const bodyText = await page.evaluate(() => document.body.innerText.substring(0, 200));
-                throw new Error(`No se encontró menú 'Rastreo' ni 'Rep. Hoy'. Info: ${bodyText}`);
-            }
-            await new Promise(r => setTimeout(r, 4000));
+            console.log('No se halló el botón directo. Intentando Enter para confirmar...');
+            await page.keyboard.press('Enter');
         }
 
-        // HEURÍSTICA: Buscar botón "Generar" o "Buscar" por si hay filtro previo
-        try {
-            await page.evaluate(() => {
-                const keywords = ['buscar', 'generar', 'consultar', 'ver reporte', 'refresh', 'actualizar'];
-                const buttons = Array.from(document.querySelectorAll('button, input[type="submit"], a.btn, div.btn'));
-                const actionBtn = buttons.find(b => {
-                    const text = (b.innerText || b.value || '').toLowerCase();
-                    return keywords.some(k => text.includes(k));
-                });
-                if (actionBtn && actionBtn.offsetParent !== null) actionBtn.click();
+        // HEURÍSTICA: Gatillar el botón "Generar" o "Buscar" si aparece
+        await page.evaluate(() => {
+            const controls = Array.from(document.querySelectorAll('button, input[type="submit"], a, div.btn'));
+            const goBtn = controls.find(c => {
+                const t = (c.innerText || c.value || '').toLowerCase();
+                const keywords = ['buscar', 'generar', 'consultar', 'ver reporte', 'refresh', 'actualizar', 'view'];
+                return keywords.some(k => t.includes(k)) && c.offsetParent !== null;
             });
-            await new Promise(r => setTimeout(r, 3000));
-        } catch (e) { }
+            if (goBtn) goBtn.click();
+        });
+        await new Promise(r => setTimeout(r, 4000));
 
 
-        // 5. Esperar Tabla y Extraer (Soporte Universal)
-        console.log('Esperando resultados finales...');
+        // 5. Búsqueda exhaustiva en frames
+        console.log('Buscando tabla de datos...');
 
         let targetFrame = null;
         let foundTable = false;
         const startTime = Date.now();
 
-        // Bucle de búsqueda (60 segundos)
         while (Date.now() - startTime < 60000) {
             const pages = await browser.pages();
             for (const p of pages) {
                 const frames = [p.mainFrame(), ...p.frames()];
                 for (const frame of frames) {
                     try {
-                        const tableFound = await frame.evaluate(() => {
+                        const score = await frame.evaluate(() => {
                             const tables = Array.from(document.querySelectorAll('table'));
+                            // Buscamos una tabla que tenga palabras clave de transporte
                             return tables.some(t => {
-                                const text = t.innerText.toLowerCase();
-                                return (text.includes('total dia') || text.includes('total día')) && text.includes('interno');
+                                const txt = t.innerText.toLowerCase();
+                                const hasTotal = txt.includes('total d') || txt.includes('total d\u00EDa') || txt.includes('pasajer');
+                                const hasMobile = txt.includes('interno') || txt.includes('unidad') || txt.includes('m\u00F3vil') || txt.includes('placa');
+                                return hasTotal && hasMobile;
                             });
                         });
-                        if (tableFound) {
+                        if (score) {
                             targetFrame = frame;
                             foundTable = true;
                             break;
@@ -174,103 +165,93 @@ app.post('/api/scrape-passengers', async (req, res) => {
         }
 
         if (!targetFrame) {
-            const pageSnapshot = await page.evaluate(() => document.body.innerText.replace(/\n+/g, ' | ').substring(0, 300));
-            throw new Error(`Reporte no cargado. Vista actual: "${pageSnapshot}..."`);
+            const pageSnapshot = await page.evaluate(() => document.body.innerText.replace(/\n+/g, ' | ').substring(0, 350));
+            throw new Error(`Datos no hallados. Asegúrate de estar en el reporte. Vista: "${pageSnapshot}..."`);
         }
 
-        console.log(`Fuente de datos encontrada. Extrayendo...`);
+        console.log(`Tabla localizada. Extrayendo...`);
 
         const vehicles = await targetFrame.evaluate(() => {
             const tables = Array.from(document.querySelectorAll('table'));
-            let bestResults = [];
-            let maxDataCount = -1;
+            let bestData = [];
+            let bestScore = -1;
 
             for (const table of tables) {
                 const rows = Array.from(table.querySelectorAll('tr'));
                 if (rows.length < 2) continue;
 
-                let colIdx = { interno: -1, total: -1 };
-                let foundHeaders = false;
+                let colIdx = { interno: -1, total: -1, placa: -1 };
 
-                // 1. Buscar Headers
+                // 1. Localizar cabeceras
                 for (let i = 0; i < Math.min(rows.length, 10); i++) {
-                    const texts = Array.from(rows[i].querySelectorAll('td, th')).map(c => c.innerText.trim().toLowerCase());
-                    const idxTotal = texts.findIndex(t => t.includes('total d') || t.includes('total d\u00EDa'));
-                    const idxInterno = texts.findIndex(t => t.includes('interno') || t.includes('unidad') || t.includes('m\u00F3vil'));
-
-                    if (idxTotal !== -1 && idxInterno !== -1) {
-                        colIdx.total = idxTotal;
-                        colIdx.interno = idxInterno;
-                        foundHeaders = true;
-                        break;
-                    }
+                    const cells = Array.from(rows[i].querySelectorAll('td, th')).map(c => c.innerText.trim().toLowerCase());
+                    if (colIdx.total === -1) colIdx.total = cells.findIndex(t => t.includes('total d') || t.includes('total d\u00EDa'));
+                    if (colIdx.interno === -1) colIdx.interno = cells.findIndex(t => t.includes('interno') || t.includes('unidad') || t.includes('m\u00F3vil'));
+                    if (colIdx.placa === -1) colIdx.placa = cells.findIndex(t => t.includes('placa'));
                 }
 
-                if (foundHeaders) {
-                    const currentData = [];
+                if (colIdx.total !== -1) {
+                    const currentTableData = [];
+                    const idIdx = colIdx.interno !== -1 ? colIdx.interno : colIdx.placa;
+
                     for (let j = 0; j < rows.length; j++) {
                         const cells = Array.from(rows[j].querySelectorAll('td'));
-                        if (cells.length <= Math.max(colIdx.interno, colIdx.total)) continue;
+                        if (cells.length > Math.max(idIdx, colIdx.total)) {
+                            const idRaw = cells[idIdx].innerText.trim();
+                            const paxRaw = cells[colIdx.total].innerText.trim();
 
-                        const idRaw = cells[colIdx.interno].innerText.trim();
-                        const paxRaw = cells[colIdx.total].innerText.trim();
+                            const id = idRaw.replace(/^N0*/i, '').replace(/^M/i, '').replace(/^0+/, '');
+                            const val = parseInt(paxRaw.replace(/\D/g, ''));
 
-                        const id = idRaw.replace(/^N0*/i, '').replace(/^M/i, '').replace(/^0+/, '');
-                        const pax = parseInt(paxRaw.replace(/\D/g, ''));
-
-                        // Validar: No es año (2025/2026), es número real
-                        if (id && !isNaN(pax) && (pax < 2024 || pax > 2030)) {
-                            if (!currentData.find(v => v.identifier === id)) {
-                                currentData.push({ identifier: id, pasajeros: pax.toString() });
-                            }
-                        }
-                    }
-
-                    // Priorizar tabla con más datos o con datos no-cero
-                    const nonZeroCount = currentData.filter(d => d.pasajeros !== "0").length;
-                    if (nonZeroCount > maxDataCount) {
-                        maxDataCount = nonZeroCount;
-                        bestResults = currentData;
-                    } else if (maxDataCount === 0 && currentData.length > bestResults.length) {
-                        bestResults = currentData;
-                    }
-                }
-            }
-
-            // Fallback Heurístico (Col 3 Interno, Col 8 Total Dia)
-            if (bestResults.length === 0) {
-                for (const table of tables) {
-                    const rows = Array.from(table.querySelectorAll('tr'));
-                    const currentData = [];
-                    for (const row of rows) {
-                        const cells = Array.from(row.querySelectorAll('td'));
-                        if (cells.length >= 9) {
-                            const id = cells[3].innerText.trim().replace(/^N0*/i, '').replace(/^M/i, '').replace(/^0+/, '');
-                            const pax = parseInt(cells[8].innerText.replace(/\D/g, ''));
-                            if (id && !isNaN(pax) && (pax < 2024 || pax > 2030)) {
-                                if (!currentData.find(v => v.identifier === id)) {
-                                    currentData.push({ identifier: id, pasajeros: pax.toString() });
+                            if (id && !isNaN(val) && (val < 2024 || val > 2030)) {
+                                if (!currentTableData.find(v => v.identifier === id)) {
+                                    currentTableData.push({ identifier: id, pasajeros: val.toString() });
                                 }
                             }
                         }
                     }
-                    if (currentData.length > bestResults.length) bestResults = currentData;
+
+                    // Puntuación: cuántos vehículos tienen más de 0 pasajeros
+                    const score = currentTableData.filter(d => d.pasajeros !== "0").length;
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestData = currentTableData;
+                    }
                 }
             }
 
-            return bestResults;
+            // Heurística visual (por si fallan los nombres de columnas)
+            if (bestData.length === 0) {
+                for (const table of tables) {
+                    const rows = Array.from(table.querySelectorAll('tr'));
+                    const hData = [];
+                    rows.forEach(r => {
+                        const cs = Array.from(r.querySelectorAll('td'));
+                        if (cs.length >= 9) {
+                            const id = cs[3].innerText.trim().replace(/^N0*/i, '').replace(/^M/i, '').replace(/^0+/, '');
+                            const pax = parseInt(cs[8].innerText.replace(/\D/g, ''));
+                            if (id && !isNaN(pax) && (pax < 2024 || pax > 2030)) {
+                                if (!hData.find(v => v.identifier === id)) hData.push({ identifier: id, pasajeros: pax.toString() });
+                            }
+                        }
+                    });
+                    if (hData.length > bestData.length) bestData = hData;
+                }
+            }
+
+            return bestData;
         });
 
         if (!vehicles || vehicles.length === 0) {
-            throw new Error(`Reporte vacío. Posiblemente no ha cargado los datos todavía.`);
+            throw new Error(`Reporte cargado pero no se detectaron vehículos.`);
         }
 
-        console.log(`Encontrados ${vehicles.length} vehículos con datos.`);
-        setTimeout(() => browser.close(), 3000);
+        console.log(`Extracción exitosa: ${vehicles.length} móviles.`);
+        setTimeout(() => browser.close(), 2000);
         res.json({ success: true, vehicles });
 
     } catch (error) {
-        console.error('Error crítico:', error);
+        console.error('Error del robot:', error);
         if (browser) await browser.close();
         res.status(500).json({ success: false, message: error.message });
     }
