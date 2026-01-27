@@ -187,6 +187,14 @@ app.post('/api/scrape-passengers', async (req, res) => {
 
     } catch (error) {
         console.error('Error Robot:', error);
+        // Si falló, matamos la sesión para que la próxima vez empiece de cero limpio
+        console.log('Reiniciando navegador para limpiar sesión corrupta...');
+        sessionActive = false;
+        try { if (globalPage) await globalPage.close(); } catch (e) { }
+        try { if (globalBrowser) await globalBrowser.close(); } catch (e) { }
+        globalPage = null;
+        globalBrowser = null;
+
         res.status(500).json({ success: false, message: error.message });
     }
 });
