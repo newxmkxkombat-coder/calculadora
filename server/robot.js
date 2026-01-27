@@ -185,9 +185,9 @@ app.post('/api/scrape-passengers', async (req, res) => {
                                 if (el.type === 'checkbox') el.checked = true;
                             }
                         });
-                        // Forzar que el servidor crea que queremos ver todo
+                        // Forzar que el servidor crea que queremos ver todo + PLACA ESPECÍFICA (IDOR)
                         const placaInput = document.querySelector('[name="placas"]');
-                        if (placaInput) placaInput.value = '0'; // 0 significa "TODAS"
+                        if (placaInput) placaInput.value = '0,THQ009,THQ010,THQ062';
                     } catch (e) { }
                     // -------------------------------------------------
 
@@ -234,7 +234,7 @@ app.post('/api/scrape-passengers', async (req, res) => {
                         }
                     });
                     const placaInput = document.querySelector('[name="placas"]');
-                    if (placaInput) placaInput.value = '0';
+                    if (placaInput) placaInput.value = '0,THQ009,THQ010,THQ062';
                 } catch (e) { }
                 // ------------------------------------------------------------
 
