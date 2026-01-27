@@ -54,11 +54,15 @@ const ensureLoggedIn = async (page, username, password) => {
         const currentUrl = page.url();
         const content = await page.content();
 
-        // Si vemos el input de usuario, NO estamos logueados
+        // Detección de sesión caída o expirada
+        // "Ha finalizado la sesión" es el texto clave que reportó el error
         const isLoginPage = content.includes('input type="text"') && content.includes('input type="password"');
+        const sessionExpired = content.includes('finalizado la sesión') || content.includes('finalizado la sesion') || content.includes('Session timeout');
 
-        if (isLoginPage || !currentUrl.includes('opita') || !sessionActive) {
-            console.log('Sesión no detectada o expirada. Logueándose...');
+        if (isLoginPage || !currentUrl.includes('opita') || !sessionActive || sessionExpired) {
+            console.log('Sesión no detectada o expirada (Detectado: ' + (sessionExpired ? 'Mensaje Expirado' : 'Login Form/Otro') + '). Logueándose...');
+
+            // Si la sesión expiró, a veces hay que navegar explícitamente a la raíz para limpiar el estado y ver el login
             await page.goto(TARGET_URL, { waitUntil: 'networkidle2', timeout: 45000 });
 
             await page.waitForSelector('input[type="text"]', { visible: true, timeout: 20000 });
@@ -99,70 +103,67 @@ app.post('/api/scrape-passengers', async (req, res) => {
     try {
         const page = await initBrowser();
 
-        // 1. Asegurar sesión
+        // 1. Asegurar sesión (Con detección de bloqueo "Finalizado sesión")
         await ensureLoggedIn(page, username, password);
 
-        // 2. Navegar a "Móviles" específicamente (Lo que pidió el usuario)
+        // 2. Navegar a "Móviles" específicamente
         console.log('Navegando a reporte de Móviles...');
 
-        // Verificar si ya estamos en un reporte para no recargar a lo loco
-        // Pero el usuario dice que hay que "buscar" cada vez.
-
-        // Intentar encontrar el menú "Móviles" o "Reportes -> Móviles"
+        // Navegar/Clickea en Móviles
         await page.evaluate(async () => {
-            // Buscar link directo "Móviles" o "Moviles"
             const links = Array.from(document.querySelectorAll('a, span, div, li'));
-
-            // Prioridad: "Móviles" en el menú principal
-            let target = links.find(el => {
+            // Buscar "Móviles" exacto o contenido
+            const target = links.find(el => {
                 const t = (el.innerText || '').toLowerCase().trim();
-                return t === 'móviles' || t === 'moviles' || t === 'reporte móviles';
+                return t === 'móviles' || t === 'moviles';
             });
 
             if (target) {
                 target.click();
             } else {
-                // Si no, buscar "Reportes" y luego "Móviles"
+                // Si no, intentar abrir menú Reportes primero
                 const reportes = links.find(el => (el.innerText || '').toLowerCase().trim() === 'reportes');
-                if (reportes) {
-                    reportes.click();
-                    // Esperar un poquito (esto es dentro del browser context es dificil, pero el click desencadena eventos)
-                }
+                if (reportes) reportes.click();
             }
         });
 
-        // Esperamos un momento para que la UI reaccione
-        await new Promise(r => setTimeout(r, 2000));
+        await new Promise(r => setTimeout(r, 1500));
 
-        // Ahora buscar sub-opción si estábamos en reportes
+        // Asegurar Submenú si es necesario
         await page.evaluate(() => {
             const links = Array.from(document.querySelectorAll('a, span, div, li'));
             const target = links.find(el => {
                 const t = (el.innerText || '').toLowerCase();
-                return (t.includes('móviles') || t.includes('moviles')) && el.offsetParent !== null;
+                return (t === 'móviles' || t === 'moviles') && el.offsetParent !== null;
             });
             if (target) target.click();
         });
 
-        // 3. Buscar y Clickear botón "Generar" o "Buscar" para actualizar datos
+        // 3. ACTUALIZAR (Click Lupa/Buscar) - CRÍTICO
         console.log('Actualizando datos...');
         await new Promise(r => setTimeout(r, 1000));
 
         const searchClicked = await page.evaluate(() => {
-            const btns = Array.from(document.querySelectorAll('button, input[type="submit"], a.btn, div.btn'));
-            const goBtn = btns.find(b =>
-                ['generar', 'buscar', 'consultar', 'ver', 'refresh'].some(k => (b.innerText || b.value || '').toLowerCase().includes(k))
+            // Estrategia 1: Botón con texto
+            const btns = Array.from(document.querySelectorAll('button, input[type="submit"], a.btn'));
+            const textBtn = btns.find(b =>
+                ['generar', 'buscar', 'consultar', 'ver'].some(k => (b.innerText || b.value || '').toLowerCase().includes(k))
             );
-            if (goBtn) { goBtn.click(); return true; }
+            if (textBtn) { textBtn.click(); return true; }
+
+            // Estrategia 2: La Lupa (icono) o botón verde (desagrupar)
+            // Buscamos cualquier elemento que parezca un botón de búsqueda (icono fa-search, img lupa, etc)
+            const iconBtn = document.querySelector('.fa-search, .glyphicon-search, span[class*="search"], i[class*="search"]')?.closest('a, button, div');
+            if (iconBtn) { iconBtn.click(); return true; }
+
             return false;
         });
 
-        if (searchClicked) {
-            // Esperar carga de datos (AJAX) - Si la sesión está viva es rápido
-            await new Promise(r => setTimeout(r, 4000));
-        }
+        // Espera un poco más generosa para la carga de datos
+        await new Promise(r => setTimeout(r, 3000));
 
-        // 4. Extracción "VISUAL" + SOPORTE IFRAMES
+
+        // 4. Extracción "VISUAL" + SOPORTE IFRAMES + WAIT
         console.log('Extrayendo datos de Móviles (Modo Visual + Frames)...');
 
         // Espera activa: buscar texto "Total día" en cualquier frame antes de intentar leer
@@ -178,6 +179,7 @@ app.post('/api/scrape-passengers', async (req, res) => {
             }, { timeout: 15000, polling: 1000 });
         } catch (e) {
             console.log("Timeout esperando texto 'Total día', intentando extraer de todos modos...");
+            // Si falla la espera, puede ser que el texto esté pero waitForFunction fallara por contexto
         }
 
         const vehicles = await page.evaluate(() => {
@@ -257,7 +259,7 @@ app.post('/api/scrape-passengers', async (req, res) => {
             res.json({ success: true, vehicles });
         } else {
             const debugInfo = await page.evaluate(() => document.body.innerText.substring(0, 300).replace(/\n/g, ' '));
-            throw new Error(`Header 'Total día' no hallado en ningún frame. Texto visible: ${debugInfo}...`);
+            throw new Error(`Header 'Total día' no hallado. (Probable sesión caducada o tabla oculta). Texto visible: ${debugInfo}...`);
         }
 
     } catch (error) {
@@ -276,6 +278,6 @@ setInterval(() => {
 }, 60000 * 5); // Cada 5 mins
 
 app.listen(PORT, () => {
-    console.log(`Robot Persistente V3 escuchando en ${PORT}`);
+    console.log(`Robot Persistente V3.1 escuchando en ${PORT}`);
     initBrowser(); // Arrancar browser al inicio
 });
