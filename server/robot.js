@@ -41,17 +41,6 @@ app.post('/api/scrape-passengers', async (req, res) => {
 
         const page = await browser.newPage();
 
-        // Optimización: Interceptar y bloquear recursos innecesarios
-        await page.setRequestInterception(true);
-        page.on('request', (req) => {
-            const blockedTypes = ['image', 'stylesheet', 'font', 'media'];
-            if (blockedTypes.includes(req.resourceType())) {
-                req.abort();
-            } else {
-                req.continue();
-            }
-        });
-
         // 1. Ir al Login
         console.log('Navegando a login...');
         await page.goto(TARGET_URL, { waitUntil: 'load', timeout: 60000 });
@@ -114,32 +103,47 @@ app.post('/api/scrape-passengers', async (req, res) => {
 
         if (!movilesClicked) throw new Error("No se encontró el botón 'Móviles'.");
 
-        // 5. Esperar Tabla y Extraer (Soporte para IFRAMES)
-        console.log('Esperando tabla de resultados (buscando en todos los frames)...');
+        // 5. Esperar Tabla y Extraer (Soporte para POPUPS y FRAMES)
+        console.log('Esperando resultados (buscando en tod@s las pestañas y frames)...');
+
+        // Esperemos un poco a que se abra la ventana si es un popup
+        await new Promise(r => setTimeout(r, 5000));
 
         let targetFrame = null;
+        let vehicleData = [];
         const startTime = Date.now();
 
-        // Bucle para buscar la tabla en cualquier frame durante 60 segundos
+        // Bucle de búsqueda (60 segundos)
         while (Date.now() - startTime < 60000) {
-            for (const frame of page.frames()) {
-                // Intentar buscar la tabla en este frame
-                const table = await frame.$('table');
-                if (table) {
-                    // Verificar si parece la tabla correcta (tiene filas)
-                    const rowCount = await frame.evaluate(el => el.querySelectorAll('tr').length, table);
-                    if (rowCount > 2) {
-                        targetFrame = frame;
-                        break;
-                    }
+            const pages = await browser.pages(); // Obtener todas las pestañas abiertas
+
+            for (const p of pages) {
+                // Buscar en el frame principal de la página
+                const frames = p.frames();
+                for (const frame of frames) {
+                    try {
+                        const table = await frame.$('table');
+                        if (table) {
+                            const rowCount = await frame.evaluate(el => el.querySelectorAll('tr').length, table);
+                            // Verificamos si tiene la fila de TOTAL
+                            const hasTotal = await frame.evaluate(el => el.innerText.toLowerCase().includes('total'), table);
+
+                            if (rowCount > 2 && hasTotal) {
+                                targetFrame = frame;
+                                break;
+                            }
+                        }
+                    } catch (e) { continue; }
                 }
+                if (targetFrame) break;
             }
+
             if (targetFrame) break;
-            await new Promise(r => setTimeout(r, 2000)); // Esperar 2s antes de reintentar
+            await new Promise(r => setTimeout(r, 2000));
         }
 
         if (!targetFrame) {
-            throw new Error("La tabla no apareció en ningún frame (Timeout 60s).");
+            throw new Error("No se encontró la tabla de datos en ninguna ventana.");
         }
 
         console.log(`Tabla encontrada en frame: ${targetFrame.url()}`);
