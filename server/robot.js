@@ -10,6 +10,8 @@ app.use(cors({
     // Cuando esté listo, cámbialo por: 'https://tu-usuario.github.io'
     methods: ['GET', 'POST']
 }));
+app.options(/(.*)/, cors()); // Habilitar pre-flight para todas las rutas
+app.options('/api/scrape-passengers', cors()); // Explicit OPTIONS for this route
 app.use(express.json());
 
 const PORT = process.env.PORT || 3001;
