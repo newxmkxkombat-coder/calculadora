@@ -162,14 +162,17 @@ app.post('/api/scrape-passengers', async (req, res) => {
             await new Promise(r => setTimeout(r, 4000));
         }
 
-        // 4. Extracción Específica (Interno - Total Día)
+        // 4. Extracción Específica (Estricta - Interno vs Total Día)
         console.log('Extrayendo datos de Móviles...');
 
         const vehicles = await page.evaluate(() => {
             const results = [];
+            const clean = (t) => (t || '').toLowerCase().trim();
+            const cleanNum = (t) => (t || '').replace(/\D/g, '');
 
-            // Buscar tablas en todos los frames
-            const frames = [document, ...Array.from(window.frames).map(f => { try { return f.document; } catch (e) { return null; } }).filter(d => d)];
+            const frames = [document, ...Array.from(window.frames).map(f => {
+                try { return f.document; } catch (e) { return null; }
+            }).filter(d => d)];
 
             for (const doc of frames) {
                 const tables = Array.from(doc.querySelectorAll('table'));
@@ -177,65 +180,49 @@ app.post('/api/scrape-passengers', async (req, res) => {
                     const rows = Array.from(table.querySelectorAll('tr'));
                     if (rows.length < 2) continue;
 
-                    // Identificar columnas
                     let colInterno = -1;
                     let colTotal = -1;
+                    let headerRow = -1;
 
-                    // Header heurística
-                    // Buscamos en las primeras filas
-                    for (let i = 0; i < Math.min(rows.length, 5); i++) {
+                    // 1. Buscar cabeceras exactas
+                    for (let i = 0; i < Math.min(rows.length, 8); i++) {
                         const cells = Array.from(rows[i].querySelectorAll('td, th'));
-                        const txts = cells.map(c => c.innerText.toLowerCase().trim());
+                        const texts = cells.map(c => clean(c.innerText));
 
-                        colInterno = txts.findIndex(t => t.includes('interno') || t.includes('unidad') || t.includes('móvil') || t === 'movil');
-                        colTotal = txts.findIndex(t => t.includes('total día') || t.includes('total dia') || t === 'total' || t.includes('pax'));
+                        // Indices
+                        const iInt = texts.findIndex(t => t.includes('número interno') || t.includes('numero interno'));
+                        const iTot = texts.findIndex(t => t.includes('total día') || t.includes('total dia'));
 
-                        if (colInterno !== -1 && colTotal !== -1) break;
+                        if (iInt !== -1 && iTot !== -1) {
+                            colInterno = iInt;
+                            colTotal = iTot;
+                            headerRow = i;
+                            break;
+                        }
                     }
 
-                    // Si encontramos columnas específicas
-                    if (colInterno !== -1 && colTotal !== -1) {
-                        for (const row of rows) {
-                            const cells = Array.from(row.querySelectorAll('td'));
-                            if (!cells[colInterno] || !cells[colTotal]) continue;
+                    // 2. Extraer datos alineados
+                    if (headerRow !== -1) {
+                        for (let j = headerRow + 1; j < rows.length; j++) {
+                            const cells = Array.from(rows[j].querySelectorAll('td'));
 
-                            const interno = cells[colInterno].innerText.trim().replace(/^0+/, '');
-                            const total = cells[colTotal].innerText.trim();
+                            // Asegurar que la fila tiene las columnas necesarias
+                            if (cells[colInterno] && cells[colTotal]) {
+                                // Limpieza específica: "N015" -> "15"
+                                let idRaw = cells[colInterno].innerText.trim();
+                                let id = idRaw.replace(/^[a-zA-Z]+0*/, '').replace(/^0+/, ''); // Quita letras iniciales y ceros izq
 
-                            // Validación básica
-                            if (/^\d+$/.test(interno) && /^\d+$/.test(total)) {
-                                if (!results.find(v => v.identifier === interno)) {
-                                    results.push({ identifier: interno, pasajeros: total });
-                                }
-                            }
-                        }
-                    } else {
-                        // Fallback posicional si falla header (usualmente Interno es col 0 o 1, Total col 8 o ultima)
-                        // Heurística cruda para tablas de datos
-                        for (const row of rows) {
-                            const cells = Array.from(row.querySelectorAll('td'));
-                            if (cells.length < 5) continue;
+                                let paxRaw = cells[colTotal].innerText.trim();
+                                let pax = cleanNum(paxRaw);
 
-                            // Asumimos col 0 o 1 es ID, col con numero > 0 y < 2000 es pasajero
-                            // Intentamos encontrar patron ID... Pasajero
-                            const txts = cells.map(c => c.innerText.trim());
-
-                            // ID debe ser numero corto (1-4 digitos)
-                            const possibleIdIdx = txts.findIndex(t => /^\d{1,4}$/.test(t) && !t.includes(':') && !t.includes('-'));
-                            if (possibleIdIdx !== -1) {
-                                // Buscar pasajero después del ID
-                                for (let k = possibleIdIdx + 1; k < txts.length; k++) {
-                                    const val = parseInt(txts[k]);
-                                    if (!isNaN(val) && val >= 0 && val < 2000 && !txts[k].includes(':')) { // Evitar horas
-                                        const id = txts[possibleIdIdx].replace(/^0+/, '');
-                                        if (!results.find(v => v.identifier === id)) {
-                                            results.push({ identifier: id, pasajeros: val.toString() });
-                                        }
-                                        break;
+                                if (id && pax !== '' && !isNaN(pax)) {
+                                    if (!results.find(v => v.identifier === id)) {
+                                        results.push({ identifier: id, pasajeros: pax });
                                     }
                                 }
                             }
                         }
+                        if (results.length > 0) return results;
                     }
                 }
             }
@@ -246,15 +233,12 @@ app.post('/api/scrape-passengers', async (req, res) => {
             console.log(`Éxito. ${vehicles.length} móviles encontrados.`);
             res.json({ success: true, vehicles });
         } else {
-            // Fallback Plan C: Regex texto crudo buscando "Interno... Total"
-            // A veces la tabla es div-based
-            console.log("Tablas vacías, intentando regex global...");
-            const rawBody = await page.evaluate(() => document.body.innerText);
-            // Patron: Algo que parece Interno numero ... numero (pasajeros)
-            // Asumimos que están en la misma linea o bloque cercano
-            const matches = [...rawBody.matchAll(/(\d{1,4})\s+.*?(\d{1,4})/g)];
-            // Esto es arriesgado, probemos algo mas seguro
-            throw new Error("No se pudieron extraer datos consistentes (Columna Interno/Total no hallada).");
+            // Debug: Mostrar qué ve el robot si falla
+            const layoutDump = await page.evaluate(() => {
+                const tables = Array.from(document.querySelectorAll('table'));
+                return tables.map(t => t.innerText.substring(0, 100).replace(/\n/g, ' ')).join(' || ');
+            });
+            throw new Error(`No se encontrar columnas de 'Número Interno' y 'Total día'. Tablas detectadas: ${layoutDump} ...`);
         }
 
     } catch (error) {
