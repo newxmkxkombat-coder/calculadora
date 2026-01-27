@@ -3,275 +3,276 @@ import cors from 'cors';
 import puppeteer from 'puppeteer';
 
 const app = express();
-app.use(cors({
-    origin: '*',
-    methods: ['GET', 'POST']
-}));
+app.use(cors({ origin: '*', methods: ['GET', 'POST'] }));
 app.options(/(.*)/, cors());
-app.options('/api/scrape-passengers', cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 3001;
 
-// --- OPTIMIZACIÓN GLOBAL: Instancia única del navegador ---
-let globalBrowser;
+// --- VARIABLES GLOBALES DE SESIÓN ---
+let globalBrowser = null;
+let globalPage = null; // Mantiene la pestaña abierta siempre
+let sessionActive = false;
+let lastInteraction = 0;
 
+// Configuración URL
+const TARGET_URL = 'https://gps3regisdataweb.com/opita/index.jsp';
+
+// --- INICIALIZACIÓN DEL NAVEGADOR (Solo una vez) ---
 const initBrowser = async () => {
     if (!globalBrowser) {
         console.log('Lanzando navegador global...');
         globalBrowser = await puppeteer.launch({
             headless: 'new',
             args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--no-zygote',
-                '--single-process',
-                '--disable-gpu',
-                '--disable-extensions' // Desactivar extensiones
+                '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
+                '--disable-accelerated-2d-canvas', '--no-first-run', '--no-zygote',
+                '--single-process', '--disable-gpu', '--disable-extensions'
             ]
         });
-        console.log('Navegador global listo.');
-    }
-    return globalBrowser;
-};
 
-// Inicializar al arrancar
-initBrowser();
+        globalPage = await globalBrowser.newPage();
+        await globalPage.setViewport({ width: 1366, height: 768 });
 
-app.post('/api/scrape-passengers', async (req, res) => {
-    const { username, password } = req.body;
-    const TARGET_URL = 'https://gps3regisdataweb.com/opita/index.jsp';
-    let page = null;
-
-    try {
-        const browser = await initBrowser();
-        page = await browser.newPage();
-
-        // --- OPTIMIZACIÓN: Bloqueo de recursos innecesarios ---
-        await page.setRequestInterception(true);
-        page.on('request', (req) => {
-            const resourceType = req.resourceType();
-            if (['image', 'stylesheet', 'font', 'media'].includes(resourceType)) {
-                req.abort();
-            } else {
-                req.continue();
-            }
+        // Bloqueo de recursos para velocidad
+        await globalPage.setRequestInterception(true);
+        globalPage.on('request', (req) => {
+            if (['image', 'stylesheet', 'font', 'media'].includes(req.resourceType())) req.abort();
+            else req.continue();
         });
 
-        // Configurar vista ligera
-        await page.setViewport({ width: 1280, height: 720 });
+        console.log('Navegador listo.');
+    }
+    return globalPage;
+};
 
-        // 1. Ir al Login (Usamos networkidle2 para asegurar que scripts de carga terminen)
-        console.log('Navegando a login...');
-        await page.goto(TARGET_URL, { waitUntil: 'networkidle2', timeout: 45000 });
+// --- FUNCIÓN DE LOGIN INTELIGENTE ---
+// Verifica si estamos logueados, si no, se loguea.
+const ensureLoggedIn = async (page, username, password) => {
+    try {
+        // Verificar dónde estamos
+        const currentUrl = page.url();
+        const content = await page.content();
 
-        // 2. Llenar credenciales
-        // Esperamos explícitamente a que ambos campos existan y sean visibles
-        console.log('Esperando campos del formulario...');
-        const userSelector = 'input[type="text"]';
-        const passSelector = 'input[type="password"]';
+        // Si vemos el input de usuario, NO estamos logueados
+        const isLoginPage = content.includes('input type="text"') && content.includes('input type="password"');
 
-        await Promise.all([
-            page.waitForSelector(userSelector, { visible: true, timeout: 15000 }),
-            page.waitForSelector(passSelector, { visible: true, timeout: 15000 })
-        ]);
+        if (isLoginPage || !currentUrl.includes('opita') || !sessionActive) {
+            console.log('Sesión no detectada o expirada. Logueándose...');
+            await page.goto(TARGET_URL, { waitUntil: 'networkidle2', timeout: 45000 });
 
-        await page.type(userSelector, username, { delay: 50 }); // Escribir un poco más lento
-        await page.type(passSelector, password, { delay: 50 });
+            await page.waitForSelector('input[type="text"]', { visible: true, timeout: 20000 });
+            await page.waitForSelector('input[type="password"]', { visible: true, timeout: 20000 });
 
-        // 3. Click Ingresar
-        const loginBtn = await page.$('button, input[type="submit"], input[type="button"], a.btn');
-        if (loginBtn) {
-            await Promise.all([
-                page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 20000 }),
-                loginBtn.click()
-            ]);
+            await page.type('input[type="text"]', username, { delay: 50 });
+            await page.type('input[type="password"]', password, { delay: 50 });
+
+            // Buscar botón ingresar (puede variar)
+            const loginClicked = await page.evaluate(() => {
+                const btn = Array.from(document.querySelectorAll('button, input[type="submit"], a')).find(e =>
+                    (e.innerText || e.value || '').toLowerCase().includes('ingresar')
+                );
+                if (btn) { btn.click(); return true; }
+                return false;
+            });
+
+            if (!loginClicked) await page.keyboard.press('Enter');
+
+            await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 });
+            sessionActive = true;
+            console.log('Login exitoso.');
         } else {
-            await page.keyboard.press('Enter');
-            await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 20000 });
+            console.log('Sesión activa detectada. Reutilizando...');
         }
+        lastInteraction = Date.now();
+    } catch (e) {
+        console.error("Error en login:", e.message);
+        sessionActive = false; // Forzar re-login la próxima
+        throw e;
+    }
+};
 
-        // 4. Navegación Inteligente (Optimizada)
-        console.log('Buscando ruta a datos...');
+// --- ROUTA PRINCIPAL ---
+app.post('/api/scrape-passengers', async (req, res) => {
+    const { username, password } = req.body;
 
-        // Esperar que aparezca algo que parezca un menú o enlace
-        await page.waitForFunction(() => document.querySelectorAll('a, span, div').length > 10, { timeout: 10000 });
+    try {
+        const page = await initBrowser();
 
-        // Intentar encontrar reporte directamente o menú
-        const found = await page.evaluate(async () => {
-            const keywords = ['producción por vehículo', 'produccion', 'vehículo', 'vehiculo'];
-            // Buscar directo
+        // 1. Asegurar sesión
+        await ensureLoggedIn(page, username, password);
+
+        // 2. Navegar a "Móviles" específicamente (Lo que pidió el usuario)
+        console.log('Navegando a reporte de Móviles...');
+
+        // Verificar si ya estamos en un reporte para no recargar a lo loco
+        // Pero el usuario dice que hay que "buscar" cada vez.
+
+        // Intentar encontrar el menú "Móviles" o "Reportes -> Móviles"
+        await page.evaluate(async () => {
+            // Buscar link directo "Móviles" o "Moviles"
             const links = Array.from(document.querySelectorAll('a, span, div, li'));
-            const target = links.find(el => {
-                const t = (el.innerText || '').toLowerCase();
-                return keywords.some(k => t.includes(k)) && el.innerText.length < 50;
+
+            // Prioridad: "Móviles" en el menú principal
+            let target = links.find(el => {
+                const t = (el.innerText || '').toLowerCase().trim();
+                return t === 'móviles' || t === 'moviles' || t === 'reporte móviles';
             });
 
             if (target) {
                 target.click();
-                return 'direct';
+            } else {
+                // Si no, buscar "Reportes" y luego "Móviles"
+                const reportes = links.find(el => (el.innerText || '').toLowerCase().trim() === 'reportes');
+                if (reportes) {
+                    reportes.click();
+                    // Esperar un poquito (esto es dentro del browser context es dificil, pero el click desencadena eventos)
+                }
             }
+        });
 
-            // Buscar menú reportes
-            const reportMenu = links.find(el => el.innerText.trim().toLowerCase() === 'reportes');
-            if (reportMenu) {
-                reportMenu.click();
-                return 'menu';
-            }
+        // Esperamos un momento para que la UI reaccione
+        await new Promise(r => setTimeout(r, 2000));
+
+        // Ahora buscar sub-opción si estábamos en reportes
+        await page.evaluate(() => {
+            const links = Array.from(document.querySelectorAll('a, span, div, li'));
+            const target = links.find(el => {
+                const t = (el.innerText || '').toLowerCase();
+                return (t.includes('móviles') || t.includes('moviles')) && el.offsetParent !== null;
+            });
+            if (target) target.click();
+        });
+
+        // 3. Buscar y Clickear botón "Generar" o "Buscar" para actualizar datos
+        console.log('Actualizando datos...');
+        await new Promise(r => setTimeout(r, 1000));
+
+        const searchClicked = await page.evaluate(() => {
+            const btns = Array.from(document.querySelectorAll('button, input[type="submit"], a.btn, div.btn'));
+            const goBtn = btns.find(b =>
+                ['generar', 'buscar', 'consultar', 'ver', 'refresh'].some(k => (b.innerText || b.value || '').toLowerCase().includes(k))
+            );
+            if (goBtn) { goBtn.click(); return true; }
             return false;
         });
 
-        if (found === 'menu') {
-            // Esperar un momento a que se despliegue el submenú de forma eficiente
-            await new Promise(r => setTimeout(r, 500));
-            await page.evaluate(() => {
-                const subLinks = Array.from(document.querySelectorAll('a, span, div, li'));
-                const subTarget = subLinks.find(el => {
-                    const t = (el.innerText || '').toLowerCase();
-                    return ['producción', 'produccion'].some(k => t.includes(k)) && el.offsetParent !== null;
-                });
-                if (subTarget) subTarget.click();
-            });
+        if (searchClicked) {
+            // Esperar carga de datos (AJAX) - Si la sesión está viva es rápido
+            await new Promise(r => setTimeout(r, 4000));
         }
 
-        // Esperar botón "Generar" o similar
-        try {
-            // Un selector genérico para botones de acción con texto clave
-            await page.waitForFunction(() => {
-                const els = Array.from(document.querySelectorAll('button, input[type="submit"], a'));
-                return els.some(e => ['generar', 'buscar', 'ver'].some(k => (e.innerText || e.value || '').toLowerCase().includes(k)));
-            }, { timeout: 8000 });
+        // 4. Extracción Específica (Interno - Total Día)
+        console.log('Extrayendo datos de Móviles...');
 
-            await page.evaluate(() => {
-                const els = Array.from(document.querySelectorAll('button, input[type="submit"], a'));
-                const btn = els.find(e => ['generar', 'buscar', 'ver'].some(k => (e.innerText || e.value || '').toLowerCase().includes(k)));
-                if (btn) btn.click();
-            });
-        } catch (e) {
-            console.log("No se requirió botón generar o no se encontró a tiempo.");
-        }
-
-        // 5. Esperar Tabla (Smart Wait)
-        console.log('Esperando datos...');
-        try {
-            // Esperar a que aparezca una tabla con datos relevantes en cualquier frame
-            await page.waitForFunction(() => {
-                // Función que verifica si hay una tabla con datos 'interesantes'
-                const checkDoc = (doc) => {
-                    const tables = Array.from(doc.querySelectorAll('table'));
-                    return tables.some(t => {
-                        const txt = t.innerText.toLowerCase();
-                        return (txt.includes('total') || txt.includes('pax')) && (txt.includes('móvil') || txt.includes('interno') || txt.includes('placa'));
-                    });
-                };
-
-                // Verificar frame principal
-                if (checkDoc(document)) return true;
-
-                // Verificar iframes
-                for (const frame of window.frames) {
-                    try { if (checkDoc(frame.document)) return true; } catch (e) { }
-                }
-                return false;
-            }, { timeout: 15000, polling: 500 }); // Polling cada 500ms
-        } catch (e) {
-            // Fallback si waitForFunction falla
-            console.log("Wait for table timeout, intentando scrape de todos modos.");
-        }
-
-        // 6. Extracción (Optimizada para velocidad)
         const vehicles = await page.evaluate(() => {
-            const extractFromDoc = (doc) => {
+            const results = [];
+
+            // Buscar tablas en todos los frames
+            const frames = [document, ...Array.from(window.frames).map(f => { try { return f.document; } catch (e) { return null; } }).filter(d => d)];
+
+            for (const doc of frames) {
                 const tables = Array.from(doc.querySelectorAll('table'));
-                const results = [];
                 for (const table of tables) {
                     const rows = Array.from(table.querySelectorAll('tr'));
                     if (rows.length < 2) continue;
 
-                    // Lógica simplificada y rápida: buscar celdas que parecen IDs y Pasajeros
-                    for (const row of rows) {
-                        const cells = Array.from(row.querySelectorAll('td'));
-                        if (cells.length < 4) continue;
+                    // Identificar columnas
+                    let colInterno = -1;
+                    let colTotal = -1;
 
-                        // Heurística rápida por posición (común en estos reportes) + búsqueda
-                        const txts = cells.map(c => c.innerText.trim());
+                    // Header heurística
+                    // Buscamos en las primeras filas
+                    for (let i = 0; i < Math.min(rows.length, 5); i++) {
+                        const cells = Array.from(rows[i].querySelectorAll('td, th'));
+                        const txts = cells.map(c => c.innerText.toLowerCase().trim());
 
-                        // Buscar un ID de vehículo (números cortos)
-                        const idIdx = txts.findIndex(t => /^\d{1,4}$/.test(t) || /^(N|M|Int|No)[\s-]?\d{1,4}$/i.test(t));
-                        if (idIdx === -1) continue;
+                        colInterno = txts.findIndex(t => t.includes('interno') || t.includes('unidad') || t.includes('móvil') || t === 'movil');
+                        colTotal = txts.findIndex(t => t.includes('total día') || t.includes('total dia') || t === 'total' || t.includes('pax'));
 
-                        // Buscar un valor de pasajeros (número > 0 < 2000, más adelante en la fila)
-                        for (let i = idIdx + 1; i < txts.length; i++) {
-                            const val = parseInt(txts[i]);
-                            if (!isNaN(val) && val >= 0 && val < 2000 && !txts[i].includes(':') && !txts[i].includes('-')) {
-                                // Encontrado par candidato
-                                const rawId = txts[idIdx].replace(/\D/g, '').replace(/^0+/, '');
-                                if (!results.find(r => r.identifier === rawId)) {
-                                    results.push({ identifier: rawId, pasajeros: val.toString() });
+                        if (colInterno !== -1 && colTotal !== -1) break;
+                    }
+
+                    // Si encontramos columnas específicas
+                    if (colInterno !== -1 && colTotal !== -1) {
+                        for (const row of rows) {
+                            const cells = Array.from(row.querySelectorAll('td'));
+                            if (!cells[colInterno] || !cells[colTotal]) continue;
+
+                            const interno = cells[colInterno].innerText.trim().replace(/^0+/, '');
+                            const total = cells[colTotal].innerText.trim();
+
+                            // Validación básica
+                            if (/^\d+$/.test(interno) && /^\d+$/.test(total)) {
+                                if (!results.find(v => v.identifier === interno)) {
+                                    results.push({ identifier: interno, pasajeros: total });
                                 }
-                                break; // Solo un dato de pasajeros por fila
+                            }
+                        }
+                    } else {
+                        // Fallback posicional si falla header (usualmente Interno es col 0 o 1, Total col 8 o ultima)
+                        // Heurística cruda para tablas de datos
+                        for (const row of rows) {
+                            const cells = Array.from(row.querySelectorAll('td'));
+                            if (cells.length < 5) continue;
+
+                            // Asumimos col 0 o 1 es ID, col con numero > 0 y < 2000 es pasajero
+                            // Intentamos encontrar patron ID... Pasajero
+                            const txts = cells.map(c => c.innerText.trim());
+
+                            // ID debe ser numero corto (1-4 digitos)
+                            const possibleIdIdx = txts.findIndex(t => /^\d{1,4}$/.test(t) && !t.includes(':') && !t.includes('-'));
+                            if (possibleIdIdx !== -1) {
+                                // Buscar pasajero después del ID
+                                for (let k = possibleIdIdx + 1; k < txts.length; k++) {
+                                    const val = parseInt(txts[k]);
+                                    if (!isNaN(val) && val >= 0 && val < 2000 && !txts[k].includes(':')) { // Evitar horas
+                                        const id = txts[possibleIdIdx].replace(/^0+/, '');
+                                        if (!results.find(v => v.identifier === id)) {
+                                            results.push({ identifier: id, pasajeros: val.toString() });
+                                        }
+                                        break;
+                                    }
+                                }
                             }
                         }
                     }
                 }
-                return results;
             }
-
-            let data = extractFromDoc(document);
-            // Si no hay datos, barrer iframes
-            if (data.length === 0) {
-                const frames = Array.from(window.frames);
-                for (let i = 0; i < frames.length; i++) {
-                    try {
-                        const frameData = extractFromDoc(frames[i].document);
-                        if (frameData.length > 0) {
-                            data = frameData;
-                            break;
-                        }
-                    } catch (e) { }
-                }
-            }
-            return data;
+            return results;
         });
 
-        if (!vehicles || vehicles.length === 0) {
-            // Fallback desesperado: Regex sobre todo el texto (muy rápido)
-            const textDump = await page.evaluate(() => document.body.innerText);
-            const regexMatches = [...textDump.matchAll(/\b(?:Int|Movil|No)?\.?\s*(\d{1,4})\s*[\s\S]{1,50}?\b(\d{1,4})\b/gi)];
-            const backupVehicles = [];
-            for (const m of regexMatches) {
-                const id = m[1].replace(/^0+/, '');
-                const val = parseInt(m[2]);
-                if (val < 2000 && !backupVehicles.find(v => v.identifier === id)) {
-                    backupVehicles.push({ identifier: id, pasajeros: val.toString() });
-                }
-            }
-            if (backupVehicles.length > 0) {
-                console.log("Extracción fallback regex exitosa.");
-                res.json({ success: true, vehicles: backupVehicles });
-            } else {
-                throw new Error("No se extrajeron datos válidos.");
-            }
-        } else {
-            console.log(`Extracción exitosa: ${vehicles.length} registros.`);
+        if (vehicles.length > 0) {
+            console.log(`Éxito. ${vehicles.length} móviles encontrados.`);
             res.json({ success: true, vehicles });
+        } else {
+            // Fallback Plan C: Regex texto crudo buscando "Interno... Total"
+            // A veces la tabla es div-based
+            console.log("Tablas vacías, intentando regex global...");
+            const rawBody = await page.evaluate(() => document.body.innerText);
+            // Patron: Algo que parece Interno numero ... numero (pasajeros)
+            // Asumimos que están en la misma linea o bloque cercano
+            const matches = [...rawBody.matchAll(/(\d{1,4})\s+.*?(\d{1,4})/g)];
+            // Esto es arriesgado, probemos algo mas seguro
+            throw new Error("No se pudieron extraer datos consistentes (Columna Interno/Total no hallada).");
         }
 
     } catch (error) {
-        console.error('Error (Optimizado):', error.message);
+        console.error('Error Robot:', error);
         res.status(500).json({ success: false, message: error.message });
-    } finally {
-        if (page) {
-            try {
-                await page.close(); // Cerrar solo la pestaña (Página), mantener Browser vivo
-            } catch (e) { }
-        }
     }
 });
 
+// Mantener vivo el servidor
+setInterval(() => {
+    if (globalPage && sessionActive) {
+        console.log("Keep-alive: Chequeando sesión...");
+        // Opcional: recargar ligeramente o interactuar para que no muera la sesión web
+        globalPage.evaluate(() => { window.scrollBy(0, 10); }).catch(() => sessionActive = false);
+    }
+}, 60000 * 5); // Cada 5 mins
+
 app.listen(PORT, () => {
-    console.log(`Servidor Robot OPTIMIZADO listo en ${PORT}`);
+    console.log(`Robot Persistente V3 escuchando en ${PORT}`);
+    initBrowser(); // Arrancar browser al inicio
 });
