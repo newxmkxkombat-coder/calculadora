@@ -176,6 +176,21 @@ app.post('/api/scrape-passengers', async (req, res) => {
             try {
                 // Clickear botón Buscar/Lupa sin recargar página
                 const refreshed = await page.evaluate(() => {
+                    // --- HACK MODO DIOS: ACTIVAR TODOS LOS FILTROS ---
+                    try {
+                        ['verConsolidado', 'verOtros', 'verCaptura', 'verPuntoControl', 'verPasajero'].forEach(name => {
+                            const el = document.querySelector(`[name="${name}"]`);
+                            if (el) {
+                                el.value = '1';
+                                if (el.type === 'checkbox') el.checked = true;
+                            }
+                        });
+                        // Forzar que el servidor crea que queremos ver todo
+                        const placaInput = document.querySelector('[name="placas"]');
+                        if (placaInput) placaInput.value = '0'; // 0 significa "TODAS"
+                    } catch (e) { }
+                    // -------------------------------------------------
+
                     // Estrategia combinada de botones
                     const btns = Array.from(document.querySelectorAll('button, input[type="submit"], a.btn'));
                     const textBtn = btns.find(b =>
@@ -209,6 +224,20 @@ app.post('/api/scrape-passengers', async (req, res) => {
 
             // Re-asegurar click tras carga completa por si la tabla viene vacía
             await page.evaluate(() => {
+                // --- HACK MODO DIOS: ACTIVAR TODOS LOS FILTROS (SAFE MODE) ---
+                try {
+                    ['verConsolidado', 'verOtros', 'verCaptura', 'verPuntoControl', 'verPasajero'].forEach(name => {
+                        const el = document.querySelector(`[name="${name}"]`);
+                        if (el) {
+                            el.value = '1';
+                            if (el.type === 'checkbox') el.checked = true;
+                        }
+                    });
+                    const placaInput = document.querySelector('[name="placas"]');
+                    if (placaInput) placaInput.value = '0';
+                } catch (e) { }
+                // ------------------------------------------------------------
+
                 const iconBtn = document.querySelector('.fa-search, .glyphicon-search, span[class*="search"], i[class*="search"]')?.closest('a, button, div');
                 if (iconBtn) iconBtn.click();
             });
