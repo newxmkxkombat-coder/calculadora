@@ -162,69 +162,67 @@ app.post('/api/scrape-passengers', async (req, res) => {
             await new Promise(r => setTimeout(r, 4000));
         }
 
-        // 4. Extracción Específica (Estricta - Interno vs Total Día)
-        console.log('Extrayendo datos de Móviles...');
+        // 4. Extracción "VISUAL" (Posicional) - A prueba de tablas rotas
+        console.log('Extrayendo datos de Móviles (Modo Visual)...');
 
         const vehicles = await page.evaluate(() => {
             const results = [];
             const clean = (t) => (t || '').toLowerCase().trim();
             const cleanNum = (t) => (t || '').replace(/\D/g, '');
 
-            const frames = [document, ...Array.from(window.frames).map(f => {
-                try { return f.document; } catch (e) { return null; }
-            }).filter(d => d)];
+            try {
+                // Buscamos TODOS los 'tr' (filas) visibles en la página, no importa si están en tablas anidadas
+                // A veces los reportes usan múltiples tablas (una para header, otra para data)
+                const allRows = Array.from(document.querySelectorAll('tr'));
 
-            for (const doc of frames) {
-                const tables = Array.from(doc.querySelectorAll('table'));
-                for (const table of tables) {
-                    const rows = Array.from(table.querySelectorAll('tr'));
-                    if (rows.length < 2) continue;
+                let targetColInterno = -1;
+                let targetColTotal = -1;
+                let headerFound = false;
 
-                    let colInterno = -1;
-                    let colTotal = -1;
-                    let headerRow = -1;
+                for (const row of allRows) {
+                    const cells = Array.from(row.querySelectorAll('td, th'));
+                    if (cells.length === 0) continue;
 
-                    // 1. Buscar cabeceras exactas
-                    for (let i = 0; i < Math.min(rows.length, 8); i++) {
-                        const cells = Array.from(rows[i].querySelectorAll('td, th'));
+                    // Si no hemos encontrado el header, buscamos en esta fila
+                    if (!headerFound) {
                         const texts = cells.map(c => clean(c.innerText));
 
-                        // Indices
-                        const iInt = texts.findIndex(t => t.includes('número interno') || t.includes('numero interno'));
-                        const iTot = texts.findIndex(t => t.includes('total día') || t.includes('total dia'));
+                        // Búsqueda laxa de encabezados
+                        const idxInt = texts.findIndex(t => t.includes('número interno') || t.includes('numero interno') || t === 'interno');
+                        const idxTot = texts.findIndex(t => t.includes('total día') || t.includes('total dia'));
 
-                        if (iInt !== -1 && iTot !== -1) {
-                            colInterno = iInt;
-                            colTotal = iTot;
-                            headerRow = i;
-                            break;
+                        if (idxInt !== -1 && idxTot !== -1) {
+                            targetColInterno = idxInt;
+                            targetColTotal = idxTot;
+                            headerFound = true;
+                            // console.log(`Header encontrado en indices: ${idxInt}, ${idxTot}`);
                         }
                     }
+                    // Si ya encontramos header, asumimos que las filas siguientes con estructura similar son datos
+                    // (OJO: Asumimos que la columna visual se mantiene por índice de celda)
+                    else {
+                        // Verificamos si esta fila tiene celdas suficientes en esas posiciones
+                        if (cells[targetColInterno] && cells[targetColTotal]) {
+                            const valInterno = cells[targetColInterno].innerText.trim();
+                            const valTotal = cells[targetColTotal].innerText.trim();
 
-                    // 2. Extraer datos alineados
-                    if (headerRow !== -1) {
-                        for (let j = headerRow + 1; j < rows.length; j++) {
-                            const cells = Array.from(rows[j].querySelectorAll('td'));
+                            // Lógica de validación de datos
+                            // Interno: "N015" -> "15"
+                            const id = valInterno.replace(/^[a-zA-Z]+0*/, '').replace(/^0+/, '');
+                            const pax = cleanNum(valTotal);
 
-                            // Asegurar que la fila tiene las columnas necesarias
-                            if (cells[colInterno] && cells[colTotal]) {
-                                // Limpieza específica: "N015" -> "15"
-                                let idRaw = cells[colInterno].innerText.trim();
-                                let id = idRaw.replace(/^[a-zA-Z]+0*/, '').replace(/^0+/, ''); // Quita letras iniciales y ceros izq
-
-                                let paxRaw = cells[colTotal].innerText.trim();
-                                let pax = cleanNum(paxRaw);
-
-                                if (id && pax !== '' && !isNaN(pax)) {
-                                    if (!results.find(v => v.identifier === id)) {
-                                        results.push({ identifier: id, pasajeros: pax });
-                                    }
+                            // ¿Es un dato válido? (ID numérico y Pax numérico)
+                            if (id && pax !== '' && !isNaN(pax) && valInterno.length < 10) {
+                                // valInterno < 10 evita leer filas basura o de resumen largas
+                                if (!results.find(v => v.identifier === id)) {
+                                    results.push({ identifier: id, pasajeros: pax });
                                 }
                             }
                         }
-                        if (results.length > 0) return results;
                     }
                 }
+            } catch (e) {
+                // Error silencioso dentro del context
             }
             return results;
         });
@@ -233,12 +231,11 @@ app.post('/api/scrape-passengers', async (req, res) => {
             console.log(`Éxito. ${vehicles.length} móviles encontrados.`);
             res.json({ success: true, vehicles });
         } else {
-            // Debug: Mostrar qué ve el robot si falla
-            const layoutDump = await page.evaluate(() => {
-                const tables = Array.from(document.querySelectorAll('table'));
-                return tables.map(t => t.innerText.substring(0, 100).replace(/\n/g, ' ')).join(' || ');
+            // Debug Extremo: Volcar la estructura de las primeras tablas
+            const debugInfo = await page.evaluate(() => {
+                return Array.from(document.querySelectorAll('tr')).slice(0, 10).map(r => r.innerText).join('\n---\n');
             });
-            throw new Error(`No se encontrar columnas de 'Número Interno' y 'Total día'. Tablas detectadas: ${layoutDump} ...`);
+            throw new Error(`No se pudo extraer. Header no hallado. Primeras filas:\n${debugInfo}`);
         }
 
     } catch (error) {
