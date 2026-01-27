@@ -123,11 +123,20 @@ app.post('/api/scrape-passengers', async (req, res) => {
             try {
                 const response = await fetch('https://gps3regisdataweb.com/opita/infoGPS', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
                     body: payload
                 });
 
                 const htmlText = await response.text();
+
+                // Si la respuesta no parece una tabla, devolvemos error con el contenido para debug
+                if (!htmlText.includes('<tr') && !htmlText.includes('<td')) {
+                    return { error: 'RESPUESTA_SERVIDOR_INVALIDA: ' + htmlText.substring(0, 300) };
+                }
+
                 const div = document.createElement('div');
                 div.innerHTML = '<table>' + htmlText + '</table>';
 
