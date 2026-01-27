@@ -1,53 +1,92 @@
 <!DOCTYPE html>
 <html lang="es">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Control Diario de Conductor</title>
-    <meta name="theme-color" content="#0f172a" />
-    <link rel="icon" href="/pwa-icon.svg" type="image/svg+xml">
-    <link rel="apple-touch-icon" href="/pwa-icon.svg">
-    <link rel="manifest" href="/manifest.webmanifest">
 
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>
-      body {
-        font-family: 'Inter', sans-serif;
-        background-color: #0f172a; /* bg-slate-900 */
-        background-image: radial-gradient(circle at top, rgba(34, 211, 238, 0.15) 0%, transparent 40%);
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Control Diario de Conductor</title>
+  <meta name="theme-color" content="#0f172a" />
+  <link rel="icon" href="./pwa-icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./pwa-icon.svg">
+  <link rel="manifest" href="./manifest.webmanifest">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #0f172a;
+      /* bg-slate-900 */
+      background-image: radial-gradient(circle at top, rgba(34, 211, 238, 0.15) 0%, transparent 40%);
+    }
+
+    @keyframes pulse-glow {
+
+      0%,
+      100% {
+        box-shadow: 0 0 15px rgba(20, 184, 166, 0.5);
       }
-      @keyframes pulse-glow {
-        0%, 100% { box-shadow: 0 0 15px rgba(20, 184, 166, 0.5); }
-        50% { box-shadow: 0 0 25px rgba(20, 184, 166, 0.7); }
+
+      50% {
+        box-shadow: 0 0 25px rgba(20, 184, 166, 0.7);
       }
-      .route-checkbox:checked + label {
-        animation: pulse-glow 2.5s infinite ease-in-out;
+    }
+
+    .route-checkbox:checked+label {
+      animation: pulse-glow 2.5s infinite ease-in-out;
+    }
+
+    @keyframes fade-in-backdrop {
+      0% {
+        background-color: rgba(15, 23, 42, 0);
+        backdrop-filter: blur(0px);
       }
-      @keyframes fade-in-backdrop {
-        0% { background-color: rgba(15,23,42,0); backdrop-filter: blur(0px); }
-        100% { background-color: rgba(15,23,42,0.7); backdrop-filter: blur(4px); }
+
+      100% {
+        background-color: rgba(15, 23, 42, 0.7);
+        backdrop-filter: blur(4px);
       }
-      @keyframes fade-in-scale {
-        0% { opacity: 0; transform: scale(0.95); }
-        100% { opacity: 1; transform: scale(1); }
+    }
+
+    @keyframes fade-in-scale {
+      0% {
+        opacity: 0;
+        transform: scale(0.95);
       }
-      .animate-fade-in-backdrop {
-        animation: fade-in-backdrop 0.3s ease-out forwards;
+
+      100% {
+        opacity: 1;
+        transform: scale(1);
       }
-      .animate-fade-in-scale {
-        animation: fade-in-scale 0.3s ease-out forwards;
+    }
+
+    .animate-fade-in-backdrop {
+      animation: fade-in-backdrop 0.3s ease-out forwards;
+    }
+
+    .animate-fade-in-scale {
+      animation: fade-in-scale 0.3s ease-out forwards;
+    }
+
+    @keyframes pulse-bell {
+
+      0%,
+      100% {
+        transform: scale(1);
       }
-      @keyframes pulse-bell {
-        0%, 100% { transform: scale(1); }
-        50% { transform: scale(1.1); box-shadow: 0 0 25px rgba(251, 191, 36, 0.4); }
+
+      50% {
+        transform: scale(1.1);
+        box-shadow: 0 0 25px rgba(251, 191, 36, 0.4);
       }
-      .animate-pulse-bell {
-        animation: pulse-bell 2s infinite ease-in-out;
-      }
-    </style>
+    }
+
+    .animate-pulse-bell {
+      animation: pulse-bell 2s infinite ease-in-out;
+    }
+  </style>
   <script type="importmap">
 {
   "imports": {
@@ -60,8 +99,10 @@
 </script>
 
 </head>
-  <body class="bg-slate-900">
-    <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
-  </body>
+
+<body class="bg-slate-900">
+  <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+
 </html>

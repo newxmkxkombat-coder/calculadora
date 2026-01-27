@@ -3,15 +3,18 @@ import express from 'express';
 import cors from 'cors';
 import puppeteer from 'puppeteer';
 
-// Configurar CORS para permitir peticiones desde cualquier origen (incluyendo GitHub Pages)
+const app = express();
+
+// Configurar CORS para permitir peticiones desde cualquier origen (incluyendo GitHub Pagess)
 app.use(cors({
     origin: '*',
     methods: ['GET', 'POST', 'OPTIONS']
 }));
-app.options('*', cors()); // Habilitar pre-flight para todas las rutas
+app.options(/(.*)/, cors()); // Habilitar pre-flight para todas las rutas
 app.use(express.json());
 
 const PORT = process.env.PORT || 3001;
+app.options('/api/scrape-passengers', cors()); // Explicit OPTIONS for this route
 
 app.post('/api/scrape-passengers', async (req, res) => {
     const { username, password } = req.body;
