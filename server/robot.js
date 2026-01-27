@@ -59,6 +59,20 @@ const ensureLoggedIn = async (page, username, password, forceLogin = false) => {
             return;
         }
 
+        // Si estamos forzando login, hacer logout explícito primero
+        if (forceLogin) {
+            console.log('Forzando logout del servidor...');
+            try {
+                // Intentar logout explícito (URL común en JSP)
+                await page.goto('https://gps3regisdataweb.com/opita/logout.jsp', { timeout: 5000 }).catch(() => { });
+                await page.goto('https://gps3regisdataweb.com/opita/index.jsp?logout=true', { timeout: 5000 }).catch(() => { });
+            } catch (e) { }
+            // Borrar TODAS las cookies
+            const cookies = await page.cookies();
+            if (cookies.length > 0) await page.deleteCookie(...cookies);
+            await new Promise(r => setTimeout(r, 1000));
+        }
+
         console.log('Iniciando sesión...');
         await page.goto(TARGET_URL, { waitUntil: 'networkidle2', timeout: 45000 });
 
