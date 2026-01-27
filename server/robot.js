@@ -220,106 +220,116 @@ app.post('/api/scrape-passengers', async (req, res) => {
         console.log(`Fuente de datos encontrada en: ${targetFrame.url()}`);
 
         const vehicles = await targetFrame.evaluate(() => {
-            // ESTRATEGIA 1: Iterar TODOS las tablas (no solo la primera)
+            // 1. Intentar con Tablas (Prioridad Alta)
             const tables = Array.from(document.querySelectorAll('table'));
 
             for (const table of tables) {
                 const rows = Array.from(table.querySelectorAll('tr'));
                 if (rows.length < 2) continue;
 
-                // Buscar headers en esta tabla específica
+                // Buscar headers en esta tabla o en la tabla anterior (sticky headers)
                 let headerIndex = -1;
                 let colIndices = { placa: -1, interno: -1, total: -1 };
 
+                // Buscar headers
                 for (let i = 0; i < Math.min(rows.length, 10); i++) {
                     const cells = Array.from(rows[i].querySelectorAll('td, th')).map(c => c.innerText.trim().toLowerCase());
 
-                    // Indices basados en "Total dia" y "Número interno"
-                    const idxTotal = cells.findIndex(c => c.includes('total dia') || c.includes('total día'));
-                    const idxInterno = cells.findIndex(c => c.includes('número interno') || c.includes('numero interno') || c.includes('interno'));
+                    const idxTotal = cells.findIndex(c => c.includes('total d') || c.includes('total d\u00EDa') || (c.includes('total') && c.includes('dia')));
+                    const idxInterno = cells.findIndex(c => c.includes('interno') || c.includes('unidad') || c.includes('m\u00F3vil'));
                     const idxPlaca = cells.findIndex(c => c.includes('placa'));
 
-                    if (idxTotal !== -1 && (idxInterno !== -1 || idxPlaca !== -1)) {
+                    if (idxTotal !== -1 || idxInterno !== -1) {
                         headerIndex = i;
                         colIndices.total = idxTotal;
                         colIndices.placa = idxPlaca;
                         colIndices.interno = idxInterno;
-                        // ¡Bingo! Encontramos la tabla correcta
-
-                        const data = [];
-                        for (let j = headerIndex + 1; j < rows.length; j++) {
-                            const cells = rows[j].querySelectorAll('td');
-                            if (cells.length <= colIndices.total) continue;
-
-                            let interno = colIndices.interno !== -1 ? cells[colIndices.interno].innerText.trim() : '';
-                            // Limpiar interno
-                            interno = interno.replace(/^N0*/i, '').replace(/^M/i, '');
-
-                            let placa = colIndices.placa !== -1 ? cells[colIndices.placa].innerText.trim() : '';
-                            let identifier = interno || placa;
-                            let pasajeros = cells[colIndices.total].innerText.trim();
-
-                            // Validación anti-fecha y anti-error
-                            if (pasajeros.includes('-') || pasajeros.includes(':')) continue;
-                            const numPasajeros = parseInt(pasajeros.replace(/\D/g, ''));
-                            // Ignorar años como 2026, 2025
-                            if (numPasajeros > 2024 && numPasajeros < 2030) continue;
-
-                            if (identifier && !isNaN(numPasajeros)) {
-                                const exists = data.find(v => v.identifier === identifier);
-                                if (!exists) {
-                                    data.push({ identifier, pasajeros: numPasajeros.toString() });
-                                }
-                            }
-                        }
-                        if (data.length > 0) return data;
+                        break;
                     }
                 }
+
+                // Si encontramos una tabla con datos pero sin headers, usar HEURÍSTICA DE POSICIÓN
+                // Por la imagen: Interno es col 3, Total día es col 8
+                const useHeuristic = (headerIndex === -1 && rows.some(r => r.querySelectorAll('td').length > 8));
+
+                const data = [];
+                const startRow = headerIndex !== -1 ? headerIndex + 1 : 0;
+
+                for (let j = startRow; j < rows.length; j++) {
+                    const cells = rows[j].querySelectorAll('td');
+                    if (cells.length < 5) continue;
+
+                    let interno = '';
+                    let pasajeros = '';
+
+                    if (headerIndex !== -1) {
+                        interno = colIndices.interno !== -1 ? cells[colIndices.interno].innerText.trim() : '';
+                        pasajeros = colIndices.total !== -1 ? cells[colIndices.total].innerText.trim() : '';
+                    } else if (useHeuristic) {
+                        // Fallback basado en la estructura visual de la imagen
+                        interno = cells[3] ? cells[3].innerText.trim() : '';
+                        pasajeros = cells[8] ? cells[8].innerText.trim() : '';
+                    }
+
+                    // Limpieza de datos
+                    interno = interno.replace(/^N0*/i, '').replace(/^M/i, '').replace(/^0+/, '');
+
+                    // Si el pasajero parece una dirección o fecha, lo ignoramos
+                    const val = parseInt(pasajeros.replace(/\D/g, ''));
+                    if (pasajeros.includes(':') || pasajeros.includes('-') || (val > 2020 && val < 2030)) {
+                        pasajeros = '';
+                    }
+
+                    if (interno && pasajeros && !isNaN(val)) {
+                        const exists = data.find(v => v.identifier === interno);
+                        if (!exists) {
+                            data.push({ identifier: interno, pasajeros: val.toString() });
+                        }
+                    }
+                }
+                if (data.length > 0) return data;
             }
 
-            // ESTRATEGIA 2: TEXT SCRAPING (Plan B Universal)
-            // Si fallaron las tablas, buscamos en el texto plano pero con filtro de fechas estricto
+            // ESTRATEGIA 2: TEXT SCRAPING MEJORADO
             const text = document.body.innerText;
             const results = [];
-            const lines = text.split('\n');
 
-            // Regex: Placa (THQ009) ... Interno (N015) ... Posible Número
-            // O simplemente buscamos bloques donde aparezca el interno y un número
-
-            // Buscar todos los patrones "N000" o "M000"
-            const internalMatches = [...text.matchAll(/\b(?:N|M|Movil)[-.\s]?(\d{3,4})\b/gi)];
+            // Buscar TODOS los internos (N015, N034...)
+            const internalMatches = [...text.matchAll(/\b(?:N|M|Movil|Int)[-.\s]?(\d{1,4})\b/gi)];
 
             for (const match of internalMatches) {
-                const internoFull = match[0];
-                const internoNum = match[1];
+                const internoNum = match[1].replace(/^0+/, '');
+                const lookahead = text.substring(match.index, match.index + 300);
 
-                // Buscar un número "cercano" en el texto (limitado a unos caracteres adelante)
-                // Esto es arriesgado pero es el último recurso
-                const lookahead = text.substring(match.index, match.index + 200);
-
-                // Buscar números en ese fragmento
+                // Buscamos el "Total dia" que suele estar después de una dirección o texto largo
+                // Filtramos números que parecen direcciones (ej: Ci 21, Cl 19)
                 const numbers = lookahead.match(/\b\d+\b/g) || [];
 
+                let foundPasajeros = '';
                 for (const numStr of numbers) {
                     const n = parseInt(numStr);
-                    // Filtros de Seguridad:
-                    // 1. No es el mismo interno
-                    // 2. No es un año (2020-2030)
-                    // 3. No es hora (hh:mm se suele separar, pero si viene junto 2053...)
-                    // 4. Rango pasajero creíble (0 a 10000)
-                    if (numStr !== internoNum && (n < 2024 || n > 2030) && n >= 0 && n < 10000) {
 
-                        // Verificar duplicados
-                        const exists = results.find(r => r.identifier === internoNum || r.identifier === `0${internoNum}` || r.identifier === internoNum.replace(/^0+/, ''));
-                        if (!exists) {
-                            // Normalizar a sin ceros
-                            results.push({ identifier: internoNum.replace(/^0+/, ''), pasajeros: numStr });
-                        }
-                        break; // Tomamos el primer número válido cercano
+                    // REGLAS ESTRICTAS PARA PASAJEROS:
+                    // 1. No es el interno.
+                    // 2. No es parte de una dirección común (Ci 21, Cl 19, Cra 10, etc.)
+                    const precedingText = lookahead.substring(0, lookahead.indexOf(numStr)).toLowerCase();
+                    const isAddress = precedingText.endsWith('ci ') || precedingText.endsWith('cl ') || precedingText.endsWith('cl. ') || precedingText.endsWith('#') || precedingText.endsWith('cra ') || precedingText.endsWith('av ');
+
+                    // 3. No es año ni hora.
+                    const isDate = (n > 2024 && n < 2030);
+
+                    if (numStr !== match[1] && !isAddress && !isDate && n >= 0 && n < 5000) {
+                        foundPasajeros = numStr;
+                        // No rompemos todavía, buscamos si hay un número más adelante que sea el real 
+                        // (el total día suele ser de las últimas columnas)
                     }
                 }
-            }
 
+                if (internoNum && foundPasajeros) {
+                    const exists = results.find(r => r.identifier === internoNum);
+                    if (!exists) results.push({ identifier: internoNum, pasajeros: foundPasajeros });
+                }
+            }
             return results;
         });
 
