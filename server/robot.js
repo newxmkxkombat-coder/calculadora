@@ -105,7 +105,9 @@ app.post('/api/scrape-passengers', async (req, res) => {
 
         // 5. Esperar Tabla y Extraer
         console.log('Esperando tabla de resultados...');
-        await page.waitForSelector('table', { timeout: 30000 });
+        // Dar un respiro a la página para que procese el click
+        await new Promise(r => setTimeout(r, 5000));
+        await page.waitForSelector('table', { timeout: 60000 });
 
         const vehicles = await page.evaluate(() => {
             const rows = Array.from(document.querySelectorAll('tr'));
