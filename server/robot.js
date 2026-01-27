@@ -40,6 +40,8 @@ app.post('/api/scrape-passengers', async (req, res) => {
         });
 
         const page = await browser.newPage();
+        // Configurar vista de escritorio para evitar menús móviles colapsados
+        await page.setViewport({ width: 1366, height: 768 });
 
         // 1. Ir al Login
         console.log('Navegando a login...');
