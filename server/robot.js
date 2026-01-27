@@ -106,41 +106,18 @@ app.post('/api/scrape-passengers', async (req, res) => {
         // 1. Asegurar sesión (Con detección de bloqueo "Finalizado sesión")
         await ensureLoggedIn(page, username, password);
 
-        // 2. Navegar a "Móviles" específicamente
-        console.log('Navegando a reporte de Móviles...');
+        // 2. Navegar DIRECTO a la URL mágica (Atajo del usuario)
+        const REPORT_URL_DIRECT = 'https://gps3regisdataweb.com/opita/app/seguimiento/infogps.jsp?v=3sobcmjas4';
+        console.log('Navegando directo URL reporte...');
 
-        // Navegar/Clickea en Móviles
-        await page.evaluate(async () => {
-            const links = Array.from(document.querySelectorAll('a, span, div, li'));
-            // Buscar "Móviles" exacto o contenido
-            const target = links.find(el => {
-                const t = (el.innerText || '').toLowerCase().trim();
-                return t === 'móviles' || t === 'moviles';
-            });
+        // Ir directo a la URL del reporte
+        await page.goto(REPORT_URL_DIRECT, { waitUntil: 'networkidle2', timeout: 30000 });
 
-            if (target) {
-                target.click();
-            } else {
-                // Si no, intentar abrir menú Reportes primero
-                const reportes = links.find(el => (el.innerText || '').toLowerCase().trim() === 'reportes');
-                if (reportes) reportes.click();
-            }
-        });
+        // Esperar brevemente a que renderice
+        await new Promise(r => setTimeout(r, 2000));
 
-        await new Promise(r => setTimeout(r, 1500));
-
-        // Asegurar Submenú si es necesario
-        await page.evaluate(() => {
-            const links = Array.from(document.querySelectorAll('a, span, div, li'));
-            const target = links.find(el => {
-                const t = (el.innerText || '').toLowerCase();
-                return (t === 'móviles' || t === 'moviles') && el.offsetParent !== null;
-            });
-            if (target) target.click();
-        });
-
-        // 3. ACTUALIZAR (Click Lupa/Buscar) - CRÍTICO
-        console.log('Actualizando datos...');
+        // 3. ACTUALIZAR (Click Lupa/Buscar) - CRÍTICO por si acaso
+        console.log('Verificando botón de actualización...');
         await new Promise(r => setTimeout(r, 1000));
 
         const searchClicked = await page.evaluate(() => {
@@ -152,7 +129,6 @@ app.post('/api/scrape-passengers', async (req, res) => {
             if (textBtn) { textBtn.click(); return true; }
 
             // Estrategia 2: La Lupa (icono) o botón verde (desagrupar)
-            // Buscamos cualquier elemento que parezca un botón de búsqueda (icono fa-search, img lupa, etc)
             const iconBtn = document.querySelector('.fa-search, .glyphicon-search, span[class*="search"], i[class*="search"]')?.closest('a, button, div');
             if (iconBtn) { iconBtn.click(); return true; }
 
@@ -179,7 +155,6 @@ app.post('/api/scrape-passengers', async (req, res) => {
             }, { timeout: 15000, polling: 1000 });
         } catch (e) {
             console.log("Timeout esperando texto 'Total día', intentando extraer de todos modos...");
-            // Si falla la espera, puede ser que el texto esté pero waitForFunction fallara por contexto
         }
 
         const vehicles = await page.evaluate(() => {
