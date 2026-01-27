@@ -178,65 +178,83 @@ app.post('/api/scrape-passengers', async (req, res) => {
         }
 
         if (!targetFrame) {
-            // DEBUG AVANZADO: Devolver el texto de la página para saber dónde estamos
             const pageSnapshot = await page.evaluate(() => document.body.innerText.replace(/\n+/g, ' | ').substring(0, 300));
-            throw new Error(`Sin tabla. Pantalla actual dice: "${pageSnapshot}..."`);
+            throw new Error(`Sin tabla. Texto visible: "${pageSnapshot}..."`);
         }
 
-
-
-        console.log(`Tabla encontrada en frame: ${targetFrame.url()}`);
+        console.log(`Tabla encontrada en: ${targetFrame.url()}`);
 
         const vehicles = await targetFrame.evaluate(() => {
             const rows = Array.from(document.querySelectorAll('tr'));
+
+            // 1. Identificar índices de columnas
             let headerIndex = -1;
             let colIndices = { placa: -1, interno: -1, total: -1 };
 
-            rows.some((row, idx) => {
-                const text = row.innerText.toLowerCase();
-                // Buscar encabezado por keywords
-                if (text.includes('total') && (text.includes('dia') || text.includes('día'))) {
-                    headerIndex = idx;
-                    const cells = Array.from(row.querySelectorAll('td, th')).map(c => c.innerText.trim().toLowerCase());
-                    colIndices.total = cells.findIndex(c => c.includes('total') && (c.includes('dia') || c.includes('día')));
-                    colIndices.placa = cells.findIndex(c => c.includes('placa'));
-                    colIndices.interno = cells.findIndex(c => c.includes('interno') || c.includes('movil') || c.includes('móvil'));
-                    return true;
-                }
-                return false;
-            });
+            // Buscar la fila de encapsulados más probable
+            for (let i = 0; i < Math.min(rows.length, 5); i++) {
+                const cells = Array.from(rows[i].querySelectorAll('td, th')).map(c => c.innerText.trim().toLowerCase());
 
-            if (headerIndex === -1) return null;
+                // Heurística de columnas
+                const idxTotal = cells.findIndex(c => c.includes('total') || c.includes('pasajeros') || c.includes('pax') || c.includes('cant') || c.includes('conteo'));
+                const idxPlaca = cells.findIndex(c => c.includes('placa'));
+                const idxInterno = cells.findIndex(c => c.includes('interno') || c.includes('movil') || c.includes('móvil') || c.includes('unidad'));
+
+                if (idxPlaca !== -1 || idxInterno !== -1) {
+                    headerIndex = i;
+                    colIndices.total = idxTotal;
+                    colIndices.placa = idxPlaca;
+                    colIndices.interno = idxInterno;
+
+                    // Si no encontramos 'total' explícito, asumimos la última columna numérica? 
+                    // Mejor no arriesgar, pero si 'idxTotal' es -1, intentaremos buscar un número grande en las filas de datos
+                    break;
+                }
+            }
+
+            if (headerIndex === -1) return null; // Fallback: no se entendió la tabla
 
             const data = [];
             for (let i = headerIndex + 1; i < rows.length; i++) {
                 const cells = rows[i].querySelectorAll('td');
-                if (cells.length <= colIndices.total) continue; // Skip si no tiene suficientes columnas
 
-                const interno = colIndices.interno !== -1 ? cells[colIndices.interno].innerText.trim() : '?';
-                const placa = colIndices.placa !== -1 ? cells[colIndices.placa].innerText.trim() : '?';
-                const pasajeros = cells[colIndices.total].innerText.trim();
+                // Extraer Placa / Interno
+                let interno = colIndices.interno !== -1 && cells[colIndices.interno] ? cells[colIndices.interno].innerText.trim() : '';
+                let placa = colIndices.placa !== -1 && cells[colIndices.placa] ? cells[colIndices.placa].innerText.trim() : '';
 
-                let identifier = placa;
-                // Si existe interno, úsalo, salvo que sea vacío
-                if (interno && interno.length > 0 && interno !== '0') {
-                    identifier = interno;
+                // Fallback identificador
+                let identifier = placa || interno || 'Desconocido';
+                if (interno && interno.length > 0 && interno !== '0') identifier = interno;
+
+                // Extraer Total
+                let pasajeros = '0';
+                if (colIndices.total !== -1 && cells[colIndices.total]) {
+                    pasajeros = cells[colIndices.total].innerText.trim();
+                } else {
+                    // INTENTO INTELIGENTE: Buscar la primera columna que parezca un contador (> 100)
+                    for (const cell of cells) {
+                        const val = parseInt(cell.innerText.replace(/\D/g, ''));
+                        if (!isNaN(val) && val > 50 && val < 5000) { // Rango razonable de pasjeros diarios
+                            pasajeros = cell.innerText.trim();
+                            break;
+                        }
+                    }
                 }
 
-                if (pasajeros) {
+                if (identifier !== 'Desconocido') {
                     data.push({ identifier, pasajeros });
                 }
             }
             return data;
         });
 
-        if (!vehicles) throw new Error("No se encontraron datos en la tabla (estructura desconocida).");
+        if (!vehicles || vehicles.length === 0) {
+            const pageSnapshot = await page.evaluate(() => document.body.innerText.replace(/\n+/g, ' | ').substring(0, 300));
+            throw new Error(`Tabla vacía o ilegible. Texto: "${pageSnapshot}..."`);
+        }
 
         console.log(`Encontrados ${vehicles.length} vehículos.`);
-
-        // Mantener navegador brevemente abierto para debug
         setTimeout(() => browser.close(), 3000);
-
         res.json({ success: true, vehicles });
 
     } catch (error) {
