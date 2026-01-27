@@ -42,9 +42,12 @@ const initBrowser = async () => {
             // Espiar peticiones de datos (AJAX/Fetch)
             if (['xhr', 'fetch', 'script'].includes(type)) {
                 // Solo nos interesan las que parezcan datos de móviles o actualizaciones
-                if (req.url().includes('json') || req.url().includes('data') || req.url().includes('get') || req.url().includes('posicion')) {
+                if (req.url().includes('json') || req.url().includes('data') || req.url().includes('get') || req.url().includes('posicion') || req.url().includes('infoGPS')) {
                     console.log('>> 🕵️ SPIA DETECTÓ DATA: ', req.url());
                     console.log('   -> Método:', req.method());
+                    if (req.method() === 'POST' && req.url().includes('infoGPS')) {
+                        console.log('   📤 POST DATA para infoGPS:', req.postData());
+                    }
                 }
             }
 
