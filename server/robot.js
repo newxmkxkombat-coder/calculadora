@@ -117,9 +117,8 @@ app.post('/api/scrape-passengers', async (req, res) => {
             const day = String(now.getDate()).padStart(2, '0');
             const todayStr = `${year}-${month}-${day}`;
 
-            // Experimentaremos trayendo TODOS (placas=0)
-            // Si falla, volver a: %2CTHQ009%2CTHQ010
-            const payload = `fechaInicio=${todayStr}+00%3A00%3A00&fechaFinal=${todayStr}+23%3A59%3A59&verCaptura=0&verPuntoControl=0&verPasajero=0&verAlarma=0&verConsolidado=0&verOtros=0&verValidacion=0&verTablet=0&fechaPredeterminada=2&placas=0&grupos=&rutas=&empresas=35&uniSeleccion=0&page=0&maxPerPage=500&init=0&lpto=&lalm=&lcap=&lval=&ltab=&unirPuntos=false&order=fecha_gps+DESC&agrupar=true&eventosActividad=36+%2C+69+%2C+191+%2C+500&minutosActividad=15&numLocActual=20`;
+            // Lista de PLACAS ACTUALIZADA (Bala de Plata)
+            const payload = `fechaInicio=${todayStr}+00%3A00%3A00&fechaFinal=${todayStr}+23%3A59%3A59&verCaptura=0&verPuntoControl=0&verPasajero=0&verAlarma=0&verConsolidado=0&verOtros=0&verValidacion=0&verTablet=0&fechaPredeterminada=2&placas=0%2CTHQ009%2CTHQ010%2CTHQ062%2CVXI010%2CVXH931&grupos=&rutas=&empresas=35&uniSeleccion=0&page=0&maxPerPage=500&init=0&lpto=&lalm=&lcap=&lval=&ltab=&unirPuntos=false&order=fecha_gps+DESC&agrupar=true&eventosActividad=36+%2C+69+%2C+191+%2C+500&minutosActividad=15&numLocActual=20`;
 
             try {
                 const response = await fetch('https://gps3regisdataweb.com/opita/infoGPS', {
