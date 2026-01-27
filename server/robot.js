@@ -79,70 +79,73 @@ app.post('/api/scrape-passengers', async (req, res) => {
         // 4. Navegación Inteligente (Reforzada)
         console.log('Buscando ruta a datos...');
 
-        // ESTRATEGIA: La página parece ser un menú de selección de reportes.
-        // Haremos click explícito en "Producción por vehículo" o variaciones.
-
-        const destinationClicked = await page.evaluate(() => {
-            const keywords = [
-                'producción por vehículo', 'produccion por vehiculo', 'producción',
-                'rep. hoy', 'reporte hoy', 'móviles', 'moviles'
-            ];
-
-            // Buscar en enlaces, botones, spans, divs y opciones de lista
-            const elements = Array.from(document.querySelectorAll('a, button, span, div, li, label'));
-
-            // Prioridad 1: Producción por vehículo (Exacto o cercano)
-            const target = elements.find(el => {
-                const text = (el.innerText || '').toLowerCase().trim();
-                return keywords.some(k => text.includes(k)) && el.offsetParent !== null;
+        // ESTRATEGIA PRINCIPAL: Buscar directamente el sub-reporte.
+        let targetReport = await page.evaluate(() => {
+            const keywords = ['producción por vehículo', 'produccion', 'vehículo', 'vehiculo', 'móviles', 'moviles'];
+            const elements = Array.from(document.querySelectorAll('a, span, div, li'));
+            return elements.find(el => {
+                const text = (el.innerText || '').toLowerCase();
+                return keywords.some(k => text.includes(k)) && el.innerText.length < 50; // Evitar textos largos
             });
-
-            if (target) {
-                target.click();
-                return true;
-            }
-            return false;
         });
 
-        if (destinationClicked) {
-            console.log('Opción de reporte seleccionada. Esperando carga...');
-            await new Promise(r => setTimeout(r, 4000));
+        if (targetReport) {
+            console.log('Reporte encontrado directamente. Clickeando...');
+            await page.evaluate(el => el.click(), targetReport);
         } else {
-            console.log('No se encontró opción directa. Intentando expandir menús "Reportes"...');
-            // Intentar expandir menú "Reportes" si no vimos lo anterior
-            await page.evaluate(() => {
-                const menus = Array.from(document.querySelectorAll('a, span, div'));
-                const reportMenu = menus.find(m => (m.innerText || '').toLowerCase().includes('reportes'));
-                if (reportMenu) reportMenu.click();
-            });
-            await new Promise(r => setTimeout(r, 2000));
+            console.log('Reporte directo no visible. Interactuando con menú "Reportes"...');
 
-            // Reintentar click en sub-opción tras expandir
-            await page.evaluate(() => {
-                const keywords = ['producción', 'produccion', 'móviles', 'rep. hoy'];
-                const elements = Array.from(document.querySelectorAll('a, button, span, div, li'));
-                const target = elements.find(el => {
-                    const text = (el.innerText || '').toLowerCase();
-                    return keywords.some(k => text.includes(k)) && el.offsetParent !== null;
-                });
-                if (target) target.click();
+            // 1. Encontrar menú "Reportes"
+            const reportMenuHandle = await page.evaluateHandle(() => {
+                const all = Array.from(document.querySelectorAll('a, span, div, li'));
+                return all.find(el => el.innerText.trim().toLowerCase() === 'reportes');
             });
-            await new Promise(r => setTimeout(r, 3000));
+
+            if (reportMenuHandle && reportMenuHandle.asElement()) {
+                // 2. Intentar Hover (común en menús dropdown)
+                await reportMenuHandle.hover();
+                await new Promise(r => setTimeout(r, 1000));
+
+                // 3. Intentar Clic
+                await reportMenuHandle.click();
+                await new Promise(r => setTimeout(r, 2000));
+
+                // 4. Buscar ahora el sub-link
+                const clickedSub = await page.evaluate(() => {
+                    const subKeywords = ['producción', 'produccion', 'vehículo', 'vehiculo'];
+                    const subElements = Array.from(document.querySelectorAll('a, span, div, li'));
+                    const subTarget = subElements.find(el => {
+                        const text = (el.innerText || '').toLowerCase();
+                        // Debe ser visible y contener la palabra clave
+                        return subKeywords.some(k => text.includes(k)) && el.offsetParent !== null;
+                    });
+
+                    if (subTarget) {
+                        subTarget.click();
+                        return true;
+                    }
+                    return false;
+                });
+
+                if (clickedSub) {
+                    console.log('Sub-reporte clickeado tras abrir menú.');
+                } else {
+                    console.log('Aún no se encuentra "Producción". Intentando URL directa o fallback...');
+                }
+            }
         }
 
-        // HEURÍSTICA: SIEMPRE buscar botón "Generar" o "Buscar" después de seleccionar
+        await new Promise(r => setTimeout(r, 4000)); // Esperar carga de la vista de reporte
+
+        // HEURÍSTICA: Buscar botón "Generar" o "Buscar"
         console.log('Buscando botón Generar/Buscar...');
         await page.evaluate(() => {
-            const controls = Array.from(document.querySelectorAll('button, input[type="submit"], a, div.btn'));
+            const controls = Array.from(document.querySelectorAll('button, input[type="submit"], input[type="button"], a.btn, div.btn'));
             const goBtn = controls.find(c => {
                 const t = (c.innerText || c.value || '').toLowerCase();
-                const actionKeywords = ['generar', 'buscar', 'consultar', 'ver reporte', 'refresh', 'actualizar', 'view', 'ejecutar'];
-                return actionKeywords.some(k => t.includes(k)) && c.offsetParent !== null;
+                return ['generar', 'buscar', 'consultar', 'ver', 'search'].some(k => t.includes(k));
             });
-            if (goBtn) {
-                goBtn.click();
-                console.log('Botón de acción clickeado.');
-            }
+            if (goBtn) goBtn.click();
         });
         // Espera larga para que llegue la data (AJAX)
         await new Promise(r => setTimeout(r, 6000));
