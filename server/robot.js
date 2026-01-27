@@ -76,11 +76,11 @@ app.post('/api/scrape-passengers', async (req, res) => {
         await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }).catch(e => console.log("Timeout navegacion post-login ignorado."));
         await new Promise(r => setTimeout(r, 4000)); // Esperar carga extra del dashboard
 
-        // 4. Navegación Inteligente (Basada en el dump de error)
+        // 4. Navegación Inteligente (Reforzada)
         console.log('Buscando ruta a datos...');
 
         // ESTRATEGIA: La página parece ser un menú de selección de reportes.
-        // El texto "Producción por vehículo" está visible en el error, ese es nuestro objetivo probable.
+        // Haremos click explícito en "Producción por vehículo" o variaciones.
 
         const destinationClicked = await page.evaluate(() => {
             const keywords = [
@@ -115,7 +115,7 @@ app.post('/api/scrape-passengers', async (req, res) => {
                 const reportMenu = menus.find(m => (m.innerText || '').toLowerCase().includes('reportes'));
                 if (reportMenu) reportMenu.click();
             });
-            await new Promise(r => setTimeout(r, 3000));
+            await new Promise(r => setTimeout(r, 2000));
 
             // Reintentar click en sub-opción tras expandir
             await page.evaluate(() => {
@@ -185,8 +185,13 @@ app.post('/api/scrape-passengers', async (req, res) => {
         }
 
         if (!targetFrame) {
-            const pageSnapshot = await page.evaluate(() => document.body.innerText.replace(/\n+/g, ' | ').substring(0, 350));
-            throw new Error(`Datos no hallados. Asegúrate de estar en el reporte. Vista: "${pageSnapshot}..."`);
+            const pageSnapshot = await page.evaluate(() => {
+                // Capturar una instantánea de texto de lo que ve el robot para debug
+                const bodyText = document.body.innerText.replace(/\n+/g, ' | ').substring(0, 500);
+                const links = Array.from(document.querySelectorAll('a')).map(a => a.innerText).slice(0, 5).join(', ');
+                return `Texto: ${bodyText} ... Links: ${links}`;
+            });
+            throw new Error(`Datos no hallados. El robot ve esto: "${pageSnapshot}"`);
         }
 
         console.log(`Tabla localizada. Extrayendo...`);

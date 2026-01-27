@@ -1271,25 +1271,40 @@ const VehicleMaintenanceManager: React.FC<{ records: MaintenanceRecord[]; setRec
 
 
 const RobotModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpen, onClose }) => {
-  const [username, setUsername] = useState('luniosilva');
-  const [password, setPassword] = useState('12256643');
+  const [username] = useState('luniosilva'); // Credenciales fijas o precargadas
+  const [password] = useState('12256643');
   const [isLoading, setIsLoading] = useState(false);
   const [vehicles, setVehicles] = useState<Array<{ identifier: string, pasajeros: string }>>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const timerRef = useRef<number | null>(null);
 
   // URL del servidor en Railway (Producción)
   const API_URL = 'https://calculadora-production-fa9d.up.railway.app';
 
-  const handleConnect = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const startTimer = () => {
+    setElapsedTime(0);
+    timerRef.current = window.setInterval(() => {
+      setElapsedTime(prev => prev + 1);
+    }, 100); // Actualiza cada 100ms
+  };
+
+  const stopTimer = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  const fetchPassengers = useCallback(async () => {
     setIsLoading(true);
     setErrorMessage(null);
     setVehicles([]);
+    startTimer();
 
     try {
-      // Usamos fetch con timeout para evitar esperas infinitas
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 90000); // 90 segundos timeout
+      const timeoutId = setTimeout(() => controller.abort(), 90000);
 
       const response = await fetch(`${API_URL}/api/scrape-passengers`, {
         method: 'POST',
@@ -1315,16 +1330,35 @@ const RobotModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpe
         setErrorMessage("Error de conexión con el servidor. Intenta más tarde.");
       }
     } finally {
+      stopTimer();
       setIsLoading(false);
     }
-  };
+  }, [username, password]); // Dependencias estables
+
+  // Auto-ejecutar al abrir el modal
+  useEffect(() => {
+    if (isOpen) {
+      fetchPassengers();
+    } else {
+      stopTimer();
+      setElapsedTime(0);
+      setVehicles([]);
+      setErrorMessage(null);
+    }
+    return () => stopTimer();
+  }, [isOpen, fetchPassengers]);
+
 
   if (!isOpen) return null;
+
+  const formatTime = (msCount: number) => {
+    return (msCount / 10).toFixed(1) + 's';
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in-backdrop" onClick={onClose}>
       <div className="bg-slate-800 border-2 border-indigo-500/50 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-fade-in-scale flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center gap-3 mb-6 border-b border-indigo-500/20 pb-4 flex-shrink-0">
+        <div className="flex items-center gap-3 mb-4 border-b border-indigo-500/20 pb-4 flex-shrink-0">
           <div className="p-3 bg-indigo-500/20 rounded-full text-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.3)]">
             <RobotIcon />
           </div>
@@ -1334,85 +1368,46 @@ const RobotModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpe
           </div>
         </div>
 
-        {vehicles.length === 0 ? (
-          !errorMessage ? (
-            <form onSubmit={handleConnect} className="space-y-5 overflow-y-auto">
-              <div className="bg-indigo-900/20 p-3 rounded-lg border border-indigo-500/30 mb-2">
-                <p className="text-indigo-200 text-sm flex items-start gap-2">
-                  <span className="text-lg">🤖</span>
-                  Conectando a <strong>gps3regisdataweb.com</strong>...
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1.5 ml-1">Usuario</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={username}
-                      onChange={e => setUsername(e.target.value)}
-                      className="w-full bg-slate-900/50 border border-slate-600 rounded-xl p-3 text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none placeholder-slate-600 font-mono"
-                      required
-                    />
-                    <div className="absolute right-3 top-3 text-slate-600 pointer-events-none">
-                      <UsersIcon />
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1.5 ml-1">Contraseña</label>
-                  <div className="relative">
-                    <input
-                      type="password"
-                      value={password}
-                      onChange={e => setPassword(e.target.value)}
-                      className="w-full bg-slate-900/50 border border-slate-600 rounded-xl p-3 text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none placeholder-slate-600 font-mono"
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4 border-t border-slate-700/50">
-                <button type="button" onClick={onClose} className="py-2.5 px-5 bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white rounded-xl font-semibold transition-all">Cancelar</button>
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className={`py-2.5 px-6 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-indigo-900/50 transition-all active:scale-95 ${isLoading ? 'opacity-70 cursor-wait' : ''}`}
-                >
-                  {isLoading ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Conectando...
-                    </>
-                  ) : (
-                    <>Ver Pasajeros <ArrowUpIcon /></>
-                  )}
-                </button>
-              </div>
-            </form>
-          ) : (
-            <div className="text-center py-6">
-              <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/50">
-                <XIcon />
-              </div>
-              <h4 className="text-xl font-bold text-red-400 mb-2">Error de Conexión</h4>
-              <p className="text-slate-300 text-sm px-4 mb-6">{errorMessage}</p>
-              <button onClick={() => setErrorMessage(null)} className="py-2 px-6 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-bold">Intentar de nuevo</button>
+        {/* CONTENIDO PRINCIPAL: LOADING o RESULTADOS */}
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-10 space-y-4">
+            {/* Spinner Personalizado */}
+            <div className="relative w-16 h-16">
+              <div className="absolute top-0 left-0 w-full h-full border-4 border-indigo-500/30 rounded-full"></div>
+              <div className="absolute top-0 left-0 w-full h-full border-4 border-indigo-500 rounded-full border-t-transparent animate-spin"></div>
             </div>
-          )
+            <div className="text-center">
+              <h4 className="text-lg font-bold text-white mb-1">Cargando Datos...</h4>
+              <p className="text-sm text-slate-400 mb-2">Conectando a gps3regisdataweb.com</p>
+              <span className="inline-block bg-slate-700 text-slate-200 px-3 py-1 rounded-full text-sm font-mono font-bold">
+                {formatTime(elapsedTime)}
+              </span>
+            </div>
+          </div>
+        ) : errorMessage ? (
+          <div className="text-center py-6">
+            <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/50">
+              <XIcon />
+            </div>
+            <h4 className="text-xl font-bold text-red-400 mb-2">Error de Conexión</h4>
+            <p className="text-slate-300 text-sm px-4 mb-6">{errorMessage}</p>
+            <div className="flex justify-center gap-3">
+              <button onClick={onClose} className="py-2.5 px-5 bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white rounded-xl font-semibold transition-all">Cancelar</button>
+              <button onClick={fetchPassengers} className="py-2 px-6 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold shadow-lg shadow-indigo-900/50">Reintentar</button>
+            </div>
+          </div>
         ) : (
           <div className="flex flex-col h-full overflow-hidden">
-            <div className="text-center mb-4">
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-500/20 rounded-full text-green-400 border border-green-500/30 text-sm font-bold animate-pulse">
+            <div className="flex justify-between items-center mb-4 px-1">
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-500/20 rounded-full text-green-400 border border-green-500/30 text-xs font-bold animate-pulse">
                 <CheckCircleIcon />
-                Datos Actualizados
+                <span>Datos Actualizados</span>
               </div>
+              <span className="text-xs text-slate-500 font-mono">
+                Tiempo: {formatTime(elapsedTime)}
+              </span>
             </div>
+
             {vehicles.length > 0 ? (
               <div className="overflow-y-auto flex-grow pr-1 space-y-3 custom-scrollbar">
                 {vehicles.map((v, i) => (
@@ -1429,12 +1424,12 @@ const RobotModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpe
                 ))}
               </div>
             ) : (
-              <div className="text-center py-10 text-slate-400 italic">
+              <div className="text-center py-10 text-slate-400 italic bg-slate-900/30 rounded-xl border border-slate-800">
                 No se encontraron vehículos operando hoy.
               </div>
             )}
             <div className="pt-4 mt-4 border-t border-slate-700">
-              <button onClick={onClose} className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-all shadow-lg hover:shadow-indigo-500/30">
+              <button onClick={onClose} className="w-full py-3 px-4 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl font-bold transition-all">
                 Cerrar
               </button>
             </div>
