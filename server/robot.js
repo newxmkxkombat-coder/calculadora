@@ -52,15 +52,19 @@ const initBrowser = async () => {
             else req.continue();
         });
 
-        // Espiar respuestas también (para ver si es JSON)
+        // Espiar respuestas también (para ver contenido real)
         globalPage.on('response', async (resp) => {
             try {
-                const type = resp.request().resourceType();
-                if (['xhr', 'fetch'].includes(type)) {
-                    const url = resp.url();
-                    // Si parece importante, chequear headers
-                    if (url.includes('seguimiento') || url.includes('ajax')) {
-                        console.log('<< 🕵️ SPIA RECIBIÓ RESPUESTA:', url, 'Status:', resp.status());
+                const url = resp.url();
+                // Solo nos interesan nuestros sospechosos
+                if (url.includes('infoGPS') || url.includes('loadGPSStatus') || url.includes('ejecutarNotificaciones')) {
+                    console.log(`<< 🕵️ REVISANDO CONTENIDO DE: ${url}`);
+                    try {
+                        const text = await resp.text();
+                        // Imprimir los primeros 500 caracteres para ver si es JSON con datos
+                        console.log('   📦 DATO:', text.substring(0, 500));
+                    } catch (err) {
+                        console.log('   ❌ No se pudo leer texto:', err.message);
                     }
                 }
             } catch (e) { }
