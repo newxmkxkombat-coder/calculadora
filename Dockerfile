@@ -3,8 +3,7 @@ FROM ghcr.io/puppeteer/puppeteer:latest
 USER root
 
 # Variable para saltar la descarga de chromium interna de puppeteer (usamos la de la imagen)
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 
 WORKDIR /app
 
