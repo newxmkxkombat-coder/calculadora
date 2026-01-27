@@ -76,56 +76,76 @@ app.post('/api/scrape-passengers', async (req, res) => {
         await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }).catch(e => console.log("Timeout navegacion post-login ignorado."));
         await new Promise(r => setTimeout(r, 4000)); // Esperar carga extra del dashboard
 
-        // 4. Navegación Inteligente (Reforzada)
+        // 4. Navegación Inteligente (Basada en el dump de error)
         console.log('Buscando ruta a datos...');
 
-        // Intentar expandir menús principales primero
-        await page.evaluate(() => {
-            const items = Array.from(document.querySelectorAll('a, span, div, li, b'));
-            const mainMenus = items.filter(el => {
+        // ESTRATEGIA: La página parece ser un menú de selección de reportes.
+        // El texto "Producción por vehículo" está visible en el error, ese es nuestro objetivo probable.
+
+        const destinationClicked = await page.evaluate(() => {
+            const keywords = [
+                'producción por vehículo', 'produccion por vehiculo', 'producción',
+                'rep. hoy', 'reporte hoy', 'móviles', 'moviles'
+            ];
+
+            // Buscar en enlaces, botones, spans, divs y opciones de lista
+            const elements = Array.from(document.querySelectorAll('a, button, span, div, li, label'));
+
+            // Prioridad 1: Producción por vehículo (Exacto o cercano)
+            const target = elements.find(el => {
                 const text = (el.innerText || '').toLowerCase().trim();
-                return text === 'reportes' || text === 'rastreo' || text === 'consultas';
-            });
-            mainMenus.forEach(m => m.click());
-        });
-        await new Promise(r => setTimeout(r, 2000));
-
-        // Buscar el reporte específico
-        const navSuccess = await page.evaluate(() => {
-            const elements = Array.from(document.querySelectorAll('a, button, span, div, li'));
-            const keywords = ['rep. hoy', 'reporte hoy', 'móviles', 'moviles', 'reporte diario', 'actividad'];
-
-            const btn = elements.find(el => {
-                const text = (el.innerText || '').toLowerCase();
                 return keywords.some(k => text.includes(k)) && el.offsetParent !== null;
             });
 
-            if (btn) {
-                btn.click();
+            if (target) {
+                target.click();
                 return true;
             }
             return false;
         });
 
-        if (navSuccess) {
-            console.log('Navegación a reporte exitosa. Esperando carga (6s)...');
-            await new Promise(r => setTimeout(r, 6000));
+        if (destinationClicked) {
+            console.log('Opción de reporte seleccionada. Esperando carga...');
+            await new Promise(r => setTimeout(r, 4000));
         } else {
-            console.log('No se halló el botón directo. Intentando Enter para confirmar...');
-            await page.keyboard.press('Enter');
+            console.log('No se encontró opción directa. Intentando expandir menús "Reportes"...');
+            // Intentar expandir menú "Reportes" si no vimos lo anterior
+            await page.evaluate(() => {
+                const menus = Array.from(document.querySelectorAll('a, span, div'));
+                const reportMenu = menus.find(m => (m.innerText || '').toLowerCase().includes('reportes'));
+                if (reportMenu) reportMenu.click();
+            });
+            await new Promise(r => setTimeout(r, 3000));
+
+            // Reintentar click en sub-opción tras expandir
+            await page.evaluate(() => {
+                const keywords = ['producción', 'produccion', 'móviles', 'rep. hoy'];
+                const elements = Array.from(document.querySelectorAll('a, button, span, div, li'));
+                const target = elements.find(el => {
+                    const text = (el.innerText || '').toLowerCase();
+                    return keywords.some(k => text.includes(k)) && el.offsetParent !== null;
+                });
+                if (target) target.click();
+            });
+            await new Promise(r => setTimeout(r, 3000));
         }
 
-        // HEURÍSTICA: Gatillar el botón "Generar" o "Buscar" si aparece
+        // HEURÍSTICA: SIEMPRE buscar botón "Generar" o "Buscar" después de seleccionar
+        console.log('Buscando botón Generar/Buscar...');
         await page.evaluate(() => {
             const controls = Array.from(document.querySelectorAll('button, input[type="submit"], a, div.btn'));
             const goBtn = controls.find(c => {
                 const t = (c.innerText || c.value || '').toLowerCase();
-                const keywords = ['buscar', 'generar', 'consultar', 'ver reporte', 'refresh', 'actualizar', 'view'];
-                return keywords.some(k => t.includes(k)) && c.offsetParent !== null;
+                const actionKeywords = ['generar', 'buscar', 'consultar', 'ver reporte', 'refresh', 'actualizar', 'view', 'ejecutar'];
+                return actionKeywords.some(k => t.includes(k)) && c.offsetParent !== null;
             });
-            if (goBtn) goBtn.click();
+            if (goBtn) {
+                goBtn.click();
+                console.log('Botón de acción clickeado.');
+            }
         });
-        await new Promise(r => setTimeout(r, 4000));
+        // Espera larga para que llegue la data (AJAX)
+        await new Promise(r => setTimeout(r, 6000));
 
 
         // 5. Búsqueda exhaustiva en frames
@@ -146,7 +166,7 @@ app.post('/api/scrape-passengers', async (req, res) => {
                             // Buscamos una tabla que tenga palabras clave de transporte
                             return tables.some(t => {
                                 const txt = t.innerText.toLowerCase();
-                                const hasTotal = txt.includes('total d') || txt.includes('total d\u00EDa') || txt.includes('pasajer');
+                                const hasTotal = txt.includes('total d') || txt.includes('total d\u00EDa') || txt.includes('pasajer') || txt.includes('pax');
                                 const hasMobile = txt.includes('interno') || txt.includes('unidad') || txt.includes('m\u00F3vil') || txt.includes('placa');
                                 return hasTotal && hasMobile;
                             });
@@ -172,74 +192,120 @@ app.post('/api/scrape-passengers', async (req, res) => {
         console.log(`Tabla localizada. Extrayendo...`);
 
         const vehicles = await targetFrame.evaluate(() => {
+            // 1. Intentar con Tablas (Prioridad Alta)
             const tables = Array.from(document.querySelectorAll('table'));
             let bestData = [];
-            let bestScore = -1;
 
             for (const table of tables) {
                 const rows = Array.from(table.querySelectorAll('tr'));
                 if (rows.length < 2) continue;
 
-                let colIdx = { interno: -1, total: -1, placa: -1 };
+                let headerIndex = -1;
+                let colIndices = { placa: -1, interno: -1, total: -1 };
 
-                // 1. Localizar cabeceras
+                // Buscar headers
                 for (let i = 0; i < Math.min(rows.length, 10); i++) {
-                    const cells = Array.from(rows[i].querySelectorAll('td, th')).map(c => c.innerText.trim().toLowerCase());
-                    if (colIdx.total === -1) colIdx.total = cells.findIndex(t => t.includes('total d') || t.includes('total d\u00EDa'));
-                    if (colIdx.interno === -1) colIdx.interno = cells.findIndex(t => t.includes('interno') || t.includes('unidad') || t.includes('m\u00F3vil'));
-                    if (colIdx.placa === -1) colIdx.placa = cells.findIndex(t => t.includes('placa'));
+                    const headerCells = Array.from(rows[i].querySelectorAll('td, th'));
+                    const texts = headerCells.map(c => c.innerText.trim().toLowerCase());
+
+                    const idxTotal = texts.findIndex(t => t.includes('total d') || t.includes('total d\u00EDa') || t.includes('pasajer') || t.includes('pax'));
+                    const idxInterno = texts.findIndex(t => t.includes('interno') || t.includes('unidad') || t.includes('m\u00F3vil'));
+                    const idxPlaca = texts.findIndex(t => t.includes('placa'));
+
+                    if (idxTotal !== -1 || idxInterno !== -1 || idxPlaca !== -1) {
+                        headerIndex = i;
+                        colIndices.total = idxTotal;
+                        colIndices.placa = idxPlaca;
+                        colIndices.interno = idxInterno;
+                        break;
+                    }
                 }
 
-                if (colIdx.total !== -1) {
-                    const currentTableData = [];
-                    const idIdx = colIdx.interno !== -1 ? colIdx.interno : colIdx.placa;
+                // Si fallan cabeceras, probar columnas por posición (3 y 8 son comunes en estos reportes)
+                const useHeuristic = (headerIndex === -1 && rows.some(r => r.querySelectorAll('td').length > 8));
+                const data = [];
+                const startRow = headerIndex !== -1 ? headerIndex + 1 : 0;
 
-                    for (let j = 0; j < rows.length; j++) {
-                        const cells = Array.from(rows[j].querySelectorAll('td'));
-                        if (cells.length > Math.max(idIdx, colIdx.total)) {
-                            const idRaw = cells[idIdx].innerText.trim();
-                            const paxRaw = cells[colIdx.total].innerText.trim();
+                for (let j = startRow; j < rows.length; j++) {
+                    const cells = Array.from(rows[j].querySelectorAll('td'));
+                    if (cells.length < 4) continue;
 
-                            const id = idRaw.replace(/^N0*/i, '').replace(/^M/i, '').replace(/^0+/, '');
-                            const val = parseInt(paxRaw.replace(/\D/g, ''));
+                    let interno = '';
+                    let pasajeros = '';
 
-                            if (id && !isNaN(val) && (val < 2024 || val > 2030)) {
-                                if (!currentTableData.find(v => v.identifier === id)) {
-                                    currentTableData.push({ identifier: id, pasajeros: val.toString() });
-                                }
-                            }
+                    if (headerIndex !== -1) {
+                        if (colIndices.interno !== -1 && cells[colIndices.interno]) {
+                            interno = cells[colIndices.interno].innerText.trim();
+                        } else if (colIndices.placa !== -1 && cells[colIndices.placa]) {
+                            interno = cells[colIndices.placa].innerText.trim();
                         }
+
+                        if (colIndices.total !== -1 && cells[colIndices.total]) {
+                            pasajeros = cells[colIndices.total].innerText.trim();
+                        }
+                    } else if (useHeuristic) {
+                        // Asumimos layout estandar si no hay headers
+                        interno = cells[3] ? cells[3].innerText.trim() : '';
+                        pasajeros = cells[8] ? cells[8].innerText.trim() : '';
                     }
 
-                    // Puntuación: cuántos vehículos tienen más de 0 pasajeros
-                    const score = currentTableData.filter(d => d.pasajeros !== "0").length;
-                    if (score > bestScore) {
-                        bestScore = score;
-                        bestData = currentTableData;
+                    // Limpieza
+                    interno = interno.replace(/^N0*/i, '').replace(/^M/i, '').replace(/^0+/, '');
+                    const val = parseInt(pasajeros.replace(/\D/g, ''));
+
+                    // Filtro estricto anti-fechas y anti-direcciones
+                    if (pasajeros.includes(':') || pasajeros.includes('-') || (val > 2024 && val < 2030)) {
+                        pasajeros = '';
+                    }
+
+                    if (interno && !isNaN(val)) {
+                        if (!data.find(v => v.identifier === interno)) {
+                            data.push({ identifier: interno, pasajeros: val.toString() });
+                        }
+                    }
+                }
+                if (data.length > bestData.length) bestData = data;
+            }
+
+            if (bestData.length > 0) return bestData;
+
+            // ESTRATEGIA 2: TEXT SCRAPING (Plan B - Reforzado)
+            // Si las tablas fallan, buscamos patrones de texto crudo
+            const text = document.body.innerText;
+            const results = [];
+            // Buscamos patrones como "M-045" o "Int 45" o simplemente tablas de texto
+
+            // Regex para identificar IDs de moviles (1 a 4 digitos, a veces con prefijo)
+            const internalMatches = [...text.matchAll(/\b(?:N|M|Movil|Int|No|Placa)?[-.\s]?(\d{1,4})\b/gi)];
+
+            for (const match of internalMatches) {
+                const internoNum = match[1].replace(/^0+/, '');
+                // Mirar adelante unos 200 caracteres para encontrar el conteo
+                const lookahead = text.substring(match.index, match.index + 200);
+
+                // Buscar números que NO sean el mismo ID, ni fechas, ni direcciones
+                const numberMatches = [...lookahead.matchAll(/\b(\d+)\b/g)];
+
+                for (const nm of numberMatches) {
+                    const numStr = nm[1];
+                    const n = parseInt(numStr);
+
+                    // Filtros
+                    const isSame = numStr === match[1];
+                    const isDate = (n >= 2024 && n <= 2030); // Años recientes
+                    const isTime = nm.input.substring(nm.index - 1, nm.index) === ':' || nm.input.substring(nm.index + numStr.length, nm.index + numStr.length + 1) === ':';
+
+                    if (!isSame && !isDate && !isTime && n >= 0 && n < 2000) {
+                        // Asumimos que es el pasaje si está cerca y valida
+                        const exists = results.find(r => r.identifier === internoNum);
+                        if (!exists) {
+                            results.push({ identifier: internoNum, pasajeros: n.toString() });
+                        }
+                        break; // Tomamos el primer número apto como pasajeros
                     }
                 }
             }
-
-            // Heurística visual (por si fallan los nombres de columnas)
-            if (bestData.length === 0) {
-                for (const table of tables) {
-                    const rows = Array.from(table.querySelectorAll('tr'));
-                    const hData = [];
-                    rows.forEach(r => {
-                        const cs = Array.from(r.querySelectorAll('td'));
-                        if (cs.length >= 9) {
-                            const id = cs[3].innerText.trim().replace(/^N0*/i, '').replace(/^M/i, '').replace(/^0+/, '');
-                            const pax = parseInt(cs[8].innerText.replace(/\D/g, ''));
-                            if (id && !isNaN(pax) && (pax < 2024 || pax > 2030)) {
-                                if (!hData.find(v => v.identifier === id)) hData.push({ identifier: id, pasajeros: pax.toString() });
-                            }
-                        }
-                    });
-                    if (hData.length > bestData.length) bestData = hData;
-                }
-            }
-
-            return bestData;
+            return results;
         });
 
         if (!vehicles || vehicles.length === 0) {
