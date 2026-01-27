@@ -140,39 +140,57 @@ app.post('/api/scrape-passengers', async (req, res) => {
         // 1. Asegurar sesión (Con detección de bloqueo "Finalizado sesión")
         await ensureLoggedIn(page, username, password);
 
-        // 2. Navegar DIRECTO a la URL mágica (Atajo del usuario)
+        // 2. Lógica Híbrida: MODO RÁPIDO (Click AJAX) vs MODO SEGURO (Navegación Total)
         const REPORT_URL_DIRECT = 'https://gps3regisdataweb.com/opita/app/seguimiento/infogps.jsp?v=3sobcmjas4';
+        const currentUrl = page.url();
+        let dataRefreshed = false;
 
-        // Verificación: Si ya estamos en la URL mágica, ¿para qué recargar?
-        // A menos que sea necesario actualizar datos
-        console.log('Navegando/Recargando directo URL reporte...');
-        await page.goto(REPORT_URL_DIRECT, { waitUntil: 'networkidle2', timeout: 30000 });
+        // A) MODO RÁPIDO: Intentar refresco (CLICK en buscar) solo si ya estamos en la URL correcta
+        if (currentUrl === REPORT_URL_DIRECT) {
+            console.log('Ya estamos en el reporte. Intentando actualización RÁPIDA (Click)...');
+            try {
+                // Clickear botón Buscar/Lupa sin recargar página
+                const refreshed = await page.evaluate(() => {
+                    // Estrategia combinada de botones
+                    const btns = Array.from(document.querySelectorAll('button, input[type="submit"], a.btn'));
+                    const textBtn = btns.find(b =>
+                        ['generar', 'buscar', 'consultar', 'ver'].some(k => (b.innerText || b.value || '').toLowerCase().includes(k))
+                    );
+                    if (textBtn) { textBtn.click(); return true; }
 
-        // Esperar brevemente a que renderice
-        await new Promise(r => setTimeout(r, 2000));
+                    const iconBtn = document.querySelector('.fa-search, .glyphicon-search, span[class*="search"], i[class*="search"]')?.closest('a, button, div');
+                    if (iconBtn) { iconBtn.click(); return true; }
+                    return false;
+                });
 
-        // 3. ACTUALIZAR (Click Lupa/Buscar) - CRÍTICO por si acaso
-        console.log('Verificando botón de actualización...');
-        await new Promise(r => setTimeout(r, 1000));
+                if (refreshed) {
+                    // Esperamos la carga de datos AJAX (2.5s es más rápido que una recarga total de 10s)
+                    console.log('Botón clickeado. Esperando datos frescos...');
+                    await new Promise(r => setTimeout(r, 2500));
+                    dataRefreshed = true;
+                } else {
+                    console.log('No se encontró botón para modo rápido. Pasando a modo seguro...');
+                }
+            } catch (e) {
+                console.log('Falló modo rápido (' + e.message + '). Pasando a modo seguro...');
+            }
+        }
 
-        const searchClicked = await page.evaluate(() => {
-            // Estrategia 1: Botón con texto
-            const btns = Array.from(document.querySelectorAll('button, input[type="submit"], a.btn'));
-            const textBtn = btns.find(b =>
-                ['generar', 'buscar', 'consultar', 'ver'].some(k => (b.innerText || b.value || '').toLowerCase().includes(k))
-            );
-            if (textBtn) { textBtn.click(); return true; }
+        // B) MODO SEGURO: Si el modo rápido no se usó o falló, hacemos la recarga completa (Navegar de cero)
+        if (!dataRefreshed) {
+            console.log('Ejecutando Carga COMPLETA (Modo Seguro - Recarga total)...');
+            await page.goto(REPORT_URL_DIRECT, { waitUntil: 'networkidle2', timeout: 30000 });
+            await new Promise(r => setTimeout(r, 2000));
 
-            // Estrategia 2: La Lupa (icono) o botón verde (desagrupar)
-            const iconBtn = document.querySelector('.fa-search, .glyphicon-search, span[class*="search"], i[class*="search"]')?.closest('a, button, div');
-            if (iconBtn) { iconBtn.click(); return true; }
-
-            return false;
-        });
-
-        // Espera un poco más generosa para la carga de datos
-        await new Promise(r => setTimeout(r, 3000));
-
+            // Re-asegurar click tras carga completa por si la tabla viene vacía
+            await page.evaluate(() => {
+                const iconBtn = document.querySelector('.fa-search, .glyphicon-search, span[class*="search"], i[class*="search"]')?.closest('a, button, div');
+                if (iconBtn) iconBtn.click();
+            });
+            await new Promise(r => setTimeout(r, 2000));
+        } else {
+            console.log('Actualización rápida completada sin recargas.');
+        }
 
         // 4. Extracción "VISUAL" + SOPORTE IFRAMES + WAIT
         console.log('Extrayendo datos de Móviles (Modo Visual + Frames)...');
@@ -288,6 +306,6 @@ setInterval(() => {
 }, 60000 * 5); // Cada 5 mins
 
 app.listen(PORT, () => {
-    console.log(`Robot Persistente V3.1 escuchando en ${PORT}`);
+    console.log(`Robot Persistente V3.2 (Hybrid) escuchando en ${PORT}`);
     initBrowser(); // Arrancar browser al inicio
 });
