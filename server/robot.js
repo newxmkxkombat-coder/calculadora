@@ -77,13 +77,17 @@ app.post('/api/scrape-passengers', async (req, res) => {
         console.log('Buscando menu Rastreo...');
         await new Promise(r => setTimeout(r, 2000));
 
-        // Intentar click en Rastreo
+        // Estrategia de Clic Mejorada: Click solo en elementos interactivos
         const menuClicked = await page.evaluate(() => {
-            const elements = Array.from(document.querySelectorAll('*'));
-            const rastreo = elements.find(el => el.innerText && el.innerText.trim() === 'Rastreo');
-            if (rastreo) {
-                rastreo.click();
-                return true;
+            // Priorizar enlaces y botones, luego spans/divs que parezcan menú
+            const selectors = ['a', 'div[role="button"]', 'span', 'div'];
+            for (const selector of selectors) {
+                const elements = Array.from(document.querySelectorAll(selector));
+                const rastreo = elements.find(el => el.innerText && el.innerText.trim() === 'Rastreo');
+                if (rastreo && rastreo.offsetParent !== null) { // Visible check
+                    rastreo.click();
+                    return true;
+                }
             }
             return false;
         });
@@ -92,22 +96,53 @@ app.post('/api/scrape-passengers', async (req, res) => {
 
         // Intentar click en Móviles
         const movilesClicked = await page.evaluate(() => {
-            const elements = Array.from(document.querySelectorAll('*'));
-            const moviles = elements.find(el => el.innerText && (el.innerText.includes('Móviles') || el.innerText.includes('Moviles')));
-            if (moviles) {
-                moviles.click();
-                return true;
+            const selectors = ['a', 'div[role="button"]', 'span', 'div', 'li'];
+            for (const selector of selectors) {
+                const elements = Array.from(document.querySelectorAll(selector));
+                const moviles = elements.find(el => {
+                    const text = (el.innerText || '').toLowerCase();
+                    return text.includes('móviles') || text.includes('moviles');
+                });
+                if (moviles && moviles.offsetParent !== null) {
+                    moviles.click();
+                    return true;
+                }
             }
             return false;
         });
 
-        if (!movilesClicked) throw new Error("No se encontró el botón 'Móviles'.");
+        if (!movilesClicked) {
+            // Fallback: Intentar buscar en frames si el menú está dentro
+            // (Simplificado para no complicar, lanzamos error con debug)
+            const bodyText = await page.evaluate(() => document.body.innerText.substring(0, 200));
+            throw new Error(`No se encontró botón 'Móviles'. Texto página: ${bodyText}...`);
+        }
+
+        // HEURÍSTICA: Buscar botón "Generar" o "Buscar" por si hay filtro previo
+        console.log("Buscando botón de confirmación secundario...");
+        try {
+            await new Promise(r => setTimeout(r, 2000));
+            const actionClicked = await page.evaluate(() => {
+                const keywords = ['buscar', 'generar', 'consultar', 'ver reporte', 'refresh', 'actualizar'];
+                const buttons = Array.from(document.querySelectorAll('button, input[type="submit"], a.btn, div.btn'));
+
+                const actionBtn = buttons.find(b => {
+                    const text = (b.innerText || b.value || '').toLowerCase();
+                    return keywords.some(k => text.includes(k));
+                });
+
+                if (actionBtn && actionBtn.offsetParent !== null) {
+                    actionBtn.click();
+                    return true;
+                }
+                return false;
+            });
+            if (actionClicked) console.log("Botón secundario clickeado.");
+        } catch (e) { console.log("No se requirió acción secundaria."); }
+
 
         // 5. Esperar Tabla y Extraer (Soporte para POPUPS y FRAMES)
-        console.log('Esperando resultados (buscando en tod@s las pestañas y frames)...');
-
-        // Esperemos un poco a que se abra la ventana si es un popup
-        await new Promise(r => setTimeout(r, 5000));
+        console.log('Esperando resultados...');
 
         let targetFrame = null;
         let vehicleData = [];
@@ -115,20 +150,18 @@ app.post('/api/scrape-passengers', async (req, res) => {
 
         // Bucle de búsqueda (60 segundos)
         while (Date.now() - startTime < 60000) {
-            const pages = await browser.pages(); // Obtener todas las pestañas abiertas
+            const pages = await browser.pages();
 
             for (const p of pages) {
-                // Buscar en el frame principal de la página
-                const frames = p.frames();
+                // Check main frame
+                const frames = [p.mainFrame(), ...p.frames()];
                 for (const frame of frames) {
                     try {
                         const table = await frame.$('table');
                         if (table) {
                             const rowCount = await frame.evaluate(el => el.querySelectorAll('tr').length, table);
-                            // Verificamos si tiene la fila de TOTAL
-                            const hasTotal = await frame.evaluate(el => el.innerText.toLowerCase().includes('total'), table);
-
-                            if (rowCount > 2 && hasTotal) {
+                            // Relaxed check: just rows > 2
+                            if (rowCount > 2) {
                                 targetFrame = frame;
                                 break;
                             }
@@ -143,8 +176,12 @@ app.post('/api/scrape-passengers', async (req, res) => {
         }
 
         if (!targetFrame) {
-            throw new Error("No se encontró la tabla de datos en ninguna ventana.");
+            // DEBUG AVANZADO: Devolver el texto de la página para saber dónde estamos
+            const pageSnapshot = await page.evaluate(() => document.body.innerText.replace(/\n+/g, ' | ').substring(0, 300));
+            throw new Error(`Sin tabla. Pantalla actual dice: "${pageSnapshot}..."`);
         }
+
+
 
         console.log(`Tabla encontrada en frame: ${targetFrame.url()}`);
 
