@@ -3,28 +3,23 @@ import cors from 'cors';
 import puppeteer from 'puppeteer';
 
 const app = express();
-// Configurar CORS para permitir peticiones desde tu GitHub Pages
 app.use(cors({
-    origin: '*', // Por ahora permitimos todo para facilitar pruebas.
-    // Cuando esté listo, cámbialo por: 'https://tu-usuario.github.io'
+    origin: '*',
     methods: ['GET', 'POST']
 }));
-app.options(/(.*)/, cors()); // Habilitar pre-flight para todas las rutas
-app.options('/api/scrape-passengers', cors()); // Explicit OPTIONS for this route
+app.options(/(.*)/, cors());
+app.options('/api/scrape-passengers', cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 3001;
 
-app.post('/api/scrape-passengers', async (req, res) => {
-    const { username, password } = req.body;
-    const TARGET_URL = 'https://gps3regisdataweb.com/opita/index.jsp';
+// --- OPTIMIZACIÓN GLOBAL: Instancia única del navegador ---
+let globalBrowser;
 
-    console.log(`Iniciando robot para usuario: ${username}`);
-
-    let browser;
-    try {
-        browser = await puppeteer.launch({
-            // 'new' es el nuevo modo headless, más rápido y compatible
+const initBrowser = async () => {
+    if (!globalBrowser) {
+        console.log('Lanzando navegador global...');
+        globalBrowser = await puppeteer.launch({
             headless: 'new',
             args: [
                 '--no-sandbox',
@@ -34,303 +29,240 @@ app.post('/api/scrape-passengers', async (req, res) => {
                 '--no-first-run',
                 '--no-zygote',
                 '--single-process',
-                '--disable-gpu'
+                '--disable-gpu',
+                '--disable-extensions' // Desactivar extensiones
             ]
         });
+        console.log('Navegador global listo.');
+    }
+    return globalBrowser;
+};
 
-        const page = await browser.newPage();
-        // Configurar vista de escritorio para evitar menús móviles colapsados
-        await page.setViewport({ width: 1366, height: 768 });
+// Inicializar al arrancar
+initBrowser();
 
-        // 1. Ir al Login
+app.post('/api/scrape-passengers', async (req, res) => {
+    const { username, password } = req.body;
+    const TARGET_URL = 'https://gps3regisdataweb.com/opita/index.jsp';
+    let page = null;
+
+    try {
+        const browser = await initBrowser();
+        page = await browser.newPage();
+
+        // --- OPTIMIZACIÓN: Bloqueo de recursos innecesarios ---
+        await page.setRequestInterception(true);
+        page.on('request', (req) => {
+            const resourceType = req.resourceType();
+            if (['image', 'stylesheet', 'font', 'media'].includes(resourceType)) {
+                req.abort();
+            } else {
+                req.continue();
+            }
+        });
+
+        // Configurar vista ligera
+        await page.setViewport({ width: 1280, height: 720 });
+
+        // 1. Ir al Login (Timeout reducido)
         console.log('Navegando a login...');
-        await page.goto(TARGET_URL, { waitUntil: 'load', timeout: 60000 });
+        await page.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-        // 2. Llenar credenciales
-        const userInput = await page.$('input[type="text"]');
-        const passInput = await page.$('input[type="password"]');
-
-        if (!userInput || !passInput) {
-            throw new Error("No se encontraron los campos de usuario/contraseña.");
-        }
-
-        await userInput.type(username);
-        await passInput.type(password);
+        // 2. Llenar credenciales (Espera inteligente)
+        await page.waitForSelector('input[type="text"]', { timeout: 10000 });
+        await page.type('input[type="text"]', username);
+        await page.type('input[type="password"]', password);
 
         // 3. Click Ingresar
-        const loginSuccess = await page.evaluate(() => {
-            const buttons = Array.from(document.querySelectorAll('button, input[type="submit"], input[type="button"], a'));
-            const loginBtn = buttons.find(b => b.innerText.toLowerCase().includes('ingresar') || b.value?.toLowerCase().includes('ingresar'));
-            if (loginBtn) {
-                loginBtn.click();
-                return true;
+        const loginBtn = await page.$('button, input[type="submit"], input[type="button"], a.btn');
+        if (loginBtn) {
+            await Promise.all([
+                page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 20000 }),
+                loginBtn.click()
+            ]);
+        } else {
+            await page.keyboard.press('Enter');
+            await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 20000 });
+        }
+
+        // 4. Navegación Inteligente (Optimizada)
+        console.log('Buscando ruta a datos...');
+
+        // Esperar que aparezca algo que parezca un menú o enlace
+        await page.waitForFunction(() => document.querySelectorAll('a, span, div').length > 10, { timeout: 10000 });
+
+        // Intentar encontrar reporte directamente o menú
+        const found = await page.evaluate(async () => {
+            const keywords = ['producción por vehículo', 'produccion', 'vehículo', 'vehiculo'];
+            // Buscar directo
+            const links = Array.from(document.querySelectorAll('a, span, div, li'));
+            const target = links.find(el => {
+                const t = (el.innerText || '').toLowerCase();
+                return keywords.some(k => t.includes(k)) && el.innerText.length < 50;
+            });
+
+            if (target) {
+                target.click();
+                return 'direct';
+            }
+
+            // Buscar menú reportes
+            const reportMenu = links.find(el => el.innerText.trim().toLowerCase() === 'reportes');
+            if (reportMenu) {
+                reportMenu.click();
+                return 'menu';
             }
             return false;
         });
 
-        if (!loginSuccess) {
-            await page.keyboard.press('Enter');
-        }
-
-        // Esperar navegación post-login
-        await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }).catch(e => console.log("Timeout navegacion post-login ignorado."));
-        await new Promise(r => setTimeout(r, 4000)); // Esperar carga extra del dashboard
-
-        // 4. Navegación Inteligente (Reforzada)
-        console.log('Buscando ruta a datos...');
-
-        // ESTRATEGIA PRINCIPAL: Buscar directamente el sub-reporte.
-        let targetReport = await page.evaluate(() => {
-            const keywords = ['producción por vehículo', 'produccion', 'vehículo', 'vehiculo', 'móviles', 'moviles'];
-            const elements = Array.from(document.querySelectorAll('a, span, div, li'));
-            return elements.find(el => {
-                const text = (el.innerText || '').toLowerCase();
-                return keywords.some(k => text.includes(k)) && el.innerText.length < 50; // Evitar textos largos
-            });
-        });
-
-        if (targetReport) {
-            console.log('Reporte encontrado directamente. Clickeando...');
-            await page.evaluate(el => el.click(), targetReport);
-        } else {
-            console.log('Reporte directo no visible. Interactuando con menú "Reportes"...');
-
-            // 1. Encontrar menú "Reportes"
-            const reportMenuHandle = await page.evaluateHandle(() => {
-                const all = Array.from(document.querySelectorAll('a, span, div, li'));
-                return all.find(el => el.innerText.trim().toLowerCase() === 'reportes');
-            });
-
-            if (reportMenuHandle && reportMenuHandle.asElement()) {
-                // 2. Intentar Hover (común en menús dropdown)
-                await reportMenuHandle.hover();
-                await new Promise(r => setTimeout(r, 1000));
-
-                // 3. Intentar Clic
-                await reportMenuHandle.click();
-                await new Promise(r => setTimeout(r, 2000));
-
-                // 4. Buscar ahora el sub-link
-                const clickedSub = await page.evaluate(() => {
-                    const subKeywords = ['producción', 'produccion', 'vehículo', 'vehiculo'];
-                    const subElements = Array.from(document.querySelectorAll('a, span, div, li'));
-                    const subTarget = subElements.find(el => {
-                        const text = (el.innerText || '').toLowerCase();
-                        // Debe ser visible y contener la palabra clave
-                        return subKeywords.some(k => text.includes(k)) && el.offsetParent !== null;
-                    });
-
-                    if (subTarget) {
-                        subTarget.click();
-                        return true;
-                    }
-                    return false;
+        if (found === 'menu') {
+            // Esperar un momento a que se despliegue el submenú de forma eficiente
+            await new Promise(r => setTimeout(r, 500));
+            await page.evaluate(() => {
+                const subLinks = Array.from(document.querySelectorAll('a, span, div, li'));
+                const subTarget = subLinks.find(el => {
+                    const t = (el.innerText || '').toLowerCase();
+                    return ['producción', 'produccion'].some(k => t.includes(k)) && el.offsetParent !== null;
                 });
-
-                if (clickedSub) {
-                    console.log('Sub-reporte clickeado tras abrir menú.');
-                } else {
-                    console.log('Aún no se encuentra "Producción". Intentando URL directa o fallback...');
-                }
-            }
+                if (subTarget) subTarget.click();
+            });
         }
 
-        await new Promise(r => setTimeout(r, 4000)); // Esperar carga de la vista de reporte
+        // Esperar botón "Generar" o similar
+        try {
+            // Un selector genérico para botones de acción con texto clave
+            await page.waitForFunction(() => {
+                const els = Array.from(document.querySelectorAll('button, input[type="submit"], a'));
+                return els.some(e => ['generar', 'buscar', 'ver'].some(k => (e.innerText || e.value || '').toLowerCase().includes(k)));
+            }, { timeout: 8000 });
 
-        // HEURÍSTICA: Buscar botón "Generar" o "Buscar"
-        console.log('Buscando botón Generar/Buscar...');
-        await page.evaluate(() => {
-            const controls = Array.from(document.querySelectorAll('button, input[type="submit"], input[type="button"], a.btn, div.btn'));
-            const goBtn = controls.find(c => {
-                const t = (c.innerText || c.value || '').toLowerCase();
-                return ['generar', 'buscar', 'consultar', 'ver', 'search'].some(k => t.includes(k));
+            await page.evaluate(() => {
+                const els = Array.from(document.querySelectorAll('button, input[type="submit"], a'));
+                const btn = els.find(e => ['generar', 'buscar', 'ver'].some(k => (e.innerText || e.value || '').toLowerCase().includes(k)));
+                if (btn) btn.click();
             });
-            if (goBtn) goBtn.click();
-        });
-        // Espera larga para que llegue la data (AJAX)
-        await new Promise(r => setTimeout(r, 6000));
+        } catch (e) {
+            console.log("No se requirió botón generar o no se encontró a tiempo.");
+        }
 
+        // 5. Esperar Tabla (Smart Wait)
+        console.log('Esperando datos...');
+        try {
+            // Esperar a que aparezca una tabla con datos relevantes en cualquier frame
+            await page.waitForFunction(() => {
+                // Función que verifica si hay una tabla con datos 'interesantes'
+                const checkDoc = (doc) => {
+                    const tables = Array.from(doc.querySelectorAll('table'));
+                    return tables.some(t => {
+                        const txt = t.innerText.toLowerCase();
+                        return (txt.includes('total') || txt.includes('pax')) && (txt.includes('móvil') || txt.includes('interno') || txt.includes('placa'));
+                    });
+                };
 
-        // 5. Búsqueda exhaustiva en frames
-        console.log('Buscando tabla de datos...');
+                // Verificar frame principal
+                if (checkDoc(document)) return true;
 
-        let targetFrame = null;
-        let foundTable = false;
-        const startTime = Date.now();
+                // Verificar iframes
+                for (const frame of window.frames) {
+                    try { if (checkDoc(frame.document)) return true; } catch (e) { }
+                }
+                return false;
+            }, { timeout: 15000, polling: 500 }); // Polling cada 500ms
+        } catch (e) {
+            // Fallback si waitForFunction falla
+            console.log("Wait for table timeout, intentando scrape de todos modos.");
+        }
 
-        while (Date.now() - startTime < 60000) {
-            const pages = await browser.pages();
-            for (const p of pages) {
-                const frames = [p.mainFrame(), ...p.frames()];
-                for (const frame of frames) {
+        // 6. Extracción (Optimizada para velocidad)
+        const vehicles = await page.evaluate(() => {
+            const extractFromDoc = (doc) => {
+                const tables = Array.from(doc.querySelectorAll('table'));
+                const results = [];
+                for (const table of tables) {
+                    const rows = Array.from(table.querySelectorAll('tr'));
+                    if (rows.length < 2) continue;
+
+                    // Lógica simplificada y rápida: buscar celdas que parecen IDs y Pasajeros
+                    for (const row of rows) {
+                        const cells = Array.from(row.querySelectorAll('td'));
+                        if (cells.length < 4) continue;
+
+                        // Heurística rápida por posición (común en estos reportes) + búsqueda
+                        const txts = cells.map(c => c.innerText.trim());
+
+                        // Buscar un ID de vehículo (números cortos)
+                        const idIdx = txts.findIndex(t => /^\d{1,4}$/.test(t) || /^(N|M|Int|No)[\s-]?\d{1,4}$/i.test(t));
+                        if (idIdx === -1) continue;
+
+                        // Buscar un valor de pasajeros (número > 0 < 2000, más adelante en la fila)
+                        for (let i = idIdx + 1; i < txts.length; i++) {
+                            const val = parseInt(txts[i]);
+                            if (!isNaN(val) && val >= 0 && val < 2000 && !txts[i].includes(':') && !txts[i].includes('-')) {
+                                // Encontrado par candidato
+                                const rawId = txts[idIdx].replace(/\D/g, '').replace(/^0+/, '');
+                                if (!results.find(r => r.identifier === rawId)) {
+                                    results.push({ identifier: rawId, pasajeros: val.toString() });
+                                }
+                                break; // Solo un dato de pasajeros por fila
+                            }
+                        }
+                    }
+                }
+                return results;
+            }
+
+            let data = extractFromDoc(document);
+            // Si no hay datos, barrer iframes
+            if (data.length === 0) {
+                const frames = Array.from(window.frames);
+                for (let i = 0; i < frames.length; i++) {
                     try {
-                        const score = await frame.evaluate(() => {
-                            const tables = Array.from(document.querySelectorAll('table'));
-                            // Buscamos una tabla que tenga palabras clave de transporte
-                            return tables.some(t => {
-                                const txt = t.innerText.toLowerCase();
-                                const hasTotal = txt.includes('total d') || txt.includes('total d\u00EDa') || txt.includes('pasajer') || txt.includes('pax');
-                                const hasMobile = txt.includes('interno') || txt.includes('unidad') || txt.includes('m\u00F3vil') || txt.includes('placa');
-                                return hasTotal && hasMobile;
-                            });
-                        });
-                        if (score) {
-                            targetFrame = frame;
-                            foundTable = true;
+                        const frameData = extractFromDoc(frames[i].document);
+                        if (frameData.length > 0) {
+                            data = frameData;
                             break;
                         }
                     } catch (e) { }
                 }
-                if (foundTable) break;
             }
-            if (foundTable) break;
-            await new Promise(r => setTimeout(r, 2000));
-        }
-
-        if (!targetFrame) {
-            const pageSnapshot = await page.evaluate(() => {
-                // Capturar una instantánea de texto de lo que ve el robot para debug
-                const bodyText = document.body.innerText.replace(/\n+/g, ' | ').substring(0, 500);
-                const links = Array.from(document.querySelectorAll('a')).map(a => a.innerText).slice(0, 5).join(', ');
-                return `Texto: ${bodyText} ... Links: ${links}`;
-            });
-            throw new Error(`Datos no hallados. El robot ve esto: "${pageSnapshot}"`);
-        }
-
-        console.log(`Tabla localizada. Extrayendo...`);
-
-        const vehicles = await targetFrame.evaluate(() => {
-            // 1. Intentar con Tablas (Prioridad Alta)
-            const tables = Array.from(document.querySelectorAll('table'));
-            let bestData = [];
-
-            for (const table of tables) {
-                const rows = Array.from(table.querySelectorAll('tr'));
-                if (rows.length < 2) continue;
-
-                let headerIndex = -1;
-                let colIndices = { placa: -1, interno: -1, total: -1 };
-
-                // Buscar headers
-                for (let i = 0; i < Math.min(rows.length, 10); i++) {
-                    const headerCells = Array.from(rows[i].querySelectorAll('td, th'));
-                    const texts = headerCells.map(c => c.innerText.trim().toLowerCase());
-
-                    const idxTotal = texts.findIndex(t => t.includes('total d') || t.includes('total d\u00EDa') || t.includes('pasajer') || t.includes('pax'));
-                    const idxInterno = texts.findIndex(t => t.includes('interno') || t.includes('unidad') || t.includes('m\u00F3vil'));
-                    const idxPlaca = texts.findIndex(t => t.includes('placa'));
-
-                    if (idxTotal !== -1 || idxInterno !== -1 || idxPlaca !== -1) {
-                        headerIndex = i;
-                        colIndices.total = idxTotal;
-                        colIndices.placa = idxPlaca;
-                        colIndices.interno = idxInterno;
-                        break;
-                    }
-                }
-
-                // Si fallan cabeceras, probar columnas por posición (3 y 8 son comunes en estos reportes)
-                const useHeuristic = (headerIndex === -1 && rows.some(r => r.querySelectorAll('td').length > 8));
-                const data = [];
-                const startRow = headerIndex !== -1 ? headerIndex + 1 : 0;
-
-                for (let j = startRow; j < rows.length; j++) {
-                    const cells = Array.from(rows[j].querySelectorAll('td'));
-                    if (cells.length < 4) continue;
-
-                    let interno = '';
-                    let pasajeros = '';
-
-                    if (headerIndex !== -1) {
-                        if (colIndices.interno !== -1 && cells[colIndices.interno]) {
-                            interno = cells[colIndices.interno].innerText.trim();
-                        } else if (colIndices.placa !== -1 && cells[colIndices.placa]) {
-                            interno = cells[colIndices.placa].innerText.trim();
-                        }
-
-                        if (colIndices.total !== -1 && cells[colIndices.total]) {
-                            pasajeros = cells[colIndices.total].innerText.trim();
-                        }
-                    } else if (useHeuristic) {
-                        // Asumimos layout estandar si no hay headers
-                        interno = cells[3] ? cells[3].innerText.trim() : '';
-                        pasajeros = cells[8] ? cells[8].innerText.trim() : '';
-                    }
-
-                    // Limpieza
-                    interno = interno.replace(/^N0*/i, '').replace(/^M/i, '').replace(/^0+/, '');
-                    const val = parseInt(pasajeros.replace(/\D/g, ''));
-
-                    // Filtro estricto anti-fechas y anti-direcciones
-                    if (pasajeros.includes(':') || pasajeros.includes('-') || (val > 2024 && val < 2030)) {
-                        pasajeros = '';
-                    }
-
-                    if (interno && !isNaN(val)) {
-                        if (!data.find(v => v.identifier === interno)) {
-                            data.push({ identifier: interno, pasajeros: val.toString() });
-                        }
-                    }
-                }
-                if (data.length > bestData.length) bestData = data;
-            }
-
-            if (bestData.length > 0) return bestData;
-
-            // ESTRATEGIA 2: TEXT SCRAPING (Plan B - Reforzado)
-            // Si las tablas fallan, buscamos patrones de texto crudo
-            const text = document.body.innerText;
-            const results = [];
-            // Buscamos patrones como "M-045" o "Int 45" o simplemente tablas de texto
-
-            // Regex para identificar IDs de moviles (1 a 4 digitos, a veces con prefijo)
-            const internalMatches = [...text.matchAll(/\b(?:N|M|Movil|Int|No|Placa)?[-.\s]?(\d{1,4})\b/gi)];
-
-            for (const match of internalMatches) {
-                const internoNum = match[1].replace(/^0+/, '');
-                // Mirar adelante unos 200 caracteres para encontrar el conteo
-                const lookahead = text.substring(match.index, match.index + 200);
-
-                // Buscar números que NO sean el mismo ID, ni fechas, ni direcciones
-                const numberMatches = [...lookahead.matchAll(/\b(\d+)\b/g)];
-
-                for (const nm of numberMatches) {
-                    const numStr = nm[1];
-                    const n = parseInt(numStr);
-
-                    // Filtros
-                    const isSame = numStr === match[1];
-                    const isDate = (n >= 2024 && n <= 2030); // Años recientes
-                    const isTime = nm.input.substring(nm.index - 1, nm.index) === ':' || nm.input.substring(nm.index + numStr.length, nm.index + numStr.length + 1) === ':';
-
-                    if (!isSame && !isDate && !isTime && n >= 0 && n < 2000) {
-                        // Asumimos que es el pasaje si está cerca y valida
-                        const exists = results.find(r => r.identifier === internoNum);
-                        if (!exists) {
-                            results.push({ identifier: internoNum, pasajeros: n.toString() });
-                        }
-                        break; // Tomamos el primer número apto como pasajeros
-                    }
-                }
-            }
-            return results;
+            return data;
         });
 
         if (!vehicles || vehicles.length === 0) {
-            throw new Error(`Reporte cargado pero no se detectaron vehículos.`);
+            // Fallback desesperado: Regex sobre todo el texto (muy rápido)
+            const textDump = await page.evaluate(() => document.body.innerText);
+            const regexMatches = [...textDump.matchAll(/\b(?:Int|Movil|No)?\.?\s*(\d{1,4})\s*[\s\S]{1,50}?\b(\d{1,4})\b/gi)];
+            const backupVehicles = [];
+            for (const m of regexMatches) {
+                const id = m[1].replace(/^0+/, '');
+                const val = parseInt(m[2]);
+                if (val < 2000 && !backupVehicles.find(v => v.identifier === id)) {
+                    backupVehicles.push({ identifier: id, pasajeros: val.toString() });
+                }
+            }
+            if (backupVehicles.length > 0) {
+                console.log("Extracción fallback regex exitosa.");
+                res.json({ success: true, vehicles: backupVehicles });
+            } else {
+                throw new Error("No se extrajeron datos válidos.");
+            }
+        } else {
+            console.log(`Extracción exitosa: ${vehicles.length} registros.`);
+            res.json({ success: true, vehicles });
         }
 
-        console.log(`Extracción exitosa: ${vehicles.length} móviles.`);
-        setTimeout(() => browser.close(), 2000);
-        res.json({ success: true, vehicles });
-
     } catch (error) {
-        console.error('Error del robot:', error);
-        if (browser) await browser.close();
+        console.error('Error (Optimizado):', error.message);
         res.status(500).json({ success: false, message: error.message });
+    } finally {
+        if (page) {
+            try {
+                await page.close(); // Cerrar solo la pestaña (Página), mantener Browser vivo
+            } catch (e) { }
+        }
     }
 });
 
 app.listen(PORT, () => {
-    console.log(`Servidor de Robot GPS listo en puerto ${PORT}`);
+    console.log(`Servidor Robot OPTIMIZADO listo en ${PORT}`);
 });
