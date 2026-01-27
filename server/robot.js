@@ -108,6 +108,14 @@ app.post('/api/scrape-passengers', async (req, res) => {
         const page = await initBrowser();
         await ensureLoggedIn(page, username, password);
 
+        // CORRECCIÓN REFERER: Navegar a la página del reporte
+        const REPORT_URL_DIRECT = 'https://gps3regisdataweb.com/opita/app/seguimiento/infogps.jsp?v=3sobcmjas4';
+        if (!page.url().includes('infogps.jsp')) {
+            console.log('Navegando al contexto del reporte...');
+            await page.goto(REPORT_URL_DIRECT, { waitUntil: 'networkidle2', timeout: 30000 });
+            await new Promise(r => setTimeout(r, 1000));
+        }
+
         console.log('Ejecutando extracción directa (API Fetch)...');
 
         const vehicles = await page.evaluate(async () => {
