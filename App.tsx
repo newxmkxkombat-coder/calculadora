@@ -1270,17 +1270,22 @@ const VehicleMaintenanceManager: React.FC<{ records: MaintenanceRecord[]; setRec
 };
 
 
-const RobotModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpen, onClose }) => {
+const RobotModal: React.FC<{ isOpen: boolean; onClose: () => void; onSelectPassengers: (total: string) => void }> = ({ isOpen, onClose, onSelectPassengers }) => {
   const [username] = useState('luniosilva'); // Credenciales fijas o precargadas
   const [password] = useState('12256643');
   const [isLoading, setIsLoading] = useState(false);
   const [vehicles, setVehicles] = useState<Array<{ identifier: string, pasajeros: string }>>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [deduction, setDeduction] = useState<string>(() => localStorage.getItem('passengerDeduction') || '');
   const timerRef = useRef<number | null>(null);
 
   // URL del servidor en Railway (Producción)
   const API_URL = 'https://calculadora-production-fa9d.up.railway.app';
+
+  useEffect(() => {
+    localStorage.setItem('passengerDeduction', deduction);
+  }, [deduction]);
 
   const startTimer = () => {
     setElapsedTime(0);
@@ -1355,16 +1360,87 @@ const RobotModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpe
     return (msCount / 10).toFixed(1) + 's';
   };
 
+  const handleVehicleClick = (vehiclePassengers: string) => {
+    const rawPassengers = parseInt(vehiclePassengers.replace(/\./g, ''), 10);
+    const deductionVal = parseInt(deduction, 10) || 0;
+
+    if (!isNaN(rawPassengers)) {
+      const finalCount = Math.max(0, rawPassengers + deductionVal);
+      onSelectPassengers(finalCount.toString());
+    }
+  };
+
+  const handleDeductionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    // Allow empty, minus sign only (while typing), or valid integer (positive or negative)
+    if (val === '' || val === '-' || /^-?\d+$/.test(val)) {
+      setDeduction(val);
+    }
+  };
+
+  const incrementDeduction = (amount: number) => {
+    const current = parseInt(deduction || '0', 10);
+    setDeduction((current + amount).toString());
+  };
+
+  const decrementDeduction = (amount: number) => {
+    const current = parseInt(deduction || '0', 10);
+    const newVal = current - amount;
+    setDeduction(newVal.toString());
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in-backdrop" onClick={onClose}>
       <div className="bg-slate-800 border-2 border-indigo-500/50 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-fade-in-scale flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center gap-3 mb-4 border-b border-indigo-500/20 pb-4 flex-shrink-0">
-          <div className="p-3 bg-indigo-500/20 rounded-full text-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.3)]">
-            <RobotIcon />
+        <div className="flex items-center justify-between mb-4 border-b border-indigo-500/20 pb-4 flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-indigo-500/20 rounded-full text-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.3)]">
+              <RobotIcon />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-indigo-300">Datos GPS</h3>
+              <p className="text-xs text-indigo-400/70">Conexión Segura</p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-xl font-bold text-indigo-300">Robot GPS</h3>
-            <p className="text-xs text-indigo-400/70">Conexión Segura</p>
+          <button
+            onClick={onClose}
+            className="p-2.5 rounded-full bg-slate-700/50 hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-all active:scale-95 border border-transparent hover:border-red-500/30 shadow-lg"
+            title="Cerrar"
+          >
+            <XIcon />
+          </button>
+        </div>
+
+        {/* Input de Descuento */}
+        {/* Input Compacto */}
+        <div className="mb-2 bg-slate-900/50 p-2 rounded-lg border border-slate-700/50 flex items-center justify-between gap-2">
+          <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1 shrink-0">
+            <TrashIcon /> A Descontar
+          </label>
+
+          <div className="flex items-center gap-2 bg-slate-800/80 rounded-md p-1 border border-slate-700">
+            <button
+              onClick={() => decrementDeduction(1)}
+              className="w-8 h-8 flex items-center justify-center rounded bg-slate-700 text-red-400 hover:bg-red-500/20 active:scale-95 transition-all font-bold text-lg leading-none pb-0.5"
+            >
+              −
+            </button>
+
+            <input
+              type="text"
+              inputMode="numeric"
+              value={deduction}
+              onChange={handleDeductionChange}
+              className="bg-transparent border-none text-white text-lg font-bold text-center w-14 focus:ring-0 active:ring-0 p-0 placeholder-slate-600"
+              placeholder="0"
+            />
+
+            <button
+              onClick={() => incrementDeduction(1)}
+              className="w-8 h-8 flex items-center justify-center rounded bg-slate-700 text-green-400 hover:bg-green-500/20 active:scale-95 transition-all font-bold text-lg leading-none pb-0.5"
+            >
+              +
+            </button>
           </div>
         </div>
 
@@ -1409,20 +1485,35 @@ const RobotModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpe
             </div>
 
             {vehicles.length > 0 ? (
-              <div className="overflow-y-auto flex-grow pr-1 space-y-3 custom-scrollbar">
-                {vehicles.map((v, i) => (
-                  <div key={i} className="bg-slate-900/50 border border-slate-700 p-4 rounded-xl flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Vehículo</p>
-                      <p className="text-2xl font-black text-white">{v.identifier}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Pasajeros</p>
-                      <p className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-cyan-400">{v.pasajeros}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <>
+                <p className="text-xs text-center text-indigo-300 mb-2 font-medium animate-pulse">👇 Toca un vehículo para cargar los pasajeros</p>
+                <div className="overflow-y-auto flex-grow pr-1 space-y-3 custom-scrollbar">
+                  {vehicles.map((v, i) => (
+                    <button
+                      key={i}
+                      onClick={() => handleVehicleClick(v.pasajeros)}
+                      className="w-full bg-slate-900/50 border border-slate-700 hover:border-indigo-500 hover:bg-indigo-500/10 p-4 rounded-xl flex items-center justify-between group transition-all duration-200"
+                    >
+                      <div className="text-left">
+                        <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1 group-hover:text-indigo-300">Vehículo</p>
+                        <p className="text-2xl font-black text-white">{v.identifier}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1 group-hover:text-indigo-300">Pasajeros</p>
+                        <div className="flex flex-col items-end">
+                          <p className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-cyan-400 group-hover:from-indigo-400 group-hover:to-cyan-300">{v.pasajeros}</p>
+                          {/* Mostrar previo del cálculo si hay ajuste */}
+                          {parseInt(deduction) !== 0 && !isNaN(parseInt(deduction)) && (
+                            <span className="text-xs text-slate-500 font-mono">
+                              {parseInt(deduction) > 0 ? '+' : ''} {deduction} = <span className="text-indigo-300 font-bold">{Math.max(0, (parseInt(v.pasajeros.replace(/\./g, '')) || 0) + parseInt(deduction || '0'))}</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </>
             ) : (
               <div className="text-center py-10 text-slate-400 italic bg-slate-900/30 rounded-xl border border-slate-800">
                 No se encontraron vehículos operando hoy.
@@ -2165,7 +2256,15 @@ const App: React.FC = () => {
 
         <DocumentManager documents={documents} setDocuments={setDocuments} />
 
-        <RobotModal isOpen={isRobotModalOpen} onClose={() => setIsRobotModalOpen(false)} />
+        <RobotModal
+          isOpen={isRobotModalOpen}
+          onClose={() => setIsRobotModalOpen(false)}
+          onSelectPassengers={(passengers) => {
+            setFormData(prev => ({ ...prev, numPassengers: formatNumberWithDots(passengers) }));
+            setIsRobotModalOpen(false);
+            setToastMessage('Pasajeros actualizados desde Robot GPS');
+          }}
+        />
 
         <div
           className="fixed right-6 sm:right-8 z-40 flex flex-col items-end gap-3 transition-[bottom] duration-300 ease-in-out"
