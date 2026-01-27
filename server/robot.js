@@ -51,22 +51,48 @@ const initBrowser = async () => {
 const ensureLoggedIn = async (page, username, password) => {
     try {
         // Verificar dónde estamos
-        const currentUrl = page.url();
-        const content = await page.content();
+        let currentUrl = page.url();
+        let content = await page.content();
 
         // Detección de sesión caída o expirada
         // "Ha finalizado la sesión" es el texto clave que reportó el error
-        const isLoginPage = content.includes('input type="text"') && content.includes('input type="password"');
+        let isLoginPage = content.includes('input type="text"') && content.includes('input type="password"');
         const sessionExpired = content.includes('finalizado la sesión') || content.includes('finalizado la sesion') || content.includes('Session timeout');
 
-        if (isLoginPage || !currentUrl.includes('opita') || !sessionActive || sessionExpired) {
-            console.log('Sesión no detectada o expirada (Detectado: ' + (sessionExpired ? 'Mensaje Expirado' : 'Login Form/Otro') + '). Logueándose...');
+        // Si todo parece estar bien y no estamos en login, retornamos rápido
+        if (!isLoginPage && currentUrl.includes('opita') && sessionActive && !sessionExpired) {
+            console.log('Sesión activa detectada (Estado OK). Reutilizando...');
+            lastInteraction = Date.now();
+            return;
+        }
 
-            // Si la sesión expiró, a veces hay que navegar explícitamente a la raíz para limpiar el estado y ver el login
-            await page.goto(TARGET_URL, { waitUntil: 'networkidle2', timeout: 45000 });
+        console.log('Sesión no detectada o expirada (Detectado: ' + (sessionExpired ? 'Mensaje Expirado' : 'Login/Otro') + '). Iniciando login...');
 
-            await page.waitForSelector('input[type="text"]', { visible: true, timeout: 20000 });
-            await page.waitForSelector('input[type="password"]', { visible: true, timeout: 20000 });
+        // Ir al login
+        await page.goto(TARGET_URL, { waitUntil: 'networkidle2', timeout: 45000 });
+
+        // VERIFICACIÓN CRÍTICA: ¿Nos redirigió solos?
+        // A veces el servidor recuerda la cookie y nos manda directo adentro.
+        // Esperar un toque para ver si cambia la URL o el contenido
+        await new Promise(r => setTimeout(r, 1500));
+        currentUrl = page.url();
+        content = await page.content();
+
+        // Detectar si estamos adentro (URL contiene app/seguimiento o NO hay inputs de login)
+        isLoginPage = content.includes('input type="text"') && content.includes('input type="password"');
+        const isInsideApp = currentUrl.includes('app') || currentUrl.includes('seguimiento') || currentUrl.includes('menu');
+
+        if (isInsideApp && !isLoginPage) {
+            console.log('El servidor nos redirigió automáticamente adentro. No es necesario escribir password.');
+            sessionActive = true;
+            lastInteraction = Date.now();
+            return;
+        }
+
+        // Si seguimos viendo el form de login, ahí sí esperamos los campos
+        try {
+            await page.waitForSelector('input[type="text"]', { visible: true, timeout: 10000 });
+            await page.waitForSelector('input[type="password"]', { visible: true, timeout: 10000 });
 
             await page.type('input[type="text"]', username, { delay: 50 });
             await page.type('input[type="password"]', password, { delay: 50 });
@@ -83,11 +109,19 @@ const ensureLoggedIn = async (page, username, password) => {
             if (!loginClicked) await page.keyboard.press('Enter');
 
             await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 });
-            sessionActive = true;
-            console.log('Login exitoso.');
-        } else {
-            console.log('Sesión activa detectada. Reutilizando...');
+            console.log('Login manual exitoso.');
+        } catch (e) {
+            console.log("Advertencia en Login Manual: " + e.message);
+            // Fallback final: Si por alguna razón dio timeout pero SÍ estamos dentro
+            if (page.url().includes('opita') && !page.url().includes('index.jsp')) {
+                console.log("Recuperación: El sistema está dentro a pesar del error.");
+                sessionActive = true;
+                return;
+            }
+            throw e;
         }
+
+        sessionActive = true;
         lastInteraction = Date.now();
     } catch (e) {
         console.error("Error en login:", e.message);
@@ -108,9 +142,10 @@ app.post('/api/scrape-passengers', async (req, res) => {
 
         // 2. Navegar DIRECTO a la URL mágica (Atajo del usuario)
         const REPORT_URL_DIRECT = 'https://gps3regisdataweb.com/opita/app/seguimiento/infogps.jsp?v=3sobcmjas4';
-        console.log('Navegando directo URL reporte...');
 
-        // Ir directo a la URL del reporte
+        // Verificación: Si ya estamos en la URL mágica, ¿para qué recargar?
+        // A menos que sea necesario actualizar datos
+        console.log('Navegando/Recargando directo URL reporte...');
         await page.goto(REPORT_URL_DIRECT, { waitUntil: 'networkidle2', timeout: 30000 });
 
         // Esperar brevemente a que renderice
