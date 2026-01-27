@@ -197,27 +197,27 @@ async function runScraper(username, password, retry = false) {
         }
 
     } catch (error) {
-        console.error('Error Robot:', error.message);
+        console.error(`Error Robot (Intento ${retry ? '2/2' : '1/2'}):`, error.message);
 
-        // AUTO-HEALING: Auto-Reintento si es error de sesión
-        // Si no hemos reintentado ya y el error parece de sesión
-        if (!retry && (error.message.includes('end_session') || error.message.includes('RESPUESTA_SERVIDOR_INVALIDA'))) {
-            console.log('⚠️ Detectado fallo de sesión. Ejecutando AUTO-REINTENTO (Reset total)...');
+        // AUTO-HEALING: REINTENTAR EN CUALQUIER ERROR (Primera vez)
+        if (!retry) {
+            console.log('⚠️ FALLO DETECTADO. Ejecutando AUTO-REINTENTO (Reset total)...');
 
-            // 1. Matar sesión
+            // 1. Matar sesión completamente
             sessionActive = false;
-            try { await globalPage.deleteCookie(...(await globalPage.cookies())); } catch (e) { } // Borrar cookies
+            try { if (globalPage) await globalPage.deleteCookie(...(await globalPage.cookies())); } catch (e) { }
             try { if (globalPage) await globalPage.close(); } catch (e) { }
             try { if (globalBrowser) await globalBrowser.close(); } catch (e) { }
             globalPage = null;
             globalBrowser = null;
 
-            // 2. Reintentar recursivamente
-            console.log('🔄 Re-lanzando lógica limpia...');
-            return await runScraper(username, password, true); // <--- Llamada recursiva directa
+            // 2. Reintentar
+            console.log('🔄 Re-lanzando con sesión limpia (Intento 2/2)...');
+            return await runScraper(username, password, true);
         }
 
-        throw error; // Si falla de nuevo, lanzamos el error hacia arriba
+        // Si ya reintentamos, lanzamos el error
+        throw error;
     }
 }
 
