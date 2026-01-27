@@ -114,13 +114,37 @@ app.post('/api/scrape-passengers', async (req, res) => {
 
         if (!movilesClicked) throw new Error("No se encontró el botón 'Móviles'.");
 
-        // 5. Esperar Tabla y Extraer
-        console.log('Esperando tabla de resultados...');
-        // Dar un respiro a la página para que procese el click
-        await new Promise(r => setTimeout(r, 5000));
-        await page.waitForSelector('table', { timeout: 60000 });
+        // 5. Esperar Tabla y Extraer (Soporte para IFRAMES)
+        console.log('Esperando tabla de resultados (buscando en todos los frames)...');
 
-        const vehicles = await page.evaluate(() => {
+        let targetFrame = null;
+        const startTime = Date.now();
+
+        // Bucle para buscar la tabla en cualquier frame durante 60 segundos
+        while (Date.now() - startTime < 60000) {
+            for (const frame of page.frames()) {
+                // Intentar buscar la tabla en este frame
+                const table = await frame.$('table');
+                if (table) {
+                    // Verificar si parece la tabla correcta (tiene filas)
+                    const rowCount = await frame.evaluate(el => el.querySelectorAll('tr').length, table);
+                    if (rowCount > 2) {
+                        targetFrame = frame;
+                        break;
+                    }
+                }
+            }
+            if (targetFrame) break;
+            await new Promise(r => setTimeout(r, 2000)); // Esperar 2s antes de reintentar
+        }
+
+        if (!targetFrame) {
+            throw new Error("La tabla no apareció en ningún frame (Timeout 60s).");
+        }
+
+        console.log(`Tabla encontrada en frame: ${targetFrame.url()}`);
+
+        const vehicles = await targetFrame.evaluate(() => {
             const rows = Array.from(document.querySelectorAll('tr'));
             let headerIndex = -1;
             let colIndices = { placa: -1, interno: -1, total: -1 };
