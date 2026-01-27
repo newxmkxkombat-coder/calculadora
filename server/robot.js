@@ -170,14 +170,12 @@ app.post('/api/scrape-passengers', async (req, res) => {
         const currentUrl = page.url();
         let dataRefreshed = false;
 
-        // A) MODO RÁPIDO: Intentar refresco (CLICK en buscar) solo si ya estamos en la URL correcta
+        // A) MODO TURBO (V4.1): Intentar refresco (CLICK en buscar) solo si ya estamos en la URL correcta
         if (currentUrl === REPORT_URL_DIRECT) {
-            console.log('Ya estamos en el reporte. Intentando actualización RÁPIDA (Click)...');
+            console.log('⚡ MODO TURBO: Ya estamos en el reporte. Intentando actualización rápida...');
             try {
                 // Clickear botón Buscar/Lupa sin recargar página
                 const refreshed = await page.evaluate(() => {
-                    // Estrategia combinada de botones
-
                     // Estrategia combinada de botones
                     const btns = Array.from(document.querySelectorAll('button, input[type="submit"], a.btn'));
                     const textBtn = btns.find(b =>
@@ -191,48 +189,46 @@ app.post('/api/scrape-passengers', async (req, res) => {
                 });
 
                 if (refreshed) {
-                    // Esperamos la carga de datos AJAX (2.5s es más rápido que una recarga total de 10s)
-                    console.log('Botón clickeado. Esperando datos frescos...');
-                    await new Promise(r => setTimeout(r, 2500));
+                    console.log('⚡ Botón clickeado. Esperando datos frescos...');
+                    await new Promise(r => setTimeout(r, 1500)); // Espera reducida para AJAX
                     dataRefreshed = true;
                 } else {
-                    console.log('No se encontró botón para modo rápido. Pasando a modo seguro...');
+                    console.log('⚠️ No se encontró botón para Turbo. Pasando a recarga...');
                 }
             } catch (e) {
-                console.log('Falló modo rápido (' + e.message + '). Pasando a modo seguro...');
+                console.log('⚠️ Falló Turbo (' + e.message + '). Pasando a recarga...');
             }
         }
 
-        // B) MODO SEGURO: Si el modo rápido no se usó o falló, hacemos la recarga completa (Navegar de cero)
+        // B) MODO SEGURO: Si el modo Turbo no se usó o falló, hacemos la recarga completa
         if (!dataRefreshed) {
-            console.log('Ejecutando Carga COMPLETA (Modo Seguro - Recarga total)...');
+            console.log('🐢 Ejecutando Recarga Completa (Primera vez o Fallback)...');
             await page.goto(REPORT_URL_DIRECT, { waitUntil: 'networkidle2', timeout: 30000 });
-            await new Promise(r => setTimeout(r, 2000));
+            await new Promise(r => setTimeout(r, 1500));
 
-            // Re-asegurar click tras carga completa por si la tabla viene vacía
+            // Re-asegurar click tras carga completa
             await page.evaluate(() => {
                 const iconBtn = document.querySelector('.fa-search, .glyphicon-search, span[class*="search"], i[class*="search"]')?.closest('a, button, div');
                 if (iconBtn) iconBtn.click();
             });
-            await new Promise(r => setTimeout(r, 2000));
+            await new Promise(r => setTimeout(r, 1500));
         } else {
-            console.log('Actualización rápida completada sin recargas.');
+            console.log('⚡ Actualización Turbo completada.');
         }
 
-        // 4. Extracción "VISUAL" + SOPORTE IFRAMES + WAIT
-        console.log('Extrayendo datos de Móviles (Modo Visual + Frames)...');
+        // 4. Extracción "VISUAL" + SOPORTE IFRAMES + WAIT (Optimizado 100ms polling)
+        console.log('Extrayendo datos de Móviles...');
 
-        // Espera activa: buscar texto "Total día" en cualquier frame antes de intentar leer
+        // Espera activa: buscar texto "Total día" en cualquier frame con polling agresivo
         try {
             await page.waitForFunction(() => {
                 const searchTxt = (doc) => (doc.body.innerText || '').toLowerCase().includes('total día') || (doc.body.innerText || '').toLowerCase().includes('total dia');
-
                 if (searchTxt(document)) return true;
                 for (const frame of window.frames) {
                     try { if (searchTxt(frame.document)) return true; } catch (e) { }
                 }
                 return false;
-            }, { timeout: 15000, polling: 1000 });
+            }, { timeout: 10000, polling: 100 }); // Polling rápido 100ms
         } catch (e) {
             console.log("Timeout esperando texto 'Total día', intentando extraer de todos modos...");
         }

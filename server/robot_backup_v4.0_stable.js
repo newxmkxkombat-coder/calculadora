@@ -177,6 +177,8 @@ app.post('/api/scrape-passengers', async (req, res) => {
                 // Clickear botón Buscar/Lupa sin recargar página
                 const refreshed = await page.evaluate(() => {
                     // Estrategia combinada de botones
+
+                    // Estrategia combinada de botones
                     const btns = Array.from(document.querySelectorAll('button, input[type="submit"], a.btn'));
                     const textBtn = btns.find(b =>
                         ['generar', 'buscar', 'consultar', 'ver'].some(k => (b.innerText || b.value || '').toLowerCase().includes(k))
