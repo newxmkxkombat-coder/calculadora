@@ -64,14 +64,23 @@ app.post('/api/scrape-passengers', async (req, res) => {
         // Configurar vista ligera
         await page.setViewport({ width: 1280, height: 720 });
 
-        // 1. Ir al Login (Timeout reducido)
+        // 1. Ir al Login (Usamos networkidle2 para asegurar que scripts de carga terminen)
         console.log('Navegando a login...');
-        await page.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        await page.goto(TARGET_URL, { waitUntil: 'networkidle2', timeout: 45000 });
 
-        // 2. Llenar credenciales (Espera inteligente)
-        await page.waitForSelector('input[type="text"]', { timeout: 10000 });
-        await page.type('input[type="text"]', username);
-        await page.type('input[type="password"]', password);
+        // 2. Llenar credenciales
+        // Esperamos explícitamente a que ambos campos existan y sean visibles
+        console.log('Esperando campos del formulario...');
+        const userSelector = 'input[type="text"]';
+        const passSelector = 'input[type="password"]';
+
+        await Promise.all([
+            page.waitForSelector(userSelector, { visible: true, timeout: 15000 }),
+            page.waitForSelector(passSelector, { visible: true, timeout: 15000 })
+        ]);
+
+        await page.type(userSelector, username, { delay: 50 }); // Escribir un poco más lento
+        await page.type(passSelector, password, { delay: 50 });
 
         // 3. Click Ingresar
         const loginBtn = await page.$('button, input[type="submit"], input[type="button"], a.btn');
