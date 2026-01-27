@@ -1274,12 +1274,11 @@ const RobotModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpe
   const [username, setUsername] = useState('luniosilva');
   const [password, setPassword] = useState('12256643');
   const [isLoading, setIsLoading] = useState(false);
-  // Cambiamos el estado de resultado para manejar la lista de vehículos
   const [vehicles, setVehicles] = useState<Array<{ identifier: string, pasajeros: string }>>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // URL del servidor (Local o Nube)
-  const API_URL = import.meta.env.VITE_API_URL || 'https://calculadora-production-fa9d.up.railway.app';
+  // URL del servidor en Railway (Producción)
+  const API_URL = 'https://calculadora-production-fa9d.up.railway.app';
 
   const handleConnect = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1288,23 +1287,33 @@ const RobotModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpe
     setVehicles([]);
 
     try {
+      // Usamos fetch con timeout para evitar esperas infinitas
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 90000); // 90 segundos timeout
+
       const response = await fetch(`${API_URL}/api/scrape-passengers`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
+        body: JSON.stringify({ username, password }),
+        signal: controller.signal
       });
 
+      clearTimeout(timeoutId);
       const data = await response.json();
 
       if (response.ok && data.success) {
         setVehicles(data.vehicles);
       } else {
-        setErrorMessage(data.message || "Error desconocido al obtener datos.");
+        setErrorMessage(data.message || "Error al obtener datos. Verifica usuario/contraseña.");
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      setErrorMessage("No se pudo conectar con el Robot. Revisa que el servidor 'server/robot.js' esté corriendo.");
+      if (error.name === 'AbortError') {
+        setErrorMessage("La conexión tardó demasiado. Intenta de nuevo.");
+      } else {
+        setErrorMessage("Error de conexión con el servidor. Intenta más tarde.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -1325,106 +1334,110 @@ const RobotModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpe
           </div>
         </div>
 
-        {vehicles.length === 0 && !errorMessage ? (
-          <form onSubmit={handleConnect} className="space-y-5 overflow-y-auto">
-            <div className="bg-indigo-900/20 p-3 rounded-lg border border-indigo-500/30 mb-2">
-              <p className="text-indigo-200 text-sm flex items-start gap-2">
-                <span className="text-lg">🤖</span>
-                Ingresando a <strong>gps3regisdataweb.com</strong>...
-              </p>
-            </div>
+        {vehicles.length === 0 ? (
+          !errorMessage ? (
+            <form onSubmit={handleConnect} className="space-y-5 overflow-y-auto">
+              <div className="bg-indigo-900/20 p-3 rounded-lg border border-indigo-500/30 mb-2">
+                <p className="text-indigo-200 text-sm flex items-start gap-2">
+                  <span className="text-lg">🤖</span>
+                  Conectando a <strong>gps3regisdataweb.com</strong>...
+                </p>
+              </div>
 
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1.5 ml-1">Usuario</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={username}
-                    onChange={e => setUsername(e.target.value)}
-                    className="w-full bg-slate-900/50 border border-slate-600 rounded-xl p-3 text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none placeholder-slate-600 font-mono"
-                    required
-                  />
-                  <div className="absolute right-3 top-3 text-slate-600 pointer-events-none">
-                    <UsersIcon />
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1.5 ml-1">Usuario</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={username}
+                      onChange={e => setUsername(e.target.value)}
+                      className="w-full bg-slate-900/50 border border-slate-600 rounded-xl p-3 text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none placeholder-slate-600 font-mono"
+                      required
+                    />
+                    <div className="absolute right-3 top-3 text-slate-600 pointer-events-none">
+                      <UsersIcon />
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1.5 ml-1">Contraseña</label>
+                  <div className="relative">
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      className="w-full bg-slate-900/50 border border-slate-600 rounded-xl p-3 text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none placeholder-slate-600 font-mono"
+                      required
+                    />
                   </div>
                 </div>
               </div>
-              <div>
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1.5 ml-1">Contraseña</label>
-                <div className="relative">
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    className="w-full bg-slate-900/50 border border-slate-600 rounded-xl p-3 text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none placeholder-slate-600 font-mono"
-                    required
-                  />
-                </div>
-              </div>
-            </div>
 
-            <div className="flex justify-end gap-3 pt-4 border-t border-slate-700/50">
-              <button type="button" onClick={onClose} className="py-2.5 px-5 bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white rounded-xl font-semibold transition-all">Cancelar</button>
-              <button
-                type="submit"
-                disabled={isLoading}
-                className={`py-2.5 px-6 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-indigo-900/50 transition-all active:scale-95 ${isLoading ? 'opacity-70 cursor-wait' : ''}`}
-              >
-                {isLoading ? (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Conectando...
-                  </>
-                ) : (
-                  <>Ver Pasajeros <ArrowUpIcon /></>
-                )}
-              </button>
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-700/50">
+                <button type="button" onClick={onClose} className="py-2.5 px-5 bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white rounded-xl font-semibold transition-all">Cancelar</button>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className={`py-2.5 px-6 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-indigo-900/50 transition-all active:scale-95 ${isLoading ? 'opacity-70 cursor-wait' : ''}`}
+                >
+                  {isLoading ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Conectando...
+                    </>
+                  ) : (
+                    <>Ver Pasajeros <ArrowUpIcon /></>
+                  )}
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="text-center py-6">
+              <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/50">
+                <XIcon />
+              </div>
+              <h4 className="text-xl font-bold text-red-400 mb-2">Error de Conexión</h4>
+              <p className="text-slate-300 text-sm px-4 mb-6">{errorMessage}</p>
+              <button onClick={() => setErrorMessage(null)} className="py-2 px-6 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-bold">Intentar de nuevo</button>
             </div>
-          </form>
+          )
         ) : (
           <div className="flex flex-col h-full overflow-hidden">
-            {errorMessage ? (
-              <div className="text-center py-6">
-                <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/50">
-                  <XIcon />
-                </div>
-                <h4 className="text-xl font-bold text-red-400 mb-2">Error de Conexión</h4>
-                <p className="text-slate-300 text-sm px-4 mb-6">{errorMessage}</p>
-                <button onClick={() => setErrorMessage(null)} className="py-2 px-6 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-bold">Intentar de nuevo</button>
+            <div className="text-center mb-4">
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-500/20 rounded-full text-green-400 border border-green-500/30 text-sm font-bold animate-pulse">
+                <CheckCircleIcon />
+                Datos Actualizados
+              </div>
+            </div>
+            {vehicles.length > 0 ? (
+              <div className="overflow-y-auto flex-grow pr-1 space-y-3 custom-scrollbar">
+                {vehicles.map((v, i) => (
+                  <div key={i} className="bg-slate-900/50 border border-slate-700 p-4 rounded-xl flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Vehículo</p>
+                      <p className="text-2xl font-black text-white">{v.identifier}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Pasajeros</p>
+                      <p className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-cyan-400">{v.pasajeros}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : (
-              <>
-                <div className="text-center mb-4">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-500/20 rounded-full text-green-400 border border-green-500/30 text-sm font-bold animate-pulse">
-                    <CheckCircleIcon />
-                    Datos Actualizados
-                  </div>
-                </div>
-                <div className="overflow-y-auto flex-grow pr-1 space-y-3 custom-scrollbar">
-                  {vehicles.map((v, i) => (
-                    <div key={i} className="bg-slate-900/50 border border-slate-700 p-4 rounded-xl flex items-center justify-between">
-                      <div>
-                        <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Vehículo</p>
-                        <p className="text-2xl font-black text-white">{v.identifier}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Pasajeros</p>
-                        <p className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-cyan-400">{v.pasajeros}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="pt-4 mt-4 border-t border-slate-700">
-                  <button onClick={onClose} className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-all shadow-lg hover:shadow-indigo-500/30">
-                    Cerrar
-                  </button>
-                </div>
-              </>
+              <div className="text-center py-10 text-slate-400 italic">
+                No se encontraron vehículos operando hoy.
+              </div>
             )}
+            <div className="pt-4 mt-4 border-t border-slate-700">
+              <button onClick={onClose} className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-all shadow-lg hover:shadow-indigo-500/30">
+                Cerrar
+              </button>
+            </div>
           </div>
         )}
       </div>
