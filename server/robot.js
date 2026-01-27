@@ -21,7 +21,7 @@ const TARGET_URL = 'https://gps3regisdataweb.com/opita/index.jsp';
 // --- INICIALIZACIÓN DEL NAVEGADOR ---
 const initBrowser = async () => {
     if (!globalBrowser) {
-        console.log('Lanzando navegador global (Modo Bala de Plata)...');
+        console.log('Lanzando navegador global (Modo Bala de Plata V5)...');
         globalBrowser = await puppeteer.launch({
             headless: 'new',
             args: [
@@ -54,7 +54,6 @@ const ensureLoggedIn = async (page, username, password) => {
         let isLoginPage = content.includes('input type="text"') && content.includes('input type="password"');
         const sessionExpired = content.includes('finalizado la sesión') || content.includes('finalizado la sesion') || content.includes('Session timeout');
 
-        // Si no estamos en login, pero estamos en 'opita' y la sesión supuestamente está activa: OK
         if (!isLoginPage && currentUrl.includes('opita') && sessionActive && !sessionExpired) {
             lastInteraction = Date.now();
             return;
@@ -63,12 +62,10 @@ const ensureLoggedIn = async (page, username, password) => {
         console.log('Iniciando sesión...');
         await page.goto(TARGET_URL, { waitUntil: 'networkidle2', timeout: 45000 });
 
-        // Verificación CRÍTICA MEJORADA: Redirección automática (Cookies vivas)
-        await new Promise(r => setTimeout(r, 2000)); // Un poco más de tiempo para redirigir
+        await new Promise(r => setTimeout(r, 2000));
         let newUrl = page.url();
-        let newContent = await page.content(); // Chequear contenido por si la URL no cambia rápido
+        let newContent = await page.content();
 
-        // Si la URL dice 'app'/'menu' O si el contenido NO tiene password input pero SÍ dice 'opita'
         if (newUrl.includes('app') || newUrl.includes('menu') || newUrl.includes('seguimiento') || (newContent.includes('opita') && !newContent.includes('input type="password"'))) {
             console.log('Redirección automática o sesión viva detectada. Saltando login.');
             sessionActive = true;
@@ -85,7 +82,6 @@ const ensureLoggedIn = async (page, username, password) => {
             sessionActive = true;
             console.log('Login exitoso.');
         } catch (e) {
-            // Última red de seguridad
             if (page.url().includes('opita') && !page.url().includes('index.jsp')) {
                 console.log('Login visual falló pero parece que estamos dentro. Continuando...');
                 sessionActive = true;
@@ -100,9 +96,9 @@ const ensureLoggedIn = async (page, username, password) => {
     }
 };
 
-// --- ROUTA PRINCIPAL (BALA DE PLATA) ---
+// --- ROUTA PRINCIPAL (BALA DE PLATA + AUTO-HEALING) ---
 app.post('/api/scrape-passengers', async (req, res) => {
-    const { username, password } = req.body;
+    const { username, password, _retry } = req.body;
 
     try {
         const page = await initBrowser();
@@ -140,9 +136,8 @@ app.post('/api/scrape-passengers', async (req, res) => {
 
                 const htmlText = await response.text();
 
-                // Si la respuesta no parece una tabla, devolvemos error con el contenido para debug
                 if (!htmlText.includes('<tr') && !htmlText.includes('<td')) {
-                    return { error: 'RESPUESTA_SERVIDOR_INVALIDA: ' + htmlText.substring(0, 300) };
+                    throw new Error('RESPUESTA_SERVIDOR_INVALIDA: ' + htmlText.substring(0, 300));
                 }
 
                 const div = document.createElement('div');
@@ -203,16 +198,35 @@ app.post('/api/scrape-passengers', async (req, res) => {
         }
 
     } catch (error) {
-        console.error('Error Robot:', error);
-        // Si falló, matamos la sesión para que la próxima vez empiece de cero limpio
-        console.log('Reiniciando navegador para limpiar sesión corrupta...');
+        console.error('Error Robot:', error.message);
+
+        // AUTO-HEALING: Auto-Reintento
+        // Si no hemos reintentado ya y el error parece de sesión (end_session o similar)
+        if (!_retry && (error.message.includes('end_session') || error.message.includes('RESPUESTA_SERVIDOR_INVALIDA'))) {
+            console.log('⚠️ Detectado fallo de sesión. Ejecutando AUTO-REINTENTO (Reset total)...');
+
+            // 1. Matar sesión
+            sessionActive = false;
+            try { await globalPage.deleteCookie(...(await globalPage.cookies())); } catch (e) { } // Borrar cookies
+            try { if (globalPage) await globalPage.close(); } catch (e) { }
+            try { if (globalBrowser) await globalBrowser.close(); } catch (e) { }
+            globalPage = null;
+            globalBrowser = null;
+
+            // 2. Reintentar recursivamente
+            req.body._retry = true;
+            console.log('🔄 Re-lanzando petición limpia...');
+            return app._router.handle(req, res, () => { });
+        }
+
+        // Limpieza final y error al cliente
         sessionActive = false;
         try { if (globalPage) await globalPage.close(); } catch (e) { }
         try { if (globalBrowser) await globalBrowser.close(); } catch (e) { }
         globalPage = null;
         globalBrowser = null;
 
-        res.status(500).json({ success: false, message: error.message });
+        res.status(500).json({ success: false, message: error.message + ' (Sesión reiniciada, intente de nuevo)' });
     }
 });
 
@@ -224,6 +238,6 @@ setInterval(() => {
 }, 300000);
 
 app.listen(PORT, () => {
-    console.log(`Robot API DIRECTA V4.1 (Login Fix + All Plates) escuchando en ${PORT}`);
+    console.log(`Robot API DIRECTA V5 "Auto-Healing" escuchando en ${PORT}`);
     initBrowser();
 });
