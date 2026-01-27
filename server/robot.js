@@ -21,7 +21,7 @@ const TARGET_URL = 'https://gps3regisdataweb.com/opita/index.jsp';
 // --- INICIALIZACIÓN DEL NAVEGADOR ---
 const initBrowser = async () => {
     if (!globalBrowser) {
-        console.log('Lanzando navegador global (Modo Bala de Plata V5)...');
+        console.log('Lanzando navegador global (Modo Bala de Plata V6)...');
         globalBrowser = await puppeteer.launch({
             headless: 'new',
             args: [
@@ -96,10 +96,8 @@ const ensureLoggedIn = async (page, username, password) => {
     }
 };
 
-// --- ROUTA PRINCIPAL (BALA DE PLATA + AUTO-HEALING) ---
-app.post('/api/scrape-passengers', async (req, res) => {
-    const { username, password, _retry } = req.body;
-
+// --- LÓGICA DE EXTRACCIÓN (Encapsulada para poder reintentar) ---
+async function runScraper(username, password, retry = false) {
     try {
         const page = await initBrowser();
         await ensureLoggedIn(page, username, password);
@@ -136,6 +134,7 @@ app.post('/api/scrape-passengers', async (req, res) => {
 
                 const htmlText = await response.text();
 
+                // Si la respuesta no parece una tabla, devolvemos error con el contenido para debug
                 if (!htmlText.includes('<tr') && !htmlText.includes('<td')) {
                     throw new Error('RESPUESTA_SERVIDOR_INVALIDA: ' + htmlText.substring(0, 300));
                 }
@@ -191,8 +190,8 @@ app.post('/api/scrape-passengers', async (req, res) => {
         if (vehicles.error) throw new Error(vehicles.error);
 
         if (vehicles.length > 0) {
-            console.log(`Éxito API. ${vehicles.length} móviles.`);
-            res.json({ success: true, vehicles });
+            // Éxito real
+            return vehicles;
         } else {
             throw new Error("La API no retornó datos válidos o la tabla estaba vacía.");
         }
@@ -200,9 +199,9 @@ app.post('/api/scrape-passengers', async (req, res) => {
     } catch (error) {
         console.error('Error Robot:', error.message);
 
-        // AUTO-HEALING: Auto-Reintento
-        // Si no hemos reintentado ya y el error parece de sesión (end_session o similar)
-        if (!_retry && (error.message.includes('end_session') || error.message.includes('RESPUESTA_SERVIDOR_INVALIDA'))) {
+        // AUTO-HEALING: Auto-Reintento si es error de sesión
+        // Si no hemos reintentado ya y el error parece de sesión
+        if (!retry && (error.message.includes('end_session') || error.message.includes('RESPUESTA_SERVIDOR_INVALIDA'))) {
             console.log('⚠️ Detectado fallo de sesión. Ejecutando AUTO-REINTENTO (Reset total)...');
 
             // 1. Matar sesión
@@ -214,15 +213,24 @@ app.post('/api/scrape-passengers', async (req, res) => {
             globalBrowser = null;
 
             // 2. Reintentar recursivamente
-            req.body._retry = true;
-            console.log('🔄 Re-lanzando petición limpia...');
-            return app._router.handle(req, res, () => { });
+            console.log('🔄 Re-lanzando lógica limpia...');
+            return await runScraper(username, password, true); // <--- Llamada recursiva directa
         }
 
-        // Limpieza final y error al cliente
+        throw error; // Si falla de nuevo, lanzamos el error hacia arriba
+    }
+}
+
+// --- ROUTA PRINCIPAL ---
+app.post('/api/scrape-passengers', async (req, res) => {
+    try {
+        const vehicles = await runScraper(req.body.username, req.body.password);
+        console.log(`Éxito API. ${vehicles.length} móviles.`);
+        res.json({ success: true, vehicles });
+    } catch (error) {
+        // Limpiamos sesión por si acaso para la próxima
         sessionActive = false;
         try { if (globalPage) await globalPage.close(); } catch (e) { }
-        try { if (globalBrowser) await globalBrowser.close(); } catch (e) { }
         globalPage = null;
         globalBrowser = null;
 
@@ -238,6 +246,6 @@ setInterval(() => {
 }, 300000);
 
 app.listen(PORT, () => {
-    console.log(`Robot API DIRECTA V5 "Auto-Healing" escuchando en ${PORT}`);
+    console.log(`Robot API DIRECTA V6 (Refactor Recursivo) escuchando en ${PORT}`);
     initBrowser();
 });
