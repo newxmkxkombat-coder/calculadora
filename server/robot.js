@@ -41,6 +41,17 @@ app.post('/api/scrape-passengers', async (req, res) => {
 
         const page = await browser.newPage();
 
+        // Optimización: Interceptar y bloquear recursos innecesarios
+        await page.setRequestInterception(true);
+        page.on('request', (req) => {
+            const blockedTypes = ['image', 'stylesheet', 'font', 'media'];
+            if (blockedTypes.includes(req.resourceType())) {
+                req.abort();
+            } else {
+                req.continue();
+            }
+        });
+
         // 1. Ir al Login
         console.log('Navegando a login...');
         await page.goto(TARGET_URL, { waitUntil: 'load', timeout: 60000 });
