@@ -34,11 +34,36 @@ const initBrowser = async () => {
         globalPage = await globalBrowser.newPage();
         await globalPage.setViewport({ width: 1366, height: 768 });
 
-        // Bloqueo de recursos para velocidad
+        // Bloqueo de recursos para velocidad + MODO ESPÍA (Ingeniería Inversa)
         await globalPage.setRequestInterception(true);
         globalPage.on('request', (req) => {
-            if (['image', 'stylesheet', 'font', 'media'].includes(req.resourceType())) req.abort();
+            const type = req.resourceType();
+
+            // Espiar peticiones de datos (AJAX/Fetch)
+            if (['xhr', 'fetch', 'script'].includes(type)) {
+                // Solo nos interesan las que parezcan datos de móviles o actualizaciones
+                if (req.url().includes('json') || req.url().includes('data') || req.url().includes('get') || req.url().includes('posicion')) {
+                    console.log('>> 🕵️ SPIA DETECTÓ DATA: ', req.url());
+                    console.log('   -> Método:', req.method());
+                }
+            }
+
+            if (['image', 'stylesheet', 'font', 'media'].includes(type)) req.abort();
             else req.continue();
+        });
+
+        // Espiar respuestas también (para ver si es JSON)
+        globalPage.on('response', async (resp) => {
+            try {
+                const type = resp.request().resourceType();
+                if (['xhr', 'fetch'].includes(type)) {
+                    const url = resp.url();
+                    // Si parece importante, chequear headers
+                    if (url.includes('seguimiento') || url.includes('ajax')) {
+                        console.log('<< 🕵️ SPIA RECIBIÓ RESPUESTA:', url, 'Status:', resp.status());
+                    }
+                }
+            } catch (e) { }
         });
 
         console.log('Navegador listo.');
