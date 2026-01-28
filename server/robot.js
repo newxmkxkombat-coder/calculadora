@@ -94,7 +94,21 @@ const ensureLoggedIn = async (page, username, password) => {
         console.log('Sesión no detectada o expirada (Detectado: ' + (sessionExpired ? 'Mensaje Expirado' : 'Login/Otro') + '). Iniciando login...');
 
         // Ir al login
-        await page.goto(TARGET_URL, { waitUntil: 'networkidle2', timeout: 45000 });
+        try {
+            await page.goto(TARGET_URL, { waitUntil: 'networkidle2', timeout: 45000 });
+        } catch (navError) {
+            console.error("Error navegando al login:", navError.message);
+
+            if (navError.message.includes('ERR_TOO_MANY_REDIRECTS')) {
+                console.log("♻️ Detectado bucle de redirección. Limpiando cookies y reintentando...");
+                const client = await page.createCDPSession();
+                await client.send('Network.clearBrowserCookies');
+                await client.send('Network.clearBrowserCache');
+                await page.goto(TARGET_URL, { waitUntil: 'networkidle2', timeout: 45000 });
+            } else {
+                throw navError;
+            }
+        }
 
         // VERIFICACIÓN CRÍTICA: ¿Nos redirigió solos?
         // A veces el servidor recuerda la cookie y nos manda directo adentro.
