@@ -1,0 +1,5 @@
+{
+  "name": "Calculadora de Ganancias para Conductor",
+  "description": "Una aplicación web para que los conductores de autobús calculen sus ganancias diarias, gastos y el monto a liquidar al propietario del vehículo, basado en pasajeros, tarifas y comisiones.",
+  "requestFramePermissions": []
+}
