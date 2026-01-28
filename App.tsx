@@ -1925,7 +1925,7 @@ const App: React.FC = () => {
                   className="flex items-center gap-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 px-3 py-1 rounded-lg text-indigo-300 font-bold transition-all hover:scale-105 active:scale-95 shadow-[0_0_10px_rgba(99,102,241,0.2)] ml-1"
                 >
                   <RobotIcon />
-                  <span>{gpsStatus === 'loading' ? 'Sync...' : 'Ver Pasajeros'}</span>
+                  <span>{gpsStatus === 'loading' ? 'Sync...' : 'Pasajeros'}</span>
                 </button>
                 <div className="hidden sm:flex items-center gap-1.5 opacity-80">
                   <span>{new Date().toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
