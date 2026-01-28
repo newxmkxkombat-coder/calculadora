@@ -80,9 +80,15 @@ const ensureLoggedIn = async (page, username, password) => {
         let content = await page.content();
 
         // Detección de sesión caída o expirada
-        // "Ha finalizado la sesión" es el texto clave que reportó el error
-        let isLoginPage = content.includes('input type="text"') && content.includes('input type="password"');
-        const sessionExpired = content.includes('finalizado la sesión') || content.includes('finalizado la sesion') || content.includes('Session timeout');
+        // Mejorada: Busca texto visible de login además de inputs
+        const pageText = (await page.evaluate(() => document.body.innerText)).toLowerCase();
+        let isLoginPage = content.includes('input type="text"') ||
+            pageText.includes('inicia sesión') ||
+            (pageText.includes('usuario') && pageText.includes('contraseña'));
+
+        const sessionExpired = content.includes('finalizado la sesión') ||
+            content.includes('finalizado la sesion') ||
+            content.includes('Session timeout');
 
         // Si todo parece estar bien y no estamos en login, retornamos rápido
         if (!isLoginPage && currentUrl.includes('opita') && sessionActive && !sessionExpired) {
@@ -91,7 +97,10 @@ const ensureLoggedIn = async (page, username, password) => {
             return;
         }
 
-        console.log('Sesión no detectada o expirada (Detectado: ' + (sessionExpired ? 'Mensaje Expirado' : 'Login/Otro') + '). Iniciando login...');
+        console.log('Sesión no detectada o expirada (Detectado: ' + (sessionExpired ? 'Mensaje Expirado' : 'Login visible') + '). Iniciando login...');
+
+        // Reset flag de sesión si detectamos login
+        sessionActive = false;
 
         // Ir al login
         try {
@@ -116,9 +125,10 @@ const ensureLoggedIn = async (page, username, password) => {
         await new Promise(r => setTimeout(r, 1500));
         currentUrl = page.url();
         content = await page.content();
+        const freshPageText = (await page.evaluate(() => document.body.innerText)).toLowerCase();
 
         // Detectar si estamos adentro (URL contiene app/seguimiento o NO hay inputs de login)
-        isLoginPage = content.includes('input type="text"') && content.includes('input type="password"');
+        isLoginPage = content.includes('input type="text"') || freshPageText.includes('inicia sesión');
         const isInsideApp = currentUrl.includes('app') || currentUrl.includes('seguimiento') || currentUrl.includes('menu');
 
         if (isInsideApp && !isLoginPage) {

@@ -37,6 +37,11 @@ export default defineConfig(({ mode }) => {
         }
       })
     ],
+    server: {
+      proxy: {
+        '/api': 'http://localhost:3001'
+      }
+    },
     base: isProduction ? '/calculadora/' : '/',
     build: {
       outDir: 'dist',

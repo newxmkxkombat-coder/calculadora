@@ -1452,7 +1452,7 @@ const App: React.FC = () => {
   const dragStartRef = useRef({ x: 0, y: 0, initialX: 0, initialY: 0 });
   const focusedElementRef = useRef<HTMLInputElement | null>(null);
 
-  const API_URL = 'https://calculadora-production-fa9d.up.railway.app';
+  const API_URL = import.meta.env.DEV ? '' : 'https://calculadora-production-fa9d.up.railway.app';
 
   useEffect(() => {
     localStorage.setItem('passengerDeduction', passengerDeduction);
