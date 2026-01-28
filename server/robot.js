@@ -191,8 +191,10 @@ const ensureLoggedIn = async (page, username, password) => {
 // --- ROUTA PRINCIPAL ---
 app.post('/api/scrape-passengers', async (req, res) => {
     const { username, password } = req.body;
+    const startTotalTime = Date.now();
 
     try {
+        console.log(`[${new Date().toLocaleTimeString()}] Iniciando petición de datos...`);
         const page = await initBrowser();
 
         // 1. Asegurar sesión (Con detección de bloqueo "Finalizado sesión")
@@ -339,8 +341,9 @@ app.post('/api/scrape-passengers', async (req, res) => {
         });
 
         if (vehicles.length > 0) {
-            console.log(`Éxito. ${vehicles.length} móviles encontrados.`);
-            res.json({ success: true, vehicles });
+            const totalTime = Date.now() - startTotalTime;
+            console.log(`✅ Éxito. ${vehicles.length} móviles encontrados. Tiempo Total: ${totalTime / 1000}s`);
+            res.json({ success: true, vehicles, executionTime: totalTime });
         } else {
             const debugInfo = await page.evaluate(() => document.body.innerText.substring(0, 300).replace(/\n/g, ' '));
             throw new Error(`Header 'Total día' no hallado. (Probable sesión caducada o tabla oculta). Texto visible: ${debugInfo}...`);
