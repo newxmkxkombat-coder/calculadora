@@ -140,11 +140,20 @@ const ensureLoggedIn = async (page, username, password) => {
 
         // Si seguimos viendo el form de login, ahí sí esperamos los campos
         try {
-            await page.waitForSelector('input[type="text"]', { visible: true, timeout: 10000 });
-            await page.waitForSelector('input[type="password"]', { visible: true, timeout: 10000 });
+            console.log("Esperando campos de login...");
+            // Aumentar timeout y quitar 'visible: true' estricto por si el bloqueo de CSS afecta
+            // Usar selectores múltiples por si acaso
+            const inputOptions = { timeout: 30000 };
 
-            await page.type('input[type="text"]', username, { delay: 50 });
-            await page.type('input[type="password"]', password, { delay: 50 });
+            const userSelector = 'input[type="text"], input[name*="user"], input[name*="usu"], input[name*="login"]';
+            const passSelector = 'input[type="password"], input[name*="pass"], input[name*="clave"], input[name*="contra"]';
+
+            await page.waitForSelector(userSelector, inputOptions);
+            await page.waitForSelector(passSelector, inputOptions);
+
+            console.log("Campos detectados, escribiendo credenciales...");
+            await page.type(userSelector, username, { delay: 50 });
+            await page.type(passSelector, password, { delay: 50 });
 
             // Buscar botón ingresar (puede variar)
             const loginClicked = await page.evaluate(() => {
