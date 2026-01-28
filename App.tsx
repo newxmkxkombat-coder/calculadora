@@ -1454,7 +1454,6 @@ const RobotModal: React.FC<{ isOpen: boolean; onClose: () => void; onSelectPasse
             </div>
             <div className="text-center">
               <h4 className="text-lg font-bold text-white mb-1">Cargando Datos...</h4>
-              <p className="text-sm text-slate-400 mb-2">Conectando a gps3regisdataweb.com</p>
               <span className="inline-block bg-slate-700 text-slate-200 px-3 py-1 rounded-full text-sm font-mono font-bold">
                 {formatTime(elapsedTime)}
               </span>
