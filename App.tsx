@@ -1302,6 +1302,20 @@ const LiveStatusBar: React.FC<{ status: 'idle' | 'loading' | 'success' | 'error'
 };
 
 const RobotModal: React.FC<{ isOpen: boolean; onClose: () => void; vehicles: Array<{ identifier: string, pasajeros: string }>; status: string; deduction: string; onDeductionChange: (val: string) => void; onSelectPassengers: (total: string) => void }> = ({ isOpen, onClose, vehicles, status, deduction, onDeductionChange, onSelectPassengers }) => {
+  const [timer, setTimer] = useState(0);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isOpen && status === 'loading') {
+      setTimer(0);
+      interval = setInterval(() => {
+        setTimer((prev) => prev + 1);
+      }, 100); // 100ms for smooth 0.1s updates or just 1000ms for seconds? User asked for "Timer". I'll do seconds with decimals or just seconds. Let's do seconds. 
+      // Actually user said "ver un timer correr" (see a timer run).
+    }
+    return () => clearInterval(interval);
+  }, [isOpen, status]);
+
   if (!isOpen) return null;
 
   const handleVehicleClick = (vehiclePassengers: string) => {
@@ -1361,6 +1375,7 @@ const RobotModal: React.FC<{ isOpen: boolean; onClose: () => void; vehicles: Arr
             </div>
             <div className="text-center">
               <h4 className="text-lg font-bold text-white mb-1">Cargando Datos...</h4>
+              <p className="text-sm font-mono text-indigo-300">{timer} s</p>
             </div>
           </div>
         ) : (
@@ -1491,11 +1506,7 @@ const App: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => {
-    fetchGpsData(); // Initial fetch
-    const interval = setInterval(fetchGpsData, 45000); // Poll every 45 seconds
-    return () => clearInterval(interval);
-  }, [fetchGpsData]);
+
 
   useEffect(() => {
     saveHistoryToLocalStorage(history);
@@ -1899,7 +1910,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-900 text-white p-4 sm:p-6 lg:p-8 pt-16 sm:pt-20" onClick={handleBackgroundClick}>
-      <LiveStatusBar status={gpsStatus} vehicles={gpsVehicles} onClick={() => setIsRobotModalOpen(true)} />
+      <LiveStatusBar status={gpsStatus} vehicles={gpsVehicles} onClick={() => { setIsRobotModalOpen(true); fetchGpsData(); }} />
       <Toast
         message={toastMessage}
         show={!!toastMessage}
@@ -1921,7 +1932,7 @@ const App: React.FC = () => {
                   <span>Calendario</span>
                 </a>
                 <button
-                  onClick={() => setIsRobotModalOpen(true)}
+                  onClick={() => { setIsRobotModalOpen(true); fetchGpsData(); }}
                   className="flex items-center gap-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 px-3 py-1 rounded-lg text-indigo-300 font-bold transition-all hover:scale-105 active:scale-95 shadow-[0_0_10px_rgba(99,102,241,0.2)] ml-1"
                 >
                   <RobotIcon />

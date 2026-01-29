@@ -148,8 +148,20 @@ const ensureLoggedIn = async (page, username, password) => {
             const userSelector = 'input[type="text"], input[name*="user"], input[name*="usu"], input[name*="login"]';
             const passSelector = 'input[type="password"], input[name*="pass"], input[name*="clave"], input[name*="contra"]';
 
-            await page.waitForSelector(userSelector, inputOptions);
-            await page.waitForSelector(passSelector, inputOptions);
+            // BEFORE waiting, check one more time if we are already inside to avoid 30s timeout
+            const quickCheck = await page.evaluate(() => {
+                const text = document.body.innerText.toLowerCase();
+                return text.includes('menú') || text.includes('cerrar sesión') || text.includes('vehículos') || window.location.href.includes('seguimiento');
+            });
+
+            if (quickCheck) {
+                console.log("Detectado estado 'Logueado' antes de esperar inputs. Saltando login.");
+                sessionActive = true;
+                return;
+            }
+
+            await page.waitForSelector(userSelector, { ...inputOptions, timeout: 5000 }); // Reducido para detectar fallo rápido y reintentar o asumir login
+            await page.waitForSelector(passSelector, { ...inputOptions, timeout: 5000 });
 
             console.log("Campos detectados, escribiendo credenciales...");
             await page.type(userSelector, username, { delay: 50 });
@@ -170,8 +182,13 @@ const ensureLoggedIn = async (page, username, password) => {
             console.log('Login manual exitoso.');
         } catch (e) {
             console.log("Advertencia en Login Manual: " + e.message);
-            // Fallback final: Si por alguna razón dio timeout pero SÍ estamos dentro
-            if (page.url().includes('opita') && !page.url().includes('index.jsp')) {
+
+            // Nueva Validación de Emergencia:
+            // Si el timeout falló, es posible que YA estemos logueados pero la detección inicial falló
+            // O que la página cargó pero los IDs cambiaron.
+            const forcedCheck = await page.evaluate(() => document.body.innerText.length > 500); // Si hay contenido sustancial
+
+            if (forcedCheck || (page.url().includes('opita') && !page.url().includes('index.jsp'))) {
                 console.log("Recuperación: El sistema está dentro a pesar del error.");
                 sessionActive = true;
                 return;
