@@ -1310,8 +1310,7 @@ const RobotModal: React.FC<{ isOpen: boolean; onClose: () => void; vehicles: Arr
       setTimer(0);
       interval = setInterval(() => {
         setTimer((prev) => prev + 1);
-      }, 100); // 100ms for smooth 0.1s updates or just 1000ms for seconds? User asked for "Timer". I'll do seconds with decimals or just seconds. Let's do seconds. 
-      // Actually user said "ver un timer correr" (see a timer run).
+      }, 1000);
     }
     return () => clearInterval(interval);
   }, [isOpen, status]);
@@ -1383,6 +1382,9 @@ const RobotModal: React.FC<{ isOpen: boolean; onClose: () => void; vehicles: Arr
             {vehicles.length > 0 ? (
               <>
                 <p className="text-xs text-center text-indigo-300 mb-2 font-medium animate-pulse">👇 Toca un vehículo para cargar los pasajeros</p>
+                <div className="flex justify-between items-center px-2 mb-2">
+                  <p className="text-[10px] text-slate-500 font-mono">Tiempo transcurrido: <span className="text-indigo-400 font-bold">{timer} seg</span></p>
+                </div>
                 <div className="overflow-y-auto flex-grow pr-1 space-y-3 custom-scrollbar">
                   {vehicles.map((v, i) => (
                     <button key={i} onClick={() => handleVehicleClick(v.pasajeros)} className="w-full bg-slate-900/50 border border-slate-700 hover:border-indigo-500 hover:bg-indigo-500/10 p-4 rounded-xl flex items-center justify-between group transition-all duration-200">
