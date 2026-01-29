@@ -1301,7 +1301,7 @@ const LiveStatusBar: React.FC<{ status: 'idle' | 'loading' | 'success' | 'error'
   );
 };
 
-const RobotModal: React.FC<{ isOpen: boolean; onClose: () => void; vehicles: Array<{ identifier: string, pasajeros: string }>; status: string; deduction: string; onDeductionChange: (val: string) => void; onSelectPassengers: (total: string) => void }> = ({ isOpen, onClose, vehicles, status, deduction, onDeductionChange, onSelectPassengers }) => {
+const RobotModal: React.FC<{ isOpen: boolean; onClose: () => void; vehicles: Array<{ identifier: string, pasajeros: string }>; status: string; deduction: string; onDeductionChange: (val: string) => void; onSelectPassengers: (total: string) => void; onUpdate: () => void }> = ({ isOpen, onClose, vehicles, status, deduction, onDeductionChange, onSelectPassengers, onUpdate }) => {
   const [timer, setTimer] = useState(0);
 
   useEffect(() => {
@@ -1352,6 +1352,7 @@ const RobotModal: React.FC<{ isOpen: boolean; onClose: () => void; vehicles: Arr
               </p>
             </div>
           </div>
+          <button onClick={onUpdate} className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold py-1.5 px-3 rounded-lg shadow transition-transform active:scale-95 mx-3">Actualizar</button>
           <button onClick={onClose} className="p-2.5 rounded-full bg-slate-700/50 hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-all active:scale-95 border border-transparent hover:border-red-500/30 shadow-lg" title="Cerrar"><XIcon /></button>
         </div>
 
@@ -1382,9 +1383,7 @@ const RobotModal: React.FC<{ isOpen: boolean; onClose: () => void; vehicles: Arr
             {vehicles.length > 0 ? (
               <>
                 <p className="text-xs text-center text-indigo-300 mb-2 font-medium animate-pulse">👇 Toca un vehículo para cargar los pasajeros</p>
-                <div className="flex justify-between items-center px-2 mb-2">
-                  <p className="text-[10px] text-slate-500 font-mono">Tiempo transcurrido: <span className="text-indigo-400 font-bold">{timer} seg</span></p>
-                </div>
+
                 <div className="overflow-y-auto flex-grow pr-1 space-y-3 custom-scrollbar">
                   {vehicles.map((v, i) => (
                     <button key={i} onClick={() => handleVehicleClick(v.pasajeros)} className="w-full bg-slate-900/50 border border-slate-700 hover:border-indigo-500 hover:bg-indigo-500/10 p-4 rounded-xl flex items-center justify-between group transition-all duration-200">
@@ -1405,6 +1404,9 @@ const RobotModal: React.FC<{ isOpen: boolean; onClose: () => void; vehicles: Arr
                       </div>
                     </button>
                   ))}
+                </div>
+                <div className="mt-2 pt-2 border-t border-slate-700/50 text-center">
+                  <p className="text-[10px] text-slate-500 font-mono">Tiempo transcurrido: <span className="text-indigo-400 font-bold">{timer} seg</span></p>
                 </div>
               </>
             ) : (
@@ -2198,6 +2200,7 @@ const App: React.FC = () => {
           status={gpsStatus}
           deduction={passengerDeduction}
           onDeductionChange={setPassengerDeduction}
+          onUpdate={fetchGpsData}
           onSelectPassengers={(passengers) => {
             setFormData(prev => ({ ...prev, numPassengers: formatNumberWithDots(passengers) }));
             setIsRobotModalOpen(false);
