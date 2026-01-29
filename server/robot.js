@@ -223,7 +223,7 @@ app.post('/api/scrape-passengers', async (req, res) => {
         let dataRefreshed = false;
 
         // A) MODO TURBO (V4.1): Intentar refresco (CLICK en buscar) solo si ya estamos en la URL correcta
-        if (currentUrl === REPORT_URL_DIRECT) {
+        if (currentUrl.includes('infogps.jsp')) {
             console.log('⚡ MODO TURBO: Ya estamos en el reporte. Intentando actualización rápida...');
             try {
                 // Clickear botón Buscar/Lupa sin recargar página
