@@ -77,7 +77,13 @@ const ensureLoggedIn = async (page, username, password) => {
     try {
         // Verificar dónde estamos
         let currentUrl = page.url();
-        let content = await page.content();
+        let content = '';
+        try {
+            content = await page.content();
+        } catch (e) {
+            console.log("⚠️ Detectado conflicto de Frame (Detached). Forzando reinicio de sesión...", e.message);
+            sessionActive = false;
+        }
 
         // Detección de sesión caída o expirada
         // Mejorada: Busca texto visible de login además de inputs
