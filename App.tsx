@@ -1471,8 +1471,8 @@ const App: React.FC = () => {
   const dragStartRef = useRef({ x: 0, y: 0, initialX: 0, initialY: 0 });
   const focusedElementRef = useRef<HTMLInputElement | null>(null);
 
-  // Forzar conexión a Railway (Robot en la nube) para mayor estabilidad y evitar errores locales
-  const API_URL = 'https://calculadora-production-fa9d.up.railway.app';
+  // Forzar conexión a Render (Robot en la nube) para mayor estabilidad
+  const API_URL = 'https://exemplary-joy.onrender.com';
 
   useEffect(() => {
     localStorage.setItem('passengerDeduction', passengerDeduction);
