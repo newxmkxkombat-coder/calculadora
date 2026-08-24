@@ -74,6 +74,18 @@ const MOTIVATIONAL_PHRASES = [
 ];
 
 // --- HELPER FUNCTIONS ---
+const stripHtml = (htmlString: string): string => {
+  if (!htmlString) return '';
+  return htmlString.replace(/<[^>]*>/g, '');
+};
+
+const getLocalDateString = (date = new Date()): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('es-CO', {
     style: 'currency',
@@ -221,6 +233,26 @@ const loadMaintenanceFromLocalStorage = (): MaintenanceRecord[] => {
     return savedRecords ? JSON.parse(savedRecords) : [];
   } catch (error) {
     console.error("Error loading maintenance records from localStorage:", error);
+    return [];
+  }
+};
+
+const CUSTOM_TYPES_STORAGE_KEY = 'driverAppCustomMaintenanceTypes';
+
+const saveCustomTypesToLocalStorage = (types: string[]) => {
+  try {
+    localStorage.setItem(CUSTOM_TYPES_STORAGE_KEY, JSON.stringify(types));
+  } catch (error) {
+    console.error("Error saving custom maintenance types to localStorage:", error);
+  }
+};
+
+const loadCustomTypesFromLocalStorage = (): string[] => {
+  try {
+    const savedTypes = localStorage.getItem(CUSTOM_TYPES_STORAGE_KEY);
+    return savedTypes ? JSON.parse(savedTypes) : [];
+  } catch (error) {
+    console.error("Error loading custom maintenance types from localStorage:", error);
     return [];
   }
 };
@@ -394,6 +426,12 @@ const SearchIcon: React.FC = () => (
 const RobotIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2v-5a2 2 0 00-2-2H5a2 2 0 00-2 2v5a2 2 0 002 2zM10 5a2 2 0 012-2h0a2 2 0 012 2v2h-4V5z" />
+  </svg>
+);
+
+const CopyIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
   </svg>
 );
 
@@ -991,24 +1029,49 @@ const DocumentModal: React.FC<{ doc: ManagedDocument | null; onSave: (doc: Manag
 };
 
 // --- MAINTENANCE MANAGER COMPONENTS ---
-const MaintenanceModal: React.FC<{ record: MaintenanceRecord | null; onSave: (record: MaintenanceRecord) => void; onClose: () => void; }> = ({ record, onSave, onClose }) => {
+const MaintenanceModal: React.FC<{ 
+  record: MaintenanceRecord | null; 
+  onSave: (record: MaintenanceRecord) => void; 
+  onClose: () => void; 
+  customTypes: string[];
+  setCustomTypes: React.Dispatch<React.SetStateAction<string[]>>;
+}> = ({ record, onSave, onClose, customTypes, setCustomTypes }) => {
   const [formData, setFormData] = useState<Omit<MaintenanceRecord, 'id'>>({
     type: record?.type || 'Otro',
-    date: record?.date || new Date().toISOString().split('T')[0],
+    date: record?.date || getLocalDateString(),
     mileage: record?.mileage || '',
     nextChangeMileage: record?.nextChangeMileage || '',
     filterChangeMileage: record?.filterChangeMileage || '',
     notes: record?.notes || '',
   });
   const [customType, setCustomType] = useState('');
+  const editorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const commonTypes = ["Cambio de Aceite", "Frenos", "Llantas", "Revisión General"];
-    if (record && !commonTypes.includes(record.type)) {
+    if (editorRef.current) {
+      editorRef.current.innerHTML = record?.notes || '';
+    }
+  }, [record]);
+
+  const handleEditorChange = () => {
+    if (editorRef.current) {
+      setFormData(prev => ({ ...prev, notes: editorRef.current!.innerHTML }));
+    }
+  };
+
+  const applyStyle = (command: string, value: string = '') => {
+    document.execCommand(command, false, value);
+    handleEditorChange();
+  };
+
+  useEffect(() => {
+    const defaultTypes = ["Cambio de Aceite", "Frenos", "Llantas", "Revisión General", "Rodamiento"];
+    const allValidTypes = [...defaultTypes, ...customTypes];
+    if (record && !allValidTypes.includes(record.type)) {
       setFormData(prev => ({ ...prev, type: 'Otro' }));
       setCustomType(record.type);
     }
-  }, [record]);
+  }, [record, customTypes]);
 
   useEffect(() => {
     if (formData.type === 'Cambio de Aceite' && formData.mileage) {
@@ -1045,6 +1108,30 @@ const MaintenanceModal: React.FC<{ record: MaintenanceRecord | null; onSave: (re
     }
   };
 
+  const handleAddCustomType = () => {
+    const newType = customType.trim();
+    if (!newType) return;
+
+    const defaultTypes = ["Cambio de Aceite", "Frenos", "Llantas", "Revisión General", "Rodamiento", "Otro"];
+    if (defaultTypes.includes(newType) || customTypes.includes(newType)) {
+      alert("Este tipo de mantenimiento ya existe en la lista.");
+      return;
+    }
+
+    setCustomTypes(prev => [...prev, newType]);
+    setFormData(prev => ({ ...prev, type: newType }));
+    setCustomType('');
+  };
+
+  const handleRemoveCustomType = (typeName: string) => {
+    if (window.confirm(`¿Estás seguro de que quieres quitar "${typeName}" de tu lista de mantenimientos?`)) {
+      setCustomTypes(prev => prev.filter(t => t !== typeName));
+      if (formData.type === typeName) {
+        setFormData(prev => ({ ...prev, type: 'Revisión General' }));
+      }
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const finalType = formData.type === 'Otro' ? customType : formData.type;
@@ -1076,13 +1163,55 @@ const MaintenanceModal: React.FC<{ record: MaintenanceRecord | null; onSave: (re
               <option value="Frenos">Frenos</option>
               <option value="Llantas">Llantas</option>
               <option value="Revisión General">Revisión General</option>
+              <option value="Rodamiento">Rodamiento</option>
+              {customTypes.map(t => (
+                <option key={t} value={t}>{t}</option>
+              ))}
               <option value="Otro">Otro...</option>
             </select>
           </div>
           {formData.type === 'Otro' && (
-            <div>
-              <label className="text-sm font-medium text-slate-400 block mb-1">Especifica el tipo</label>
-              <input type="text" value={customType} onChange={e => setCustomType(e.target.value)} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-white" required />
+            <div className="space-y-3 p-3 bg-slate-900/40 border border-slate-700/60 rounded-xl">
+              <div>
+                <label className="text-sm font-medium text-slate-400 block mb-1">Nombre del nuevo mantenimiento</label>
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    value={customType} 
+                    onChange={e => setCustomType(e.target.value)} 
+                    className="flex-grow bg-slate-700 border border-slate-600 rounded-lg p-2 text-white text-sm" 
+                    placeholder="Ej: Sincronización"
+                  />
+                  <button 
+                    type="button" 
+                    onClick={handleAddCustomType}
+                    className="px-3 py-2 bg-teal-600 hover:bg-teal-500 active:bg-teal-700 text-white font-semibold rounded-lg text-sm transition-colors cursor-pointer"
+                  >
+                    Agregar
+                  </button>
+                </div>
+              </div>
+              
+              {customTypes.length > 0 && (
+                <div>
+                  <label className="text-xs font-semibold text-slate-500 block mb-1 uppercase tracking-wider">Mantenimientos Creados</label>
+                  <ul className="space-y-1 max-h-[120px] overflow-y-auto pr-1">
+                    {customTypes.map(t => (
+                      <li key={t} className="flex justify-between items-center bg-slate-800 border border-slate-700/50 p-2 rounded-lg text-sm text-slate-200">
+                        <span>{t}</span>
+                        <button 
+                          type="button" 
+                          onClick={() => handleRemoveCustomType(t)}
+                          className="text-red-400 hover:text-red-300 p-1 rounded hover:bg-slate-700 transition-colors cursor-pointer"
+                          title="Eliminar de la lista"
+                        >
+                          <TrashIcon />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           )}
 
@@ -1114,7 +1243,88 @@ const MaintenanceModal: React.FC<{ record: MaintenanceRecord | null; onSave: (re
           )}
           <div>
             <label className="text-sm font-medium text-slate-400 block mb-1">Notas</label>
-            <textarea name="notes" value={formData.notes} onChange={handleChange} rows={2} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-white" placeholder="Añade una nota..."></textarea>
+            <style>{`
+              .rich-editor[contenteditable]:empty:before {
+                content: attr(placeholder);
+                color: #64748b;
+                pointer-events: none;
+                display: block;
+              }
+            `}</style>
+            
+            {/* Barra de herramientas de formato */}
+            <div className="flex flex-wrap items-center gap-1 bg-slate-900/80 border border-slate-600 border-b-0 rounded-t-lg p-2">
+              <button
+                type="button"
+                onClick={() => applyStyle('bold')}
+                className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-slate-100 font-bold rounded text-xs border border-slate-600 cursor-pointer"
+                title="Negrita"
+              >
+                B
+              </button>
+              <button
+                type="button"
+                onClick={() => applyStyle('underline')}
+                className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-slate-100 underline rounded text-xs border border-slate-600 cursor-pointer"
+                title="Subrayado"
+              >
+                S
+              </button>
+              <button
+                type="button"
+                onClick={() => applyStyle('italic')}
+                className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-slate-100 italic rounded text-xs border border-slate-600 cursor-pointer"
+                title="Cursiva"
+              >
+                I
+              </button>
+              
+              <div className="h-4 w-px bg-slate-600 mx-1"></div>
+              
+              {/* Colores */}
+              <span className="text-[10px] text-slate-400 uppercase tracking-wider mr-1">Color:</span>
+              <button
+                type="button"
+                onClick={() => applyStyle('foreColor', '#ffffff')}
+                className="w-4 h-4 rounded-full border border-slate-500 bg-white cursor-pointer"
+                title="Blanco"
+              />
+              <button
+                type="button"
+                onClick={() => applyStyle('foreColor', '#2dd4bf')}
+                className="w-4 h-4 rounded-full border border-slate-500 bg-teal-400 cursor-pointer"
+                title="Celeste"
+              />
+              <button
+                type="button"
+                onClick={() => applyStyle('foreColor', '#f59e0b')}
+                className="w-4 h-4 rounded-full border border-slate-500 bg-amber-500 cursor-pointer"
+                title="Amarillo"
+              />
+              <button
+                type="button"
+                onClick={() => applyStyle('foreColor', '#ef4444')}
+                className="w-4 h-4 rounded-full border border-slate-500 bg-red-500 cursor-pointer"
+                title="Rojo"
+              />
+              <button
+                type="button"
+                onClick={() => applyStyle('foreColor', '#10b981')}
+                className="w-4 h-4 rounded-full border border-slate-500 bg-emerald-500 cursor-pointer"
+                title="Verde"
+              />
+            </div>
+            
+            {/* Editor editable */}
+            <div
+              ref={editorRef}
+              contentEditable
+              onInput={handleEditorChange}
+              onBlur={handleEditorChange}
+              className="rich-editor w-full bg-slate-700 border border-slate-600 rounded-b-lg p-3 text-white min-h-[150px] max-h-[300px] focus:outline-none focus:border-teal-400 overflow-y-auto text-sm"
+              placeholder="Añade una nota con estilos aquí..."
+              style={{ whiteSpace: 'pre-wrap' }}
+            />
           </div>
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
             <button type="button" onClick={onClose} className="py-2 px-4 bg-slate-600 hover:bg-slate-500 text-white rounded-lg font-semibold">Cancelar</button>
@@ -1126,7 +1336,12 @@ const MaintenanceModal: React.FC<{ record: MaintenanceRecord | null; onSave: (re
   );
 };
 
-const VehicleMaintenanceManager: React.FC<{ records: MaintenanceRecord[]; setRecords: React.Dispatch<React.SetStateAction<MaintenanceRecord[]>> }> = ({ records, setRecords }) => {
+const VehicleMaintenanceManager: React.FC<{ 
+  records: MaintenanceRecord[]; 
+  setRecords: React.Dispatch<React.SetStateAction<MaintenanceRecord[]>>;
+  customTypes: string[];
+  setCustomTypes: React.Dispatch<React.SetStateAction<string[]>>;
+}> = ({ records, setRecords, customTypes, setCustomTypes }) => {
   const [isSectionOpen, setIsSectionOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<MaintenanceRecord | null>(null);
@@ -1139,6 +1354,54 @@ const VehicleMaintenanceManager: React.FC<{ records: MaintenanceRecord[]; setRec
     return localDate.toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   }, []);
 
+  const handleCopyToClipboard = (record: MaintenanceRecord) => {
+    const formattedDate = formatDateForDisplay(record.date);
+    
+    let details = '';
+    if (record.mileage) {
+      details += `\n*Kilometraje:* ${record.mileage} km`;
+    }
+    if (record.type === 'Cambio de Aceite') {
+      if (record.filterChangeMileage) {
+        details += `\n*Cambio Filtros:* ${record.filterChangeMileage} km`;
+      }
+      if (record.nextChangeMileage) {
+        details += `\n*Próximo Cambio:* ${record.nextChangeMileage} km`;
+      }
+    }
+    
+    let notesText = '';
+    if (record.notes) {
+      // Reemplazamos los saltos de línea HTML para que se vean bien en WhatsApp
+      let temp = record.notes;
+      temp = temp.replace(/<br\s*\/?>/gi, '\n');
+      temp = temp.replace(/<\/div>/gi, '\n');
+      temp = temp.replace(/<div[^>]*>/gi, '');
+      temp = temp.replace(/<\/p>/gi, '\n\n');
+      temp = temp.replace(/<p[^>]*>/gi, '');
+      temp = temp.replace(/<li[^>]*>/gi, '• ');
+      temp = temp.replace(/<\/li>/gi, '\n');
+      temp = temp.replace(/<[^>]*>/g, ''); // Quitamos cualquier otra etiqueta HTML restante
+      
+      // Decodificamos entidades HTML como &nbsp; o &amp;
+      const doc = new DOMParser().parseFromString(temp, 'text/html');
+      notesText = doc.documentElement.textContent || temp;
+    }
+    
+    // Armamos el texto plano tal y como lo pidió el usuario
+    const textToCopy = `${formattedDate}
+*Mantenimiento:* ${record.type}${details}${notesText ? `\n\n*Nota:*\n${notesText.trim()}` : ''}`;
+
+    navigator.clipboard.writeText(textToCopy)
+      .then(() => {
+        alert("¡Mantenimiento copiado al portapapeles! Ya puedes pegarlo en WhatsApp.");
+      })
+      .catch(err => {
+        console.error("Error al copiar: ", err);
+        alert("No se pudo copiar automáticamente. Por favor, inténtalo de nuevo.");
+      });
+  };
+
   const filteredRecords = useMemo(() => {
     const lowercasedFilter = searchTerm.toLowerCase();
 
@@ -1149,7 +1412,7 @@ const VehicleMaintenanceManager: React.FC<{ records: MaintenanceRecord[]; setRec
 
       return (
         record.type.toLowerCase().includes(lowercasedFilter) ||
-        (record.notes && record.notes.toLowerCase().includes(lowercasedFilter)) ||
+        (record.notes && stripHtml(record.notes).toLowerCase().includes(lowercasedFilter)) ||
         (record.mileage && record.mileage.includes(searchTerm)) ||
         (record.filterChangeMileage && record.filterChangeMileage.includes(searchTerm)) ||
         (record.nextChangeMileage && record.nextChangeMileage.includes(searchTerm)) ||
@@ -1238,7 +1501,7 @@ const VehicleMaintenanceManager: React.FC<{ records: MaintenanceRecord[]; setRec
                 ) : (
                   filteredRecords.map(record => (
                     <div key={record.id} className="p-3 rounded-lg flex items-start justify-between gap-4 border border-slate-700 bg-slate-800/50">
-                      <div className="flex-grow">
+                      <div className="flex-grow min-w-0">
                         <p className="font-bold text-white">{record.type}</p>
                         <p className="text-sm text-slate-400">{formatDateForDisplay(record.date)}</p>
 
@@ -1250,11 +1513,17 @@ const VehicleMaintenanceManager: React.FC<{ records: MaintenanceRecord[]; setRec
                           </div>
                         )}
 
-                        {record.notes && <p className="text-xs text-slate-400 mt-2 pt-2 border-t border-slate-700 italic">Nota: {record.notes}</p>}
+                        {record.notes && (
+                          <div className="text-sm text-slate-300 mt-2 pt-2 border-t border-slate-700 leading-relaxed break-all">
+                            <span className="font-semibold text-slate-450 text-slate-400">Nota: </span>
+                            <span dangerouslySetInnerHTML={{ __html: record.notes }} />
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        <button onClick={() => handleEdit(record)} className="p-2 rounded-full bg-slate-700 hover:bg-cyan-600 text-slate-300 hover:text-white transition-colors duration-200" title="Editar"><EditIcon /></button>
-                        <button onClick={() => handleDelete(record.id)} className="p-2 rounded-full bg-slate-700 hover:bg-red-600 text-slate-300 hover:text-white transition-colors duration-200" title="Eliminar"><TrashIcon /></button>
+                        <button onClick={() => handleCopyToClipboard(record)} className="p-2 rounded-full bg-slate-700 hover:bg-emerald-600 text-slate-300 hover:text-white transition-colors duration-200 cursor-pointer" title="Copiar para WhatsApp"><CopyIcon /></button>
+                        <button onClick={() => handleEdit(record)} className="p-2 rounded-full bg-slate-700 hover:bg-cyan-600 text-slate-300 hover:text-white transition-colors duration-200 cursor-pointer" title="Editar"><EditIcon /></button>
+                        <button onClick={() => handleDelete(record.id)} className="p-2 rounded-full bg-slate-700 hover:bg-red-600 text-slate-300 hover:text-white transition-colors duration-200 cursor-pointer" title="Eliminar"><TrashIcon /></button>
                       </div>
                     </div>
                   ))
@@ -1264,7 +1533,15 @@ const VehicleMaintenanceManager: React.FC<{ records: MaintenanceRecord[]; setRec
           </div>
         </div>
       </section>
-      {isModalOpen && <MaintenanceModal record={editingRecord} onSave={handleSave} onClose={() => setIsModalOpen(false)} />}
+      {isModalOpen && (
+        <MaintenanceModal 
+          record={editingRecord} 
+          onSave={handleSave} 
+          onClose={() => setIsModalOpen(false)} 
+          customTypes={customTypes}
+          setCustomTypes={setCustomTypes}
+        />
+      )}
     </>
   );
 };
@@ -1428,6 +1705,11 @@ const App: React.FC = () => {
   const [documents, setDocuments] = useState<ManagedDocument[]>(() => loadDocumentsFromLocalStorage());
   const [maintenanceRecords, setMaintenanceRecords] = useState<MaintenanceRecord[]>(() => loadMaintenanceFromLocalStorage());
   const [passengerGoal, setPassengerGoal] = useState<number>(() => loadConfigFromLocalStorage().passengerGoal);
+  const [customMaintenanceTypes, setCustomMaintenanceTypes] = useState<string[]>(() => loadCustomTypesFromLocalStorage());
+
+  useEffect(() => {
+    saveCustomTypesToLocalStorage(customMaintenanceTypes);
+  }, [customMaintenanceTypes]);
 
   const getInitialFormData = useCallback((): FormData => {
     const config = loadConfigFromLocalStorage();
@@ -1780,6 +2062,30 @@ const App: React.FC = () => {
     }
   };
 
+  const handleCopyEntry = (entry: HistoryEntry) => {
+    const pasajeros = parseFormattedNumber(entry.formData.numPassengers);
+    const ganancias = formatCurrency(entry.results.myEarnings);
+    const combustible = formatCurrency(Number(parseFormattedNumber(entry.formData.fuelExpenses)));
+    const recaudado = formatCurrency(entry.results.totalDeliveredAmount || 0);
+
+    // Solo la fecha sin la hora
+    const soloFecha = (() => {
+      try {
+        const date = new Date(entry.timestamp);
+        return date.toLocaleDateString('es-CO', { year: 'numeric', month: '2-digit', day: '2-digit' });
+      } catch {
+        return entry.timestamp;
+      }
+    })();
+
+    const texto =
+      `*Liquidación - ${soloFecha}*\n*Pasajeros:* ${pasajeros}\n*Combustible:* ${combustible}\n*Ganancias:* ${ganancias}\n*Recaudado:* ${recaudado}`;
+
+    navigator.clipboard.writeText(texto)
+      .then(() => alert('¡Registro copiado! Ya puedes pegarlo en WhatsApp.'))
+      .catch(() => alert('No se pudo copiar. Intenta de nuevo.'));
+  };
+
   const handleClearAllHistory = () => {
     const isConfirmed = window.confirm(
       "¿Estás seguro de que quieres borrar todo el historial? Esta acción no se puede deshacer."
@@ -2089,15 +2395,20 @@ const App: React.FC = () => {
                           return (
                             <li key={entry.id} className="md:border-b md:border-slate-700 last:md:border-b-0">
                               <div className="md:hidden bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
-                                <button onClick={() => handleToggleExpand(entry.id)} className="w-full p-4 text-left bg-slate-800 hover:bg-teal-500/10 transition-colors duration-200">
-                                  <div className="flex justify-between items-start gap-4">
-                                    <div>
+                                <div className="w-full p-4 text-left bg-slate-800">
+                                  <div className="flex justify-between items-start gap-2">
+                                    <button onClick={() => handleToggleExpand(entry.id)} className="flex-grow text-left hover:opacity-80 transition-opacity">
                                       <p className="font-semibold text-slate-300">{formatTimestamp(entry.timestamp)}</p>
                                       <p className="text-sm text-slate-400">Ruta {entry.formData.route}</p>
+                                    </button>
+                                    <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
+                                      <button onClick={() => handleCopyEntry(entry)} title="Copiar para WhatsApp" className="p-1.5 rounded-full bg-slate-700 hover:bg-emerald-600 text-slate-300 hover:text-white transition-colors duration-200"><CopyIcon /></button>
+                                      <button onClick={() => handleToggleExpand(entry.id)} className="p-1 text-slate-400 hover:text-white transition-colors">
+                                        <ChevronDownIcon className={`transform transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
+                                      </button>
                                     </div>
-                                    <ChevronDownIcon className={`transform transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''} flex-shrink-0 mt-1`} />
                                   </div>
-                                  <div className="mt-3 pt-3 border-t border-slate-700/50 flex justify-between items-end">
+                                  <button onClick={() => handleToggleExpand(entry.id)} className="w-full text-left mt-3 pt-3 border-t border-slate-700/50 flex justify-between items-end hover:opacity-80 transition-opacity">
                                     <div>
                                       <p className="text-xs text-slate-400">Ganancia</p>
                                       <p className="font-bold text-green-400 text-lg leading-tight">{formatCurrency(entry.results.myEarnings)}</p>
@@ -2106,8 +2417,8 @@ const App: React.FC = () => {
                                       <p className="text-xs text-slate-400">Recaudado</p>
                                       <p className="font-semibold text-indigo-400 text-base leading-tight">{formatCurrency(entry.results.totalDeliveredAmount || 0)}</p>
                                     </div>
-                                  </div>
-                                </button>
+                                  </button>
+                                </div>
 
                                 <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isExpanded ? 'max-h-[500px]' : 'max-h-0'}`}>
                                   <div className="px-4 pb-4 border-t border-teal-500/20">
@@ -2137,6 +2448,7 @@ const App: React.FC = () => {
                                       <div className="col-span-2"><p className="text-slate-400">En Empresa</p><p className="font-bold text-blue-400 text-base">{formatCurrency(entry.results.amountToSettle)}</p></div>
                                     </div>
                                     <div className="flex items-center space-x-2 mt-4 justify-start border-t border-slate-700 pt-3">
+                                      <button onClick={() => handleCopyEntry(entry)} title="Copiar para WhatsApp" aria-label="Copiar para WhatsApp" className="p-2 rounded-full bg-slate-700 hover:bg-emerald-600 text-slate-300 hover:text-white transition-colors duration-200"><CopyIcon /></button>
                                       <button onClick={() => handleMoveEntryUp(entry.id)} title="Mover hacia arriba" aria-label="Mover hacia arriba" disabled={index === 0} className="p-2 rounded-full bg-slate-700 hover:bg-sky-600 text-slate-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowUpIcon /></button>
                                       <button onClick={() => handleMoveEntryDown(entry.id)} title="Mover hacia abajo" aria-label="Mover hacia abajo" disabled={index === history.length - 1} className="p-2 rounded-full bg-slate-700 hover:bg-sky-600 text-slate-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowDownIcon /></button>
                                       <button onClick={() => handleLoadEntry(entry.id)} title="Cargar este cálculo" aria-label="Cargar este cálculo" className="p-2 rounded-full bg-slate-700 hover:bg-cyan-600 text-slate-300 hover:text-white transition-colors duration-200"><LoadIcon /></button>
@@ -2172,6 +2484,7 @@ const App: React.FC = () => {
                                 <div className="font-bold text-indigo-400 text-base text-center">{formatCurrency(entry.results.totalDeliveredAmount || 0)}</div>
                                 <div className="font-bold text-blue-400 text-base text-center">{formatCurrency(entry.results.amountToSettle)}</div>
                                 <div className="flex items-center space-x-2 justify-end">
+                                  <button onClick={() => handleCopyEntry(entry)} title="Copiar para WhatsApp" aria-label="Copiar para WhatsApp" className="p-2 rounded-full bg-slate-700 hover:bg-emerald-600 text-slate-300 hover:text-white transition-colors duration-200"><CopyIcon /></button>
                                   <button onClick={() => handleMoveEntryUp(entry.id)} title="Mover hacia arriba" aria-label="Mover hacia arriba" disabled={index === 0} className="p-2 rounded-full bg-slate-700 hover:bg-sky-600 text-slate-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowUpIcon /></button>
                                   <button onClick={() => handleMoveEntryDown(entry.id)} title="Mover hacia abajo" aria-label="Mover hacia abajo" disabled={index === history.length - 1} className="p-2 rounded-full bg-slate-700 hover:bg-sky-600 text-slate-300 hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"><ArrowDownIcon /></button>
                                   <button onClick={() => handleLoadEntry(entry.id)} title="Cargar este cálculo" aria-label="Cargar este cálculo" className="p-2 rounded-full bg-slate-700 hover:bg-cyan-600 text-slate-300 hover:text-white transition-colors duration-200"><LoadIcon /></button>
@@ -2190,7 +2503,12 @@ const App: React.FC = () => {
           </div>
         </section>
 
-        <VehicleMaintenanceManager records={maintenanceRecords} setRecords={setMaintenanceRecords} />
+        <VehicleMaintenanceManager 
+          records={maintenanceRecords} 
+          setRecords={setMaintenanceRecords} 
+          customTypes={customMaintenanceTypes} 
+          setCustomTypes={setCustomMaintenanceTypes} 
+        />
 
         <DocumentManager documents={documents} setDocuments={setDocuments} />
 
