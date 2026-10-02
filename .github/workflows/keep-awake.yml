@@ -1,0 +1,15 @@
+# Mantiene despierto el robot GPS en Render (el plan gratis se duerme tras 15 min sin visitas).
+# Corre cada 10 min entre 5:00 a.m. y 10:59 p.m. hora de Colombia (UTC-5).
+name: Mantener despierto el robot GPS
+on:
+  schedule:
+    - cron: '*/10 10-23,0-3 * * *'
+  workflow_dispatch:
+permissions: {}
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Despertar servidor
+        run: curl -sS --max-time 120 --retry 2 https://calculadora-y7oh.onrender.com/health || true

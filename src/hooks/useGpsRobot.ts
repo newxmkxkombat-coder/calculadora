@@ -1,11 +1,19 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { GpsStatus, GpsVehicle } from '../types';
-import { fetchGpsVehicles } from '../services/gps';
+import { fetchGpsVehicles, wakeGpsServer } from '../services/gps';
 
 export const useGpsRobot = () => {
   const [status, setStatus] = useState<GpsStatus>('idle');
   const [vehicles, setVehicles] = useState<GpsVehicle[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Despertar el servidor apenas se abre la app (o vuelve a primer plano), antes de tocar el botón.
+  useEffect(() => {
+    wakeGpsServer();
+    const onVisible = () => { if (document.visibilityState === 'visible') wakeGpsServer(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
 
   const refresh = useCallback(async () => {
     setStatus(prev => (prev === 'success' || prev === 'idle' ? 'loading' : prev));

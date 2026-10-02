@@ -196,8 +196,8 @@ const ensureLoggedIn = async (page, username, password) => {
             await page.waitForSelector(passSelector, { ...inputOptions, timeout: 5000 });
 
             console.log("Campos detectados, escribiendo credenciales...");
-            await page.type(userSelector, username, { delay: 50 });
-            await page.type(passSelector, password, { delay: 50 });
+            await page.type(userSelector, username, { delay: 10 });
+            await page.type(passSelector, password, { delay: 10 });
 
             // Buscar botón ingresar (puede variar)
             const loginClicked = await page.evaluate(() => {
@@ -242,9 +242,8 @@ app.get(['/', '/health'], (req, res) => {
     res.json({ ok: true, browser: !!globalBrowser, sessionActive });
 });
 
-// --- ROUTA PRINCIPAL ---
-app.post('/api/scrape-passengers', async (req, res) => {
-    const { username, password } = req.body;
+// --- LECTURA DEL REPORTE (una a la vez, porque hay una sola pestaña) ---
+const scrapeVehicles = async (username, password) => {
     const startTotalTime = Date.now();
 
     try {
@@ -412,7 +411,7 @@ app.post('/api/scrape-passengers', async (req, res) => {
         if (vehicles.length > 0) {
             const totalTime = Date.now() - startTotalTime;
             console.log(`✅ Éxito. ${vehicles.length} móviles encontrados. Tiempo Total: ${totalTime / 1000}s`);
-            res.json({ success: true, vehicles, executionTime: totalTime });
+            return vehicles;
         } else {
             const debugInfo = await page.evaluate(() => document.body.innerText.substring(0, 300).replace(/\n/g, ' '));
             throw new Error(`Header 'Total día' no hallado. (Probable sesión caducada o tabla oculta). Texto visible: ${debugInfo}...`);
@@ -425,15 +424,61 @@ app.post('/api/scrape-passengers', async (req, res) => {
             try { await globalBrowser?.close(); } catch (e) { }
             resetBrowser();
         }
+        throw error;
+    }
+};
+
+// --- CACHÉ: respuestas al instante ---
+// Mientras alguien use la app, el robot relee el GPS en segundo plano cada BACKGROUND_REFRESH_MS
+// y la app recibe el último dato guardado sin esperar. Las credenciales solo quedan en memoria.
+const CACHE_MAX_AGE_MS = 45 * 1000;          // Dato más viejo que esto => se lee de nuevo antes de responder
+const BACKGROUND_REFRESH_MS = 40 * 1000;     // Cada cuánto se relee en segundo plano
+const ACTIVE_WINDOW_MS = 30 * 60 * 1000;     // Se relee solo si alguien consultó en los últimos 30 min
+
+let cache = null;            // { vehicles, at, username }
+let inFlight = null;         // Promesa de la lectura en curso (para no leer dos veces a la vez)
+let lastCredentials = null;
+let lastClientRequest = 0;
+
+const refreshCache = (username, password) => {
+    if (!inFlight) {
+        inFlight = scrapeVehicles(username, password)
+            .then(vehicles => { cache = { vehicles, at: Date.now(), username }; return cache; })
+            .finally(() => { inFlight = null; });
+    }
+    return inFlight;
+};
+
+// --- RUTA PRINCIPAL ---
+app.post('/api/scrape-passengers', async (req, res) => {
+    const { username, password } = req.body || {};
+    if (!username || !password) return res.status(400).json({ success: false, message: 'Faltan credenciales' });
+    lastCredentials = { username, password };
+    lastClientRequest = Date.now();
+
+    try {
+        let result = cache;
+        const fresh = result && result.username === username && Date.now() - result.at < CACHE_MAX_AGE_MS;
+        if (!fresh) result = await refreshCache(username, password);
+        res.json({ success: true, vehicles: result.vehicles, updatedAt: result.at, cached: fresh });
+    } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
 });
 
-// Mantener vivo el servidor
+// Relectura en segundo plano mientras la app está en uso; si no, solo mantener viva la sesión web
 setInterval(() => {
-    if (globalPage && sessionActive) {
+    const active = lastCredentials && Date.now() - lastClientRequest < ACTIVE_WINDOW_MS;
+    if (active) {
+        refreshCache(lastCredentials.username, lastCredentials.password)
+            .catch(e => console.log('Relectura en segundo plano falló:', e.message));
+    }
+}, BACKGROUND_REFRESH_MS);
+
+setInterval(() => {
+    const active = lastCredentials && Date.now() - lastClientRequest < ACTIVE_WINDOW_MS;
+    if (!active && globalPage && sessionActive && !inFlight) {
         console.log("Keep-alive: Chequeando sesión...");
-        // Opcional: recargar ligeramente o interactuar para que no muera la sesión web
         globalPage.evaluate(() => { window.scrollBy(0, 10); }).catch(() => sessionActive = false);
     }
 }, 60000 * 5); // Cada 5 mins

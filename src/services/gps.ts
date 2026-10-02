@@ -41,3 +41,8 @@ export const fetchGpsVehicles = async (): Promise<GpsVehicle[]> => {
     clearTimeout(timeoutId);
   }
 };
+
+/** Toca la puerta del servidor para que se despierte (Render gratis se duerme tras 15 min sin uso). */
+export const wakeGpsServer = () => {
+  fetch(`${API_URL}/health`, { cache: 'no-store' }).catch(() => {});
+};
