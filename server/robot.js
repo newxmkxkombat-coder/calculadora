@@ -434,6 +434,7 @@ const scrapeVehicles = async (username, password) => {
 // y cada 2 min el resto del tiempo (solo de 5 a.m. a 11 p.m. hora Colombia). Credenciales solo en memoria,
 // o en las variables de entorno GPS_USERNAME / GPS_PASSWORD si se configuran en Render (así arranca ya logueado).
 const CACHE_MAX_AGE_MS = 45 * 1000;          // Dato más viejo que esto => se lee de nuevo antes de responder
+const STALE_MAX_AGE_MS = 10 * 60 * 1000;    // Dato guardado que todavía se muestra al instante mientras llega el nuevo
 const ACTIVE_REFRESH_MS = 40 * 1000;         // Relectura mientras la app está en uso
 const IDLE_REFRESH_MS = 2 * 60 * 1000;       // Relectura para mantener viva la sesión cuando nadie consulta
 const ACTIVE_WINDOW_MS = 30 * 60 * 1000;     // "En uso" = alguien consultó en los últimos 30 min
@@ -455,16 +456,23 @@ const refreshCache = (username, password) => {
 
 // --- RUTA PRINCIPAL ---
 app.post('/api/scrape-passengers', async (req, res) => {
-    const { username, password } = req.body || {};
+    const { username, password, fresh: wantFresh } = req.body || {};
     if (!username || !password) return res.status(400).json({ success: false, message: 'Faltan credenciales' });
     lastCredentials = { username, password };
     lastClientRequest = Date.now();
 
     try {
-        let result = cache;
-        const fresh = result && result.username === username && Date.now() - result.at < CACHE_MAX_AGE_MS;
+        let result = cache && cache.username === username ? cache : null;
+        const age = result ? Date.now() - result.at : Infinity;
+        const fresh = age < CACHE_MAX_AGE_MS;
+        // Respuesta inmediata: si hay un dato guardado reciente (menos de STALE_MAX_AGE_MS), se entrega ya
+        // y se busca uno nuevo en segundo plano; la app vuelve a preguntar con fresh=true para recibirlo.
+        if (!fresh && !wantFresh && age < STALE_MAX_AGE_MS) {
+            refreshCache(username, password).catch(e => console.log('Relectura tras respuesta rápida falló:', e.message));
+            return res.json({ success: true, vehicles: result.vehicles, updatedAt: result.at, cached: true, refreshing: true });
+        }
         if (!fresh) result = await refreshCache(username, password);
-        res.json({ success: true, vehicles: result.vehicles, updatedAt: result.at, cached: fresh });
+        res.json({ success: true, vehicles: result.vehicles, updatedAt: result.at, cached: fresh, refreshing: false });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }

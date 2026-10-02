@@ -18,9 +18,19 @@ export const useGpsRobot = () => {
   const refresh = useCallback(async () => {
     setStatus(prev => (prev === 'success' || prev === 'idle' ? 'loading' : prev));
     try {
-      setVehicles(await fetchGpsVehicles());
-      setStatus('success');
+      // 1) Lo que el robot tenga guardado, al instante.
+      const quick = await fetchGpsVehicles();
+      setVehicles(quick.vehicles);
       setErrorMessage('');
+      if (!quick.refreshing) {
+        setStatus('success');
+        return;
+      }
+      // 2) Si ese dato tenía unos minutos, se muestra igual y se espera el nuevo sin bloquear la ventana.
+      setStatus('loading');
+      const latest = await fetchGpsVehicles(true);
+      setVehicles(latest.vehicles);
+      setStatus('success');
     } catch (error) {
       console.error('GPS Poll Error:', error);
       setErrorMessage(error instanceof Error ? error.message : 'Error desconocido');

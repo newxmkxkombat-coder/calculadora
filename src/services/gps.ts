@@ -4,8 +4,18 @@ import { GpsVehicle } from '../types';
 // TODO (pendiente, junto con el cambio de robot): mover estas credenciales al servidor.
 const GPS_CREDENTIALS = { username: 'luniosilva', password: '12256643' };
 
-/** Pide al robot los pasajeros de cada vehículo. Lanza un error con un mensaje claro si falla o tarda demasiado. */
-export const fetchGpsVehicles = async (): Promise<GpsVehicle[]> => {
+export interface GpsResult {
+  vehicles: GpsVehicle[];
+  /** true si el robot devolvió el último dato guardado y está buscando uno nuevo. */
+  refreshing: boolean;
+}
+
+/**
+ * Pide al robot los pasajeros de cada vehículo. Con fresh=false el robot puede responder al instante con el
+ * último dato guardado (refreshing=true); con fresh=true espera el dato nuevo.
+ * Lanza un error con un mensaje claro si falla o tarda demasiado.
+ */
+export const fetchGpsVehicles = async (fresh = false): Promise<GpsResult> => {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), GPS_TIMEOUT_MS);
 
@@ -14,7 +24,7 @@ export const fetchGpsVehicles = async (): Promise<GpsVehicle[]> => {
     response = await fetch(`${API_URL}/api/scrape-passengers`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(GPS_CREDENTIALS),
+      body: JSON.stringify({ ...GPS_CREDENTIALS, fresh }),
       signal: controller.signal,
     });
   } catch (error) {
@@ -36,7 +46,7 @@ export const fetchGpsVehicles = async (): Promise<GpsVehicle[]> => {
       const detail = typeof data?.message === 'string' ? data.message.slice(0, 160) : `código ${response.status}`;
       throw new Error(`El robot no pudo leer la página del GPS: ${detail}`);
     }
-    return data.vehicles as GpsVehicle[];
+    return { vehicles: data.vehicles as GpsVehicle[], refreshing: !!data.refreshing };
   } finally {
     clearTimeout(timeoutId);
   }
