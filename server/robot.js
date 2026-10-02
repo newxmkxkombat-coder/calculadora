@@ -514,45 +514,6 @@ app.post('/api/scrape-passengers', async (req, res) => {
     }
 });
 
-// --- FORMULARIO PREOPERACIONAL (Google Forms) ---
-// La app manda las respuestas (sacadas del link ya rellenado) y el correo; aquí se envían a Google.
-// Solo se acepta este formulario, para que el servidor no sirva para enviar otros.
-const PREOP_FORM_ID = '1FAIpQLScOLIelV9FBvOWZL8aseQWFYxc1dL7fYNfnpRbRK3N3hSBKQA';
-const PREOP_SUBMIT_URL = `https://docs.google.com/forms/d/e/${PREOP_FORM_ID}/formResponse`;
-
-app.post('/api/preoperacional', async (req, res) => {
-    const { email, entries } = req.body || {};
-    if (!email || !entries || typeof entries !== 'object') {
-        return res.status(400).json({ success: false, message: 'Faltan el correo o las respuestas' });
-    }
-    const body = new URLSearchParams();
-    for (const [key, value] of Object.entries(entries)) {
-        if (/^entry\.\d+$/.test(key)) body.append(key, String(value));
-    }
-    body.append('emailAddress', String(email));
-    body.append('fvv', '1');
-    body.append('pageHistory', '0,1'); // El formulario tiene 2 páginas
-
-    try {
-        const response = await fetch(PREOP_SUBMIT_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body,
-        });
-        const html = await response.text();
-        // Google devuelve la página de "Se registró tu respuesta"; si falta algo, devuelve error o el formulario otra vez.
-        const ok = response.ok && !/name="entry\.\d+"/.test(html);
-        console.log(`[${new Date().toLocaleTimeString()}] Preoperacional: código ${response.status}, ${ok ? 'enviado' : 'rechazado'}`);
-        if (!ok) {
-            return res.status(502).json({ success: false, message: `Google no aceptó el formulario (código ${response.status}). Puede que hayan cambiado las preguntas.` });
-        }
-        res.json({ success: true });
-    } catch (error) {
-        console.error('Preoperacional:', error.message);
-        res.status(500).json({ success: false, message: 'No se pudo llegar a Google Forms: ' + error.message });
-    }
-});
-
 const colombiaHour = () => Number(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota', hour: 'numeric', hour12: false })) % 24;
 
 let lastBackgroundRefresh = 0;

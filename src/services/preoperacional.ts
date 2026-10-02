@@ -1,5 +1,3 @@
-import { API_URL, GPS_TIMEOUT_MS } from '../constants';
-
 /**
  * Link del formulario Preoperacional ya rellenado con las respuestas de siempre.
  * Si la empresa cambia el formulario, basta con pegar aquí el nuevo link rellenado.
@@ -10,6 +8,8 @@ const PREFILLED_LINK =
 /** Correo que se registra con cada respuesta (el mismo del cuadrito "Registrar ... como el correo"). */
 const PREOP_EMAIL = 'newxmkxkombat@gmail.com';
 
+const PREOP_SUBMIT_URL = PREFILLED_LINK.split('/viewform')[0] + '/formResponse';
+
 const getEntries = (): Record<string, string> => {
   const entries: Record<string, string> = {};
   new URL(PREFILLED_LINK).searchParams.forEach((value, key) => {
@@ -18,34 +18,27 @@ const getEntries = (): Record<string, string> => {
   return entries;
 };
 
-/** Envía el formulario Preoperacional a través del robot (Google no deja enviarlo directo desde la app). */
-export const sendPreoperacional = async (): Promise<void> => {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), GPS_TIMEOUT_MS);
-
-  let response: Response;
-  try {
-    response = await fetch(`${API_URL}/api/preoperacional`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: PREOP_EMAIL, entries: getEntries() }),
-      signal: controller.signal,
-    });
-  } catch {
-    throw new Error(controller.signal.aborted
-      ? 'El servidor no respondió a tiempo. Si estaba dormido, ya debería estar despertando: intenta de nuevo en un minuto.'
-      : 'No se pudo llegar al servidor. Revisa tu internet e intenta de nuevo.');
-  } finally {
-    clearTimeout(timeoutId);
+/**
+ * Envía el formulario Preoperacional desde el celular. Google exige la cuenta del conductor (por eso el robot
+ * no puede enviarlo), así que se manda directo a Google en una pestaña nueva: el navegador usa la sesión de
+ * Google ya abierta y la pestaña muestra la respuesta de Google ("Se registró tu respuesta" o el error).
+ * Debe llamarse directo desde el toque del botón para que el navegador no bloquee la pestaña.
+ */
+export const sendPreoperacional = () => {
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = PREOP_SUBMIT_URL;
+  form.target = '_blank';
+  form.style.display = 'none';
+  const fields: Record<string, string> = { ...getEntries(), emailAddress: PREOP_EMAIL, fvv: '1', pageHistory: '0,1' };
+  for (const [name, value] of Object.entries(fields)) {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = name;
+    input.value = value;
+    form.appendChild(input);
   }
-
-  let data: any = null;
-  try {
-    data = await response.json();
-  } catch {
-    throw new Error(`El servidor respondió con un error (código ${response.status}).`);
-  }
-  if (!response.ok || !data?.success) {
-    throw new Error(typeof data?.message === 'string' ? data.message : `Error (código ${response.status}).`);
-  }
+  document.body.appendChild(form);
+  form.submit();
+  form.remove();
 };
