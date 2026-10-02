@@ -14,6 +14,8 @@ let globalBrowser = null;
 let globalPage = null; // Mantiene la pestaña abierta siempre
 let sessionActive = false;
 let lastInteraction = 0;
+let lastLoginAt = 0; // Última vez que se pasó por la pantalla de entrada
+const RELOGIN_EVERY_MS = 5 * 60 * 1000; // Con el aviso de "sesión finalizada" a la vista, re-entrar como mucho cada 5 min
 
 // Configuración URL
 const TARGET_URL = 'https://gps3regisdataweb.com/opita/index.jsp';
@@ -117,9 +119,13 @@ const ensureLoggedIn = async (page, username, password) => {
         // y cajas de texto (filtros), y eso hacía creer que la sesión se había caído en cada lectura.
         const visible = await page.evaluate(() => {
             const shown = (el) => !!(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length));
+            const docs = [document];
+            for (const frame of window.frames) { try { if (frame.document?.body) docs.push(frame.document); } catch (e) { } }
             return {
                 text: (document.body.innerText || '').toLowerCase(),
-                passwordVisible: Array.from(document.querySelectorAll('input[type="password"]')).some(shown)
+                passwordVisible: Array.from(document.querySelectorAll('input[type="password"]')).some(shown),
+                // El reporte (tabla con "Total día") está a la vista: estamos dentro y leyendo
+                hasReport: docs.some(d => /total d[ií]a/i.test(d.body.innerText || ''))
             };
         });
         const pageText = visible.text;
@@ -129,8 +135,17 @@ const ensureLoggedIn = async (page, username, password) => {
             pageText.includes('finalizado la sesion') ||
             pageText.includes('session timeout');
 
-        // Si todo parece estar bien y no estamos en login, retornamos rápido
-        if (!isLoginPage && currentUrl.includes('opita') && sessionActive && !sessionExpired) {
+        if (sessionExpired) {
+            const at = pageText.search(/finalizado la sesi|session timeout/);
+            console.log('Aviso de sesión en pantalla: "' + pageText.substring(Math.max(0, at - 60), at + 80).replace(/\s+/g, ' ') + '"');
+        }
+
+        // Si todo parece estar bien y no estamos en login, retornamos rápido.
+        // Si el reporte sigue a la vista, el aviso de sesión no basta para volver a entrar en cada lectura
+        // (eso hacía que cada lectura tardara ~30 s); igual se re-entra cada 5 min por si de verdad caducó.
+        const reportStillThere = visible.hasReport && currentUrl.includes('infogps.jsp') &&
+            Date.now() - lastLoginAt < RELOGIN_EVERY_MS;
+        if (!isLoginPage && currentUrl.includes('opita') && sessionActive && (!sessionExpired || reportStillThere)) {
             console.log('Sesión activa detectada (Estado OK). Reutilizando...');
             lastInteraction = Date.now();
             return;
@@ -140,6 +155,7 @@ const ensureLoggedIn = async (page, username, password) => {
 
         // Reset flag de sesión si detectamos login
         sessionActive = false;
+        lastLoginAt = Date.now();
 
         // Ir al login
         try {
