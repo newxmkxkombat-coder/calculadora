@@ -430,13 +430,13 @@ const scrapeVehicles = async (username, password) => {
 
 // --- CACHÉ Y SESIÓN SIEMPRE ABIERTA ---
 // El robot relee el GPS por su cuenta para que la sesión de la página nunca se cierre por inactividad
-// y la app reciba el dato al instante: cada 40 s si alguien consultó en los últimos 30 min,
-// y cada 2 min el resto del tiempo (solo de 5 a.m. a 11 p.m. hora Colombia). Credenciales solo en memoria,
+// y la app reciba el dato al instante: cada 20 s si alguien consultó en los últimos 30 min,
+// y cada 30 s el resto del tiempo (solo de 5 a.m. a 11 p.m. hora Colombia). Credenciales solo en memoria,
 // o en las variables de entorno GPS_USERNAME / GPS_PASSWORD si se configuran en Render (así arranca ya logueado).
-const CACHE_MAX_AGE_MS = 45 * 1000;          // Dato más viejo que esto => se lee de nuevo antes de responder
+const CACHE_MAX_AGE_MS = 30 * 1000;          // Dato más viejo que esto => se lee de nuevo antes de responder
 const STALE_MAX_AGE_MS = 10 * 60 * 1000;    // Dato guardado que todavía se muestra al instante mientras llega el nuevo
-const ACTIVE_REFRESH_MS = 40 * 1000;         // Relectura mientras la app está en uso
-const IDLE_REFRESH_MS = 2 * 60 * 1000;       // Relectura para mantener viva la sesión cuando nadie consulta
+const ACTIVE_REFRESH_MS = 20 * 1000;         // Relectura mientras la app está en uso
+const IDLE_REFRESH_MS = 30 * 1000;           // Relectura para mantener viva la sesión cuando nadie consulta
 const ACTIVE_WINDOW_MS = 30 * 60 * 1000;     // "En uso" = alguien consultó en los últimos 30 min
 const WORK_HOURS = { from: 5, to: 23 };      // Horario (Colombia) en que se mantiene la sesión abierta
 
