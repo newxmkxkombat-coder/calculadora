@@ -120,7 +120,7 @@ const ensureLoggedIn = async (page, username, password) => {
         const visible = await page.evaluate(() => {
             const shown = (el) => !!(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length));
             const docs = [document];
-            for (const frame of window.frames) { try { if (frame.document?.body) docs.push(frame.document); } catch (e) { } }
+            for (let i = 0; i < window.frames.length; i++) { try { if (window.frames[i].document?.body) docs.push(window.frames[i].document); } catch (e) { } }
             return {
                 text: (document.body.innerText || '').toLowerCase(),
                 passwordVisible: Array.from(document.querySelectorAll('input[type="password"]')).some(shown),
@@ -342,8 +342,8 @@ const scrapeVehicles = async (username, password) => {
             await page.waitForFunction(() => {
                 const searchTxt = (doc) => (doc.body.innerText || '').toLowerCase().includes('total día') || (doc.body.innerText || '').toLowerCase().includes('total dia');
                 if (searchTxt(document)) return true;
-                for (const frame of window.frames) {
-                    try { if (searchTxt(frame.document)) return true; } catch (e) { }
+                for (let i = 0; i < window.frames.length; i++) { // window.frames no se puede recorrer con for...of
+                    try { if (searchTxt(window.frames[i].document)) return true; } catch (e) { }
                 }
                 return false;
             }, { timeout: 10000, polling: 100 }); // Polling rápido 100ms
@@ -359,7 +359,7 @@ const scrapeVehicles = async (username, password) => {
             // Recopilar todos los documentos (Main + Iframes)
             const docs = [document];
             try {
-                const frames = Array.from(window.frames);
+                const frames = Array.from({ length: window.frames.length }, (_, i) => window.frames[i]);
                 for (const f of frames) {
                     try { docs.push(f.document); } catch (e) { }
                 }
