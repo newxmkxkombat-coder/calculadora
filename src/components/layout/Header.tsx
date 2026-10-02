@@ -2,7 +2,7 @@ import React from 'react';
 import { GpsStatus } from '../../types';
 import { formatCurrency } from '../../utils/format';
 import { CalculationResults } from '../../types';
-import { CalendarIcon, ClipboardCheckIcon, MoonIcon, RobotIcon, SunIcon } from '../icons';
+import { CalendarIcon, ClipboardCheckIcon, MoonIcon, RobotIcon, ShieldIcon, SunIcon } from '../icons';
 import { Theme } from '../../hooks/useTheme';
 import { Card, IconButton } from '../ui';
 import { DigitalClock } from './DigitalClock';
@@ -14,13 +14,15 @@ interface HeaderProps {
   onToggleTheme: () => void;
   onOpenRobot: () => void;
   onGoToRecords: () => void;
+  isSendingPreop: boolean;
+  onSendPreop: () => void;
 }
 
 const chipClass =
   'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold transition-all active:scale-95';
 
 /** Barra superior + tarjeta principal con la Entrega y el resumen del día. */
-export const Header: React.FC<HeaderProps> = ({ results, gpsStatus, theme, onToggleTheme, onOpenRobot, onGoToRecords }) => {
+export const Header: React.FC<HeaderProps> = ({ results, gpsStatus, theme, onToggleTheme, onOpenRobot, onGoToRecords, isSendingPreop, onSendPreop }) => {
   const isNegative = results.amountToSettle < 0;
   const entregaText = formatCurrency(results.amountToSettle);
   // Las cifras largas bajan de tamaño para que siempre quepan en pantallas angostas.
@@ -63,6 +65,14 @@ export const Header: React.FC<HeaderProps> = ({ results, gpsStatus, theme, onTog
           <CalendarIcon />
           Calendario
         </a>
+        <button
+          onClick={onSendPreop}
+          disabled={isSendingPreop}
+          className={`${chipClass} text-good bg-good/10 border-good/30 hover:bg-good/20 disabled:opacity-60`}
+        >
+          <ShieldIcon />
+          {isSendingPreop ? 'Enviando...' : 'Preoperacional'}
+        </button>
       </div>
 
       <Card className="overflow-hidden">
