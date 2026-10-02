@@ -28,8 +28,11 @@ const busIcon = (num: string) =>
   });
 
 /**
- * Mapa con todos los vehículos. Calles de OpenStreetMap con colores parecidos a Google Maps (CARTO Voyager).
+ * Mapa con todos los vehículos. Calles de OpenStreetMap (CARTO): en tema oscuro (el de la app) se usa el
+ * estilo oscuro; en tema claro, Voyager, que tiene colores parecidos a Google Maps.
  */
+const isLightTheme = () => document.documentElement.getAttribute('data-theme') === 'light';
+
 export const GpsMap: React.FC<{ vehicles: GpsVehicle[] }> = ({ vehicles }) => {
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
@@ -39,7 +42,8 @@ export const GpsMap: React.FC<{ vehicles: GpsVehicle[] }> = ({ vehicles }) => {
   useEffect(() => {
     if (!box.current) return;
     const m = L.map(box.current, { zoomControl: true, attributionControl: true }).setView(NEIVA, 13);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    const style = isLightTheme() ? 'voyager' : 'dark_all';
+    L.tileLayer(`https://{s}.basemaps.cartocdn.com/rastertiles/${style}/{z}/{x}/{y}{r}.png`, {
       maxZoom: 19,
       subdomains: 'abcd',
       attribution: '© OpenStreetMap © CARTO',
@@ -72,7 +76,7 @@ export const GpsMap: React.FC<{ vehicles: GpsVehicle[] }> = ({ vehicles }) => {
     }
   }, [vehicles]);
 
-  return <div ref={box} className="w-full h-72 rounded-2xl overflow-hidden border border-line/60 bg-[#e8eaed]" />;
+  return <div ref={box} className="w-full h-72 rounded-2xl overflow-hidden border border-line/60 bg-[#1f2633]" />;
 };
 
 export default GpsMap;
