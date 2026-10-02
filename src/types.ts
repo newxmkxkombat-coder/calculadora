@@ -66,4 +66,6 @@ export interface GpsVehicle {
   /** Coordenadas del último reporte, si la página del GPS las trae. */
   lat?: number | null;
   lng?: number | null;
+  /** true si las coordenadas se calcularon a partir de la dirección (no vienen del GPS). */
+  aproximada?: boolean;
 }

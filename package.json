@@ -12,8 +12,10 @@
     "start": "node server/robot.js"
   },
   "dependencies": {
+    "@types/leaflet": "^1.9.22",
     "cors": "^2.8.6",
     "express": "^5.2.1",
+    "leaflet": "^1.9.4",
     "puppeteer": "^24.36.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
