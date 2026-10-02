@@ -391,12 +391,18 @@ const scrapeVehicles = async (username, password) => {
                                     const locCell = targetColLoc !== -1 ? cells[targetColLoc] : null;
                                     const fechaCell = targetColFecha !== -1 ? cells[targetColFecha] : null;
                                     const link = locCell?.querySelector('a')?.href || '';
+                                    // Coordenadas exactas si la página las trae en el enlace o en el onclick (ej. "2.9273,-75.2819")
+                                    const anchor = locCell?.querySelector('a');
+                                    const rawLink = [anchor?.getAttribute('href'), anchor?.getAttribute('onclick'), locCell?.getAttribute('onclick'), locCell?.innerHTML].filter(Boolean).join(' ');
+                                    const coords = rawLink.match(/(-?\d{1,2}\.\d{4,})\s*[,;'"\s]+\s*(-?\d{1,3}\.\d{4,})/);
                                     results.push({
                                         identifier: id,
                                         pasajeros: pax,
                                         localizacion: locCell ? locCell.innerText.replace(/\s+/g, ' ').trim() : '',
                                         fechaGps: fechaCell ? fechaCell.innerText.replace(/\s+/g, ' ').trim() : '',
                                         mapaUrl: /^https?:/i.test(link) ? link : '',
+                                        lat: coords ? Number(coords[1]) : null,
+                                        lng: coords ? Number(coords[2]) : null,
                                     });
                                 }
                             }

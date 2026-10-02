@@ -15,6 +15,13 @@ interface RobotModalProps {
   onUpdate: () => void;
 }
 
+/** Enlace a Google Maps: con coordenadas exactas si las hay; si no, buscando la dirección en Neiva. */
+const mapsUrl = (v: GpsVehicle) => {
+  if (v.lat != null && v.lng != null) return `https://www.google.com/maps/search/?api=1&query=${v.lat},${v.lng}`;
+  const place = /neiva/i.test(v.localizacion || '') ? v.localizacion! : `${v.localizacion}, Neiva, Huila`;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place)}`;
+};
+
 const toNumber = (passengers: string) => parseInt(passengers.replace(/\./g, ''), 10);
 
 /** Saca la hora de "2026-10-02 08:15:45" y la deja como "8:15 AM". */
@@ -137,11 +144,10 @@ export const RobotModal: React.FC<RobotModalProps> = ({ isOpen, onClose, vehicle
                       <div className="px-3 py-2.5 min-w-0">
                         <p className="flex items-center gap-1 text-[10px] text-faint font-bold uppercase tracking-wider"><MapPinIcon /> Ubicación</p>
                         {v.localizacion ? (
-                          v.mapaUrl ? (
-                            <a href={v.mapaUrl} target="_blank" rel="noopener noreferrer" className="block text-sm font-semibold text-violet leading-snug mt-0.5 break-words">{v.localizacion}</a>
-                          ) : (
-                            <p className="text-sm font-semibold text-main leading-snug mt-0.5 break-words">{v.localizacion}</p>
-                          )
+                          <a href={mapsUrl(v)} target="_blank" rel="noopener noreferrer" className="group block mt-0.5">
+                            <span className="block text-sm font-semibold text-main leading-snug break-words">{v.localizacion}</span>
+                            <span className="inline-flex items-center gap-1 mt-1 text-[11px] font-semibold text-violet group-hover:underline">Ver en Google Maps ↗</span>
+                          </a>
                         ) : (
                           <p className="text-xs text-faint mt-0.5">Sin dato</p>
                         )}
