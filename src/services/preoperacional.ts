@@ -20,26 +20,18 @@ const getEntries = (): Record<string, string> => {
 
 /**
  * Envía el formulario Preoperacional desde el celular. Google exige la cuenta del conductor (por eso el robot
- * no puede enviarlo), así que se manda directo a Google en una pestaña nueva: el navegador usa la sesión de
- * Google ya abierta. Google devuelve el formulario lleno en la última página para que el conductor toque Enviar;
- * el "#:~:text=Enviar" le pide al navegador (Chrome) que abra la página ya bajada hasta ese botón.
+ * no puede enviarlo), así que se abre directo en Google en una pestaña nueva, con la sesión de Google del celular.
+ * Se abre como enlace normal (no como envío de formulario) para que el "#:~:text=Enviar" haga que Chrome abra la
+ * página ya bajada hasta ese botón. Si Google acepta el envío directo, muestra "Se registró tu respuesta".
  * Debe llamarse directo desde el toque del botón para que el navegador no bloquee la pestaña.
  */
 export const sendPreoperacional = () => {
-  const form = document.createElement('form');
-  form.method = 'POST';
-  form.action = `${PREOP_SUBMIT_URL}#:~:text=Enviar`;
-  form.target = '_blank';
-  form.style.display = 'none';
-  const fields: Record<string, string> = { ...getEntries(), emailAddress: PREOP_EMAIL, fvv: '1', pageHistory: '0,1' };
-  for (const [name, value] of Object.entries(fields)) {
-    const input = document.createElement('input');
-    input.type = 'hidden';
-    input.name = name;
-    input.value = value;
-    form.appendChild(input);
-  }
-  document.body.appendChild(form);
-  form.submit();
-  form.remove();
+  const params = new URLSearchParams({
+    ...getEntries(),
+    emailAddress: PREOP_EMAIL,
+    fvv: '1',
+    pageHistory: '0,1',
+    submit: 'Submit',
+  });
+  window.open(`${PREOP_SUBMIT_URL}?${params.toString()}#:~:text=Enviar`, '_blank', 'noopener');
 };
