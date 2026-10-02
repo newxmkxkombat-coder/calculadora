@@ -428,12 +428,16 @@ const scrapeVehicles = async (username, password) => {
     }
 };
 
-// --- CACHÉ: respuestas al instante ---
-// Mientras alguien use la app, el robot relee el GPS en segundo plano cada BACKGROUND_REFRESH_MS
-// y la app recibe el último dato guardado sin esperar. Las credenciales solo quedan en memoria.
+// --- CACHÉ Y SESIÓN SIEMPRE ABIERTA ---
+// El robot relee el GPS por su cuenta para que la sesión de la página nunca se cierre por inactividad
+// y la app reciba el dato al instante: cada 40 s si alguien consultó en los últimos 30 min,
+// y cada 2 min el resto del tiempo (solo de 5 a.m. a 11 p.m. hora Colombia). Credenciales solo en memoria,
+// o en las variables de entorno GPS_USERNAME / GPS_PASSWORD si se configuran en Render (así arranca ya logueado).
 const CACHE_MAX_AGE_MS = 45 * 1000;          // Dato más viejo que esto => se lee de nuevo antes de responder
-const BACKGROUND_REFRESH_MS = 40 * 1000;     // Cada cuánto se relee en segundo plano
-const ACTIVE_WINDOW_MS = 30 * 60 * 1000;     // Se relee solo si alguien consultó en los últimos 30 min
+const ACTIVE_REFRESH_MS = 40 * 1000;         // Relectura mientras la app está en uso
+const IDLE_REFRESH_MS = 2 * 60 * 1000;       // Relectura para mantener viva la sesión cuando nadie consulta
+const ACTIVE_WINDOW_MS = 30 * 60 * 1000;     // "En uso" = alguien consultó en los últimos 30 min
+const WORK_HOURS = { from: 5, to: 23 };      // Horario (Colombia) en que se mantiene la sesión abierta
 
 let cache = null;            // { vehicles, at, username }
 let inFlight = null;         // Promesa de la lectura en curso (para no leer dos veces a la vez)
@@ -466,24 +470,32 @@ app.post('/api/scrape-passengers', async (req, res) => {
     }
 });
 
-// Relectura en segundo plano mientras la app está en uso; si no, solo mantener viva la sesión web
-setInterval(() => {
-    const active = lastCredentials && Date.now() - lastClientRequest < ACTIVE_WINDOW_MS;
-    if (active) {
-        refreshCache(lastCredentials.username, lastCredentials.password)
-            .catch(e => console.log('Relectura en segundo plano falló:', e.message));
-    }
-}, BACKGROUND_REFRESH_MS);
+const colombiaHour = () => Number(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota', hour: 'numeric', hour12: false })) % 24;
 
+let lastBackgroundRefresh = 0;
 setInterval(() => {
-    const active = lastCredentials && Date.now() - lastClientRequest < ACTIVE_WINDOW_MS;
-    if (!active && globalPage && sessionActive && !inFlight) {
-        console.log("Keep-alive: Chequeando sesión...");
-        globalPage.evaluate(() => { window.scrollBy(0, 10); }).catch(() => sessionActive = false);
-    }
-}, 60000 * 5); // Cada 5 mins
+    if (!lastCredentials || inFlight) return;
+    const active = Date.now() - lastClientRequest < ACTIVE_WINDOW_MS;
+    const hour = colombiaHour();
+    const inWorkHours = hour >= WORK_HOURS.from && hour < WORK_HOURS.to;
+    if (!active && !inWorkHours) return;
+    const every = active ? ACTIVE_REFRESH_MS : IDLE_REFRESH_MS;
+    if (Date.now() - lastBackgroundRefresh < every) return;
+    lastBackgroundRefresh = Date.now();
+    refreshCache(lastCredentials.username, lastCredentials.password)
+        .catch(e => console.log('Relectura en segundo plano falló:', e.message));
+}, 10 * 1000);
+
+if (process.env.GPS_USERNAME && process.env.GPS_PASSWORD) {
+    lastCredentials = { username: process.env.GPS_USERNAME, password: process.env.GPS_PASSWORD };
+}
 
 app.listen(PORT, () => {
     console.log(`Robot Persistente V3.2 (Hybrid) escuchando en ${PORT}`);
-    initBrowser().catch(e => console.error('No se pudo lanzar el navegador al inicio:', e.message)); // Arrancar browser al inicio
+    initBrowser()
+        .then(() => {
+            // Si hay credenciales configuradas, entrar de una vez para que la primera consulta ya sea rápida
+            if (lastCredentials) return refreshCache(lastCredentials.username, lastCredentials.password);
+        })
+        .catch(e => console.error('Arranque del robot:', e.message));
 });
