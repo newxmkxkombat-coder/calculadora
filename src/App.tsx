@@ -66,7 +66,6 @@ const App: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isRobotModalOpen, setIsRobotModalOpen] = useState(false);
   const [isRecordsOpen, setIsRecordsOpen] = useState(false);
-  const [isSendingPreop, setIsSendingPreop] = useState(false);
 
   const fuelInputRef = useRef<HTMLInputElement>(null);
 
@@ -252,22 +251,12 @@ const App: React.FC = () => {
   };
 
   // --- Formulario Preoperacional: un toque y se envía solo ---
-  const handleSendPreoperacional = async () => {
-    if (isSendingPreop) return;
+  const handleSendPreoperacional = () => {
     const today = getLocalDateString();
     if (localStorage.getItem(STORAGE_KEYS.preopLastSent) === today
       && !window.confirm('Hoy ya enviaste el preoperacional. ¿Enviarlo otra vez?')) return;
-
-    setIsSendingPreop(true);
-    try {
-      await sendPreoperacional();
-      localStorage.setItem(STORAGE_KEYS.preopLastSent, today);
-      setToastMessage('Preoperacional enviado ✓');
-    } catch (error) {
-      alert(`No se pudo enviar el preoperacional. ${error instanceof Error ? error.message : ''}`);
-    } finally {
-      setIsSendingPreop(false);
-    }
+    sendPreoperacional();
+    localStorage.setItem(STORAGE_KEYS.preopLastSent, today);
   };
 
   // El botón "Registros" del encabezado abre la lista y baja hasta ella.
@@ -287,7 +276,7 @@ const App: React.FC = () => {
       <DocumentAlerts documents={documents} />
 
       <div className="max-w-4xl mx-auto">
-        <Header results={results} gpsStatus={gps.status} theme={theme} onToggleTheme={toggleTheme} onOpenRobot={openRobot} onGoToRecords={goToRecords} isSendingPreop={isSendingPreop} onSendPreop={handleSendPreoperacional} />
+        <Header results={results} gpsStatus={gps.status} theme={theme} onToggleTheme={toggleTheme} onOpenRobot={openRobot} onGoToRecords={goToRecords} onSendPreop={handleSendPreoperacional} />
 
         <DayForm formData={formData} fuelInputRef={fuelInputRef} isEditing={!!editingId} onChange={handleChange} onFocus={onFocus} />
 
