@@ -85,10 +85,10 @@ export const RobotModal: React.FC<RobotModalProps> = ({ isOpen, onClose, vehicle
           <p className="text-xs text-center text-violet mb-3 font-medium">Toca un vehículo para cargar sus pasajeros</p>
           <div className="space-y-3">
             {vehicles.map((v, i) => (
+              <div key={i} className="bg-field/50 border border-line/60 rounded-2xl overflow-hidden">
               <button
-                key={i}
                 onClick={() => handleVehicleClick(v.pasajeros)}
-                className="w-full bg-field/50 border border-line/60 hover:border-violet hover:bg-violet/10 p-4 rounded-2xl flex items-center justify-between transition-all active:scale-[0.99]"
+                className="w-full hover:bg-violet/10 p-4 flex items-center justify-between transition-all active:scale-[0.99]"
               >
                 <div className="text-left">
                   <p className="text-[11px] text-muted font-bold uppercase tracking-wider">Vehículo</p>
@@ -104,6 +104,27 @@ export const RobotModal: React.FC<RobotModalProps> = ({ isOpen, onClose, vehicle
                   )}
                 </div>
               </button>
+              {(v.localizacion || v.fechaGps) && (
+                <div className="px-4 py-2.5 border-t border-line/40 space-y-1 text-xs">
+                  {v.fechaGps && (
+                    <p className="text-muted">
+                      <span className="font-bold text-faint uppercase tracking-wider text-[10px] mr-1.5">Último reporte</span>
+                      <span className="tabular text-main">{v.fechaGps}</span>
+                    </p>
+                  )}
+                  {v.localizacion && (
+                    <p className="text-muted">
+                      <span className="font-bold text-faint uppercase tracking-wider text-[10px] mr-1.5">Ubicación</span>
+                      {v.mapaUrl ? (
+                        <a href={v.mapaUrl} target="_blank" rel="noopener noreferrer" className="text-violet underline">{v.localizacion}</a>
+                      ) : (
+                        <span className="text-main">{v.localizacion}</span>
+                      )}
+                    </p>
+                  )}
+                </div>
+              )}
+              </div>
             ))}
           </div>
           <p className="mt-3 pt-3 border-t border-line/40 text-center text-[11px] text-faint font-mono">

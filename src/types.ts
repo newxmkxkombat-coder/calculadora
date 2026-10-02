@@ -57,4 +57,10 @@ export type GpsStatus = 'idle' | 'loading' | 'success' | 'error';
 export interface GpsVehicle {
   identifier: string;
   pasajeros: string;
+  /** Dirección donde el GPS ubicó el vehículo por última vez. */
+  localizacion?: string;
+  /** Fecha y hora del último reporte GPS del vehículo. */
+  fechaGps?: string;
+  /** Enlace al mapa de esa ubicación, si la página del GPS lo trae. */
+  mapaUrl?: string;
 }
