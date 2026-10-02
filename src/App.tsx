@@ -9,6 +9,7 @@ import { usePersistentState } from './hooks/usePersistentState';
 import { useGpsRobot } from './hooks/useGpsRobot';
 import { useKeyboardOpen } from './hooks/useKeyboardOpen';
 import { useTheme } from './hooks/useTheme';
+import { sendPreoperacional } from './services/preoperacional';
 import { BackupManager } from './components/backup/BackupManager';
 import { DocumentAlerts } from './components/documents/DocumentAlerts';
 import { DocumentManager } from './components/documents/DocumentManager';
@@ -66,6 +67,7 @@ const App: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isRobotModalOpen, setIsRobotModalOpen] = useState(false);
   const [isRecordsOpen, setIsRecordsOpen] = useState(false);
+  const [isSendingPreop, setIsSendingPreop] = useState(false);
 
   const fuelInputRef = useRef<HTMLInputElement>(null);
 
@@ -250,6 +252,25 @@ const App: React.FC = () => {
     setToastMessage('Pasajeros actualizados desde el GPS');
   };
 
+  // --- Formulario Preoperacional: un toque y se envía solo ---
+  const handleSendPreoperacional = async () => {
+    if (isSendingPreop) return;
+    const today = getLocalDateString();
+    if (localStorage.getItem(STORAGE_KEYS.preopLastSent) === today
+      && !window.confirm('Hoy ya enviaste el preoperacional. ¿Enviarlo otra vez?')) return;
+
+    setIsSendingPreop(true);
+    try {
+      await sendPreoperacional();
+      localStorage.setItem(STORAGE_KEYS.preopLastSent, today);
+      setToastMessage('Preoperacional enviado ✓');
+    } catch (error) {
+      alert(`No se pudo enviar el preoperacional. ${error instanceof Error ? error.message : ''}`);
+    } finally {
+      setIsSendingPreop(false);
+    }
+  };
+
   // El botón "Registros" del encabezado abre la lista y baja hasta ella.
   const goToRecords = () => {
     setIsRecordsOpen(true);
@@ -268,7 +289,7 @@ const App: React.FC = () => {
       <DocumentAlerts documents={documents} />
 
       <div className="max-w-4xl mx-auto">
-        <Header results={results} gpsStatus={gps.status} theme={theme} onToggleTheme={toggleTheme} onOpenRobot={openRobot} onGoToRecords={goToRecords} />
+        <Header results={results} gpsStatus={gps.status} theme={theme} onToggleTheme={toggleTheme} onOpenRobot={openRobot} onGoToRecords={goToRecords} isSendingPreop={isSendingPreop} onSendPreop={handleSendPreoperacional} />
 
         <DayForm formData={formData} fuelInputRef={fuelInputRef} isEditing={!!editingId} onChange={handleChange} onFocus={onFocus} />
 
