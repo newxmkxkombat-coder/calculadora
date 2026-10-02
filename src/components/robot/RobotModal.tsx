@@ -17,8 +17,15 @@ interface RobotModalProps {
 
 const toNumber = (passengers: string) => parseInt(passengers.replace(/\./g, ''), 10);
 
-/** Saca solo la hora de "2026-10-02 07:51:10" (o "02/10/2026 07:51"). */
-const gpsTime = (raw: string) => raw.match(/\d{1,2}:\d{2}(:\d{2})?(\s?[ap]\.?\s?m\.?)?/i)?.[0] ?? raw;
+/** Saca la hora de "2026-10-02 08:15:45" y la deja como "8:15 AM". */
+const gpsTime = (raw: string) => {
+  const m = raw.match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*([ap])?\.?\s?m?\.?/i);
+  if (!m) return raw;
+  let hour = Number(m[1]);
+  const suffix = m[3] ? (m[3].toLowerCase() === 'p' ? 'PM' : 'AM') : hour >= 12 ? 'PM' : 'AM';
+  if (!m[3]) hour = hour % 12 || 12;
+  return `${hour}:${m[2]} ${suffix}`;
+};
 
 export const RobotModal: React.FC<RobotModalProps> = ({ isOpen, onClose, vehicles, status, errorMessage, deduction, onDeductionChange, onSelectPassengers, onUpdate }) => {
   const [timer, setTimer] = useState(0);
