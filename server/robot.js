@@ -113,14 +113,21 @@ const ensureLoggedIn = async (page, username, password) => {
 
         // Detección de sesión caída o expirada
         // Mejorada: Busca texto visible de login además de inputs
-        const pageText = (await page.evaluate(() => document.body.innerText)).toLowerCase();
-        let isLoginPage = content.includes('input type="text"') ||
-            pageText.includes('inicia sesión') ||
-            (pageText.includes('usuario') && pageText.includes('contraseña'));
+        // Solo cuenta lo que se VE: la página del reporte trae escondido el aviso de "finalizado la sesión"
+        // y cajas de texto (filtros), y eso hacía creer que la sesión se había caído en cada lectura.
+        const visible = await page.evaluate(() => {
+            const shown = (el) => !!(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length));
+            return {
+                text: (document.body.innerText || '').toLowerCase(),
+                passwordVisible: Array.from(document.querySelectorAll('input[type="password"]')).some(shown)
+            };
+        });
+        const pageText = visible.text;
+        let isLoginPage = visible.passwordVisible || pageText.includes('inicia sesión');
 
-        const sessionExpired = content.includes('finalizado la sesión') ||
-            content.includes('finalizado la sesion') ||
-            content.includes('Session timeout');
+        const sessionExpired = pageText.includes('finalizado la sesión') ||
+            pageText.includes('finalizado la sesion') ||
+            pageText.includes('session timeout');
 
         // Si todo parece estar bien y no estamos en login, retornamos rápido
         if (!isLoginPage && currentUrl.includes('opita') && sessionActive && !sessionExpired) {
