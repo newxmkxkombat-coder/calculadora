@@ -27,10 +27,7 @@ const busIcon = (num: string) =>
       </div>`,
   });
 
-/**
- * Mapa con todos los vehículos. Calles de OpenStreetMap (CARTO): en tema oscuro (el de la app) se usa el
- * estilo oscuro; en tema claro, Voyager, que tiene colores parecidos a Google Maps.
- */
+/** Mapa con todos los vehículos sobre las calles de OpenStreetMap. */
 const isLightTheme = () => document.documentElement.getAttribute('data-theme') === 'light';
 
 export const GpsMap: React.FC<{ vehicles: GpsVehicle[] }> = ({ vehicles }) => {
@@ -42,21 +39,13 @@ export const GpsMap: React.FC<{ vehicles: GpsVehicle[] }> = ({ vehicles }) => {
   useEffect(() => {
     if (!box.current) return;
     const m = L.map(box.current, { zoomControl: true, attributionControl: true }).setView(NEIVA, 13);
-    // Direcciones gratis de CARTO (sin clave): "dark_all" va sin "rastertiles/"; con él pide clave
-    const style = isLightTheme() ? 'rastertiles/voyager' : 'dark_all';
-    const tiles = L.tileLayer(`https://{s}.basemaps.cartocdn.com/${style}/{z}/{x}/{y}{r}.png`, {
+    // Calles de OpenStreetMap (gratis, sin clave). En tema oscuro se oscurecen con un filtro de color
+    // solo sobre las calles (los buses no cambian). CARTO se dejó porque ahora pide clave.
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
-      subdomains: 'abcd',
-      attribution: '© OpenStreetMap © CARTO',
+      attribution: '© OpenStreetMap',
+      className: isLightTheme() ? '' : 'gps-tiles-dark',
     }).addTo(m);
-    // Si CARTO no responde, usar el mapa normal de OpenStreetMap para que nunca quede en blanco
-    let switched = false;
-    tiles.on('tileerror', () => {
-      if (switched) return;
-      switched = true;
-      m.removeLayer(tiles);
-      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(m);
-    });
     layer.current = L.layerGroup().addTo(m);
     map.current = m;
     // La ventana se abre con animación: recalcular el tamaño cuando ya está visible
