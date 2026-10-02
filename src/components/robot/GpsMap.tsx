@@ -42,12 +42,21 @@ export const GpsMap: React.FC<{ vehicles: GpsVehicle[] }> = ({ vehicles }) => {
   useEffect(() => {
     if (!box.current) return;
     const m = L.map(box.current, { zoomControl: true, attributionControl: true }).setView(NEIVA, 13);
-    const style = isLightTheme() ? 'voyager' : 'dark_all';
-    L.tileLayer(`https://{s}.basemaps.cartocdn.com/rastertiles/${style}/{z}/{x}/{y}{r}.png`, {
+    // Direcciones gratis de CARTO (sin clave): "dark_all" va sin "rastertiles/"; con él pide clave
+    const style = isLightTheme() ? 'rastertiles/voyager' : 'dark_all';
+    const tiles = L.tileLayer(`https://{s}.basemaps.cartocdn.com/${style}/{z}/{x}/{y}{r}.png`, {
       maxZoom: 19,
       subdomains: 'abcd',
       attribution: '© OpenStreetMap © CARTO',
     }).addTo(m);
+    // Si CARTO no responde, usar el mapa normal de OpenStreetMap para que nunca quede en blanco
+    let switched = false;
+    tiles.on('tileerror', () => {
+      if (switched) return;
+      switched = true;
+      m.removeLayer(tiles);
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(m);
+    });
     layer.current = L.layerGroup().addTo(m);
     map.current = m;
     // La ventana se abre con animación: recalcular el tamaño cuando ya está visible

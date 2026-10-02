@@ -509,6 +509,7 @@ const geocode = (address) => {
                 found = await geoQuery(`${street}, Neiva, Huila`);
             }
             geoCache.set(address, found);
+            console.log(found ? `📍 Ubicada: "${address}" -> ${found.lat},${found.lng}` : `📍 No se encontró en el mapa: "${address}"`);
             if (geoCache.size > 500) geoCache.delete(geoCache.keys().next().value);
         } catch (e) {
             console.log('No se pudo ubicar la dirección:', e.message);
