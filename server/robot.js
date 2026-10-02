@@ -239,7 +239,14 @@ const ensureLoggedIn = async (page, username, password) => {
 
 // --- CHEQUEO DE VIDA (para despertar el servidor y comprobar que responde) ---
 app.get(['/', '/health'], (req, res) => {
-    res.json({ ok: true, browser: !!globalBrowser, sessionActive });
+    res.json({
+        ok: true,
+        browser: !!globalBrowser,
+        sessionActive,
+        uptimeMin: Math.round(process.uptime() / 60),
+        hasCredentials: !!lastCredentials,
+        lastReadSecondsAgo: cache ? Math.round((Date.now() - cache.at) / 1000) : null,
+    });
 });
 
 // --- LECTURA DEL REPORTE (una a la vez, porque hay una sola pestaña) ---
@@ -499,6 +506,18 @@ setInterval(() => {
     refreshCache(lastCredentials.username, lastCredentials.password)
         .catch(e => console.log('Relectura en segundo plano falló:', e.message));
 }, 10 * 1000);
+
+// Auto-visita: Render gratis apaga el servidor tras 15 min sin visitas desde afuera (lo que el robot hace
+// por dentro no cuenta). En horario de trabajo el servidor se visita a sí mismo por su dirección pública
+// cada 10 min para no dormirse y no perder la sesión del GPS.
+const PUBLIC_URL = process.env.RENDER_EXTERNAL_URL;
+if (PUBLIC_URL) {
+    setInterval(() => {
+        const hour = colombiaHour();
+        if (hour < WORK_HOURS.from || hour >= WORK_HOURS.to) return;
+        fetch(`${PUBLIC_URL}/health`).catch(e => console.log('Auto-visita falló:', e.message));
+    }, 10 * 60 * 1000);
+}
 
 if (process.env.GPS_USERNAME && process.env.GPS_PASSWORD) {
     lastCredentials = { username: process.env.GPS_USERNAME, password: process.env.GPS_PASSWORD };
