@@ -29,20 +29,6 @@ const mapsUrl = (v: GpsVehicle) => {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
 };
 
-const placeOf = (v: GpsVehicle) =>
-  v.lat != null && v.lng != null ? `${v.lat},${v.lng}` : /neiva/i.test(v.localizacion || '') ? v.localizacion! : `${v.localizacion}, Neiva, Huila`;
-
-/**
- * Un solo Google Maps con todos los vehículos: se arma como una ruta (A → B → ...),
- * que es la forma en que Google Maps muestra varios puntos a la vez. En Android abre la app.
- */
-const allMapsUrl = (list: GpsVehicle[]) => {
-  const places = list.map(placeOf);
-  const params = new URLSearchParams({ api: '1', origin: places[0], destination: places[places.length - 1], travelmode: 'driving' });
-  if (places.length > 2) params.set('waypoints', places.slice(1, -1).join('|'));
-  return `https://www.google.com/maps/dir/?${params.toString()}`;
-};
-
 const toNumber = (passengers: string) => parseInt(passengers.replace(/\./g, ''), 10);
 
 /** Saca la hora de "2026-10-02 08:15:45" y la deja como "8:15 AM". */
@@ -68,7 +54,6 @@ export const RobotModal: React.FC<RobotModalProps> = ({ isOpen, onClose, vehicle
   if (!isOpen) return null;
 
   const deductionValue = parseInt(deduction, 10) || 0;
-  const located = vehicles.filter(v => v.localizacion || (v.lat != null && v.lng != null));
 
   const handleVehicleClick = (vehiclePassengers: string) => {
     const raw = toNumber(vehiclePassengers);
@@ -180,16 +165,6 @@ export const RobotModal: React.FC<RobotModalProps> = ({ isOpen, onClose, vehicle
               );
             })}
           </div>
-          {located.length >= 2 && (
-            <a
-              href={allMapsUrl(located)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-violet/15 border border-violet/40 text-violet font-bold text-sm hover:bg-violet/25 active:scale-[0.99] transition-all"
-            >
-              <MapPinIcon /> Ver los {located.length} vehículos en Google Maps ↗
-            </a>
-          )}
           <p className="mt-3 pt-3 border-t border-line/40 text-center text-[11px] text-faint font-mono">
             Tiempo transcurrido: <span className="text-violet font-bold">{timer} s</span>
           </p>
