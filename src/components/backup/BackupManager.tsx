@@ -100,7 +100,15 @@ export const BackupManager: React.FC = () => {
       markBackupDone();
       setMessage({ text: 'Respaldo compartido.', ok: true });
     } catch (error) {
-      if ((error as Error).name !== 'AbortError') setMessage({ text: 'No se pudo compartir el respaldo.', ok: false });
+      const { name, message: detail } = error as Error;
+      if (name === 'AbortError') return; // el usuario cerró el menú de compartir
+      console.error('Error al compartir el respaldo:', error);
+      // Si el celular no deja compartir el archivo, se descarga para no quedarse sin copia.
+      handleExport();
+      setMessage({
+        text: `No se pudo abrir "Compartir" en este celular (${name}${detail ? `: ${detail}` : ''}). El respaldo se descargó como archivo; búscalo en Descargas.`,
+        ok: false,
+      });
     }
   };
 
@@ -161,7 +169,7 @@ export const BackupManager: React.FC = () => {
         <Button variant="primary" onClick={handleExport}><DownloadIcon /> Descargar</Button>
         {canShareFiles && <Button onClick={handleShare}>Compartir</Button>}
         <Button onClick={() => fileInputRef.current?.click()}><LoadIcon /> Restaurar</Button>
-        <input ref={fileInputRef} type="file" accept="application/json,.json" className="hidden" onChange={handleImport} />
+        <input ref={fileInputRef} type="file" className="hidden" onChange={handleImport} />
       </div>
 
       {message && (
