@@ -17,21 +17,18 @@ interface RobotModalProps {
 
 const toNumber = (passengers: string) => parseInt(passengers.replace(/\./g, ''), 10);
 
-/** Separa "2026-10-02 07:51:10" (o "02/10/2026 07:51") en hora, fecha y "hace X min". */
-const splitGpsDate = (raw: string) => {
-  const time = raw.match(/\d{1,2}:\d{2}(:\d{2})?(\s?[ap]\.?\s?m\.?)?/i)?.[0] ?? '';
-  const date = raw.replace(time, '').trim();
-  let ago = '';
+/** Saca solo la hora de "2026-10-02 07:51:10" (o "02/10/2026 07:51") y cuántos minutos han pasado. */
+const parseGpsTime = (raw: string) => {
+  const time = raw.match(/\d{1,2}:\d{2}(:\d{2})?(\s?[ap]\.?\s?m\.?)?/i)?.[0] ?? raw;
+  let minutesAgo: number | null = null;
   const iso = raw.match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{1,2}):(\d{2})/);
   const dmy = raw.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})/);
   const parts = iso ? [iso[1], iso[2], iso[3], iso[4], iso[5]] : dmy ? [dmy[3], dmy[2], dmy[1], dmy[4], dmy[5]] : null;
   if (parts) {
     const [y, mo, d, h, mi] = parts.map(Number);
-    const minutes = Math.round((Date.now() - new Date(y, mo - 1, d, h, mi).getTime()) / 60000);
-    if (minutes >= 0 && minutes < 60) ago = minutes === 0 ? 'ahora' : `hace ${minutes} min`;
-    else if (minutes >= 60 && minutes < 24 * 60) ago = `hace ${Math.floor(minutes / 60)} h`;
+    minutesAgo = Math.round((Date.now() - new Date(y, mo - 1, d, h, mi).getTime()) / 60000);
   }
-  return { time: time || raw, date: time ? date : '', ago };
+  return { time, minutesAgo };
 };
 
 export const RobotModal: React.FC<RobotModalProps> = ({ isOpen, onClose, vehicles, status, errorMessage, deduction, onDeductionChange, onSelectPassengers, onUpdate }) => {
@@ -102,7 +99,7 @@ export const RobotModal: React.FC<RobotModalProps> = ({ isOpen, onClose, vehicle
           <p className="text-xs text-center text-violet mb-3 font-medium">Toca un vehículo para cargar sus pasajeros</p>
           <div className="space-y-3">
             {vehicles.map((v, i) => {
-              const gps = v.fechaGps ? splitGpsDate(v.fechaGps) : null;
+              const gps = v.fechaGps ? parseGpsTime(v.fechaGps) : null;
               return (
                 <div key={i} className="bg-field/50 border border-line/60 rounded-2xl overflow-hidden hover:border-violet/70 transition-colors">
                   <button
@@ -135,7 +132,10 @@ export const RobotModal: React.FC<RobotModalProps> = ({ isOpen, onClose, vehicle
                         {gps ? (
                           <>
                             <p className="tabular text-base font-bold text-main mt-0.5">{gps.time}</p>
-                            <p className="tabular text-[11px] text-muted truncate">{[gps.date, gps.ago].filter(Boolean).join(' · ')}</p>
+                            <p className="flex items-center gap-1.5 text-[11px] text-muted">
+                              <span className={`h-2 w-2 rounded-full ${gps.minutesAgo !== null && gps.minutesAgo <= 5 ? 'bg-good animate-pulse' : 'bg-warn'}`} />
+                              Hora del GPS
+                            </p>
                           </>
                         ) : (
                           <p className="text-xs text-faint mt-0.5">Sin dato</p>
