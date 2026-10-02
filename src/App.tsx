@@ -265,8 +265,6 @@ const App: React.FC = () => {
 
         <DayForm formData={formData} fuelInputRef={fuelInputRef} isEditing={!!editingId} onChange={handleChange} onFocus={onFocus} />
 
-        <PeriodSummary history={history} />
-
         <HistorySection
           history={history}
           passengerGoal={passengerGoal}
@@ -279,6 +277,8 @@ const App: React.FC = () => {
           onMoveDown={id => moveEntry(id, 1)}
           onChangeTimestamp={handleChangeTimestamp}
         />
+
+        <PeriodSummary history={history} />
 
         <VehicleMaintenanceManager
           records={maintenanceRecords}

@@ -1,5 +1,6 @@
 import React from 'react';
 import { FormData } from '../../types';
+import { SHOW_ROUTE_SELECTOR } from '../../constants';
 import { BriefcaseIcon, FuelIcon, MoneyIcon, PercentageIcon, RouteIcon, UsersIcon, WrenchIcon } from '../icons';
 import { Card, SectionTitle } from '../ui';
 import { InputControl } from './InputControl';
@@ -30,7 +31,7 @@ export const DayForm: React.FC<DayFormProps> = ({ formData, fuelInputRef, isEdit
           <InputControl label="Comisión fija" name="fixedCommission" value={formData.fixedCommission} onChange={onChange} onFocus={onFocus} icon={<PercentageIcon />} tone="info" unit="%" />
         </div>
         <InputControl label="Comisión por pasajero" name="commissionPerPassenger" value={formData.commissionPerPassenger} onChange={onChange} onFocus={onFocus} icon={<MoneyIcon />} tone="good" unit="$" />
-        <RouteSelector label="Ruta actual" value={formData.route} onChange={route => onChange({ target: { name: 'route', value: route } })} icon={<RouteIcon />} options={['60', '29']} />
+        {SHOW_ROUTE_SELECTOR && <RouteSelector label="Ruta actual" value={formData.route} onChange={route => onChange({ target: { name: 'route', value: route } })} icon={<RouteIcon />} options={['60', '29']} />}
       </div>
     </Card>
 

@@ -43,6 +43,13 @@ export const Header: React.FC<HeaderProps> = ({ results, gpsStatus, theme, onTog
           <RobotIcon />
           {gpsStatus === 'loading' ? 'Sincronizando...' : 'Pasajeros GPS'}
         </button>
+        <button
+          onClick={() => document.getElementById('registros')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+          className={`${chipClass} text-info bg-info/10 border-info/30 hover:bg-info/20`}
+        >
+          <ClipboardCheckIcon />
+          Registros
+        </button>
         <a
           href="https://newxmkxkombat-coder.github.io/calendario/"
           target="_blank"

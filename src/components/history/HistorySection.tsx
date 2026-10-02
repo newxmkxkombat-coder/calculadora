@@ -1,7 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { HistoryEntry } from '../../types';
 import { formatCurrency, parseFormattedNumber } from '../../utils/format';
-import { ChevronDownIcon, ClipboardCheckIcon, TrashIcon } from '../icons';
+import { ClipboardCheckIcon, TrashIcon } from '../icons';
 import { GoalProgress } from '../summary/GoalProgress';
 import { Button, Card, EmptyState, IconBadge } from '../ui';
 import { HistoryList } from './HistoryList';
@@ -20,8 +20,6 @@ interface HistorySectionProps {
 }
 
 export const HistorySection: React.FC<HistorySectionProps> = ({ history, passengerGoal, onGoalChange, onClearAll, ...listHandlers }) => {
-  const [isListOpen, setIsListOpen] = useState(false);
-
   const totals = useMemo(() => history.reduce((acc, entry) => {
     acc.earnings += entry.results.myEarnings;
     acc.expenses += entry.results.totalExpenses;
@@ -35,11 +33,13 @@ export const HistorySection: React.FC<HistorySectionProps> = ({ history, passeng
 
   return (
     <Card className="mt-6">
-      <div className="flex items-center gap-3 p-4 sm:p-5">
+      <div id="registros" className="flex items-center gap-3 p-4 sm:p-5 scroll-mt-4">
         <IconBadge tone="violet"><ClipboardCheckIcon /></IconBadge>
-        <h2 className="text-base sm:text-lg font-bold text-main flex-grow">Historial</h2>
+        <h2 className="text-base sm:text-lg font-bold text-main">Registros diarios</h2>
+        {history.length > 0 && <span className="text-xs bg-raised/70 text-muted font-semibold px-2 py-0.5 rounded-full">{history.length}</span>}
+        <div className="flex-grow" />
         <Button variant="danger" small onClick={onClearAll} disabled={history.length === 0}>
-          <TrashIcon /> <span className="hidden sm:inline">Borrar historial</span>
+          <TrashIcon /> <span className="hidden sm:inline">Borrar todo</span>
         </Button>
       </div>
 
@@ -48,7 +48,7 @@ export const HistorySection: React.FC<HistorySectionProps> = ({ history, passeng
           <EmptyState icon={<ClipboardCheckIcon />}>Aún no hay cálculos guardados. Llena el día y toca “Guardar registro”.</EmptyState>
         ) : (
           <>
-            <GoalProgress totalPassengers={totals.passengers} goal={passengerGoal} onGoalChange={onGoalChange} />
+            <HistoryList history={history} {...listHandlers} />
 
             <div className="rounded-2xl bg-field/50 border border-line/50 p-4 sm:p-5">
               <h3 className="text-xs font-bold uppercase tracking-widest text-muted mb-4 text-center">Total del historial</h3>
@@ -65,22 +65,7 @@ export const HistorySection: React.FC<HistorySectionProps> = ({ history, passeng
               </div>
             </div>
 
-            <div>
-              <button
-                onClick={() => setIsListOpen(o => !o)}
-                aria-expanded={isListOpen}
-                className="w-full flex justify-between items-center text-left p-3 rounded-xl bg-field/50 border border-line/50 hover:bg-raised/40 transition-colors"
-              >
-                <span className="flex items-center gap-3">
-                  <span className="font-bold text-main">Registros diarios</span>
-                  <span className="text-xs bg-raised/70 text-muted font-semibold px-2 py-0.5 rounded-full">{history.length}</span>
-                </span>
-                <ChevronDownIcon className={`text-muted transition-transform duration-300 ${isListOpen ? 'rotate-180' : ''}`} />
-              </button>
-              <div className="collapsible" data-open={isListOpen}>
-                <div><div className="pt-4"><HistoryList history={history} {...listHandlers} /></div></div>
-              </div>
-            </div>
+            <GoalProgress totalPassengers={totals.passengers} goal={passengerGoal} onGoalChange={onGoalChange} />
           </>
         )}
       </div>
