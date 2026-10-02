@@ -107,7 +107,7 @@ export const GoalProgress: React.FC<GoalProgressProps> = ({ totalPassengers, goa
               <IconButton title="Cancelar" tone="bad" onClick={handleCancel} className="!p-1"><XIcon /></IconButton>
             </div>
           ) : (
-            <div className="flex items-center justify-center gap-1">
+            <div className="flex flex-wrap items-center justify-center gap-x-1">
               <p className="tabular font-bold text-good">{goal.toLocaleString('es-CO')}</p>
               <IconButton title="Editar meta" onClick={() => { setTempGoal(goal.toString()); setIsEditing(true); }} className="!p-1 !bg-transparent"><EditIcon /></IconButton>
             </div>

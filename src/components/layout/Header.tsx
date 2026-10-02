@@ -22,6 +22,9 @@ const chipClass =
 /** Barra superior + tarjeta principal con la Entrega y el resumen del día. */
 export const Header: React.FC<HeaderProps> = ({ results, gpsStatus, theme, onToggleTheme, onOpenRobot, onGoToRecords }) => {
   const isNegative = results.amountToSettle < 0;
+  const entregaText = formatCurrency(results.amountToSettle);
+  // Las cifras largas bajan de tamaño para que siempre quepan en pantallas angostas.
+  const entregaSize = entregaText.length > 12 ? 'text-2xl sm:text-5xl' : entregaText.length > 9 ? 'text-3xl sm:text-5xl' : 'text-4xl sm:text-5xl';
   const today = new Date().toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' });
 
   return (
@@ -68,8 +71,8 @@ export const Header: React.FC<HeaderProps> = ({ results, gpsStatus, theme, onTog
             <ClipboardCheckIcon />
             Entrega
           </div>
-          <p className={`tabular text-4xl sm:text-5xl font-extrabold tracking-tight transition-colors ${isNegative ? 'text-bad' : 'text-brand'}`}>
-            {formatCurrency(results.amountToSettle)}
+          <p className={`tabular whitespace-nowrap font-extrabold tracking-tight transition-colors ${entregaSize} ${isNegative ? 'text-bad' : 'text-brand'}`}>
+            {entregaText}
           </p>
           <p className="text-xs text-faint mt-1">
             {isNegative ? 'Los gastos superan lo recaudado' : 'Lo que entregas al propietario'}
@@ -85,9 +88,11 @@ export const Header: React.FC<HeaderProps> = ({ results, gpsStatus, theme, onTog
   );
 };
 
+const statSize = (value: string) => (value.length > 11 ? 'text-xs sm:text-lg' : value.length > 9 ? 'text-sm sm:text-lg' : 'text-base sm:text-lg');
+
 const Stat: React.FC<{ label: string; value: string; className: string }> = ({ label, value, className }) => (
-  <div className="py-3 px-2 text-center">
+  <div className="py-3 px-1 text-center min-w-0">
     <p className="text-[11px] font-medium text-muted">{label}</p>
-    <p className={`tabular font-bold text-base sm:text-lg ${className}`}>{value}</p>
+    <p className={`tabular font-bold whitespace-nowrap ${statSize(value)} ${className}`}>{value}</p>
   </div>
 );

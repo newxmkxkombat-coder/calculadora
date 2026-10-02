@@ -128,7 +128,7 @@ export const HistorySection: React.FC<HistorySectionProps> = ({ history, passeng
         <Card className="mt-6 p-4 sm:p-5 space-y-5">
           <div className="rounded-2xl bg-field/50 border border-line/50 p-4 sm:p-5">
             <h3 className="text-xs font-bold uppercase tracking-widest text-muted mb-4 text-center">Total del historial</h3>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
+            <div className="grid grid-cols-1 min-[360px]:grid-cols-2 md:grid-cols-5 gap-4 text-center">
               <Total label="Pasajeros" value={totals.passengers.toLocaleString('es-CO')} tone="text-brand" />
               <div>
                 <Total label="Ganancia" value={formatCurrency(totals.earnings)} tone="text-good" />
@@ -148,9 +148,12 @@ export const HistorySection: React.FC<HistorySectionProps> = ({ history, passeng
   );
 };
 
+/** Las cifras muy largas bajan de tamaño para que siempre quepan en su casilla. */
+const totalSize = (value: string) => (value.length > 12 ? 'text-sm' : value.length > 10 ? 'text-base' : 'text-lg');
+
 const Total: React.FC<{ label: string; value: string; tone: string }> = ({ label, value, tone }) => (
-  <div>
+  <div className="min-w-0">
     <p className="text-xs text-muted">{label}</p>
-    <p className={`tabular text-lg font-extrabold ${tone}`}>{value}</p>
+    <p className={`tabular whitespace-nowrap font-extrabold ${totalSize(value)} ${tone}`}>{value}</p>
   </div>
 );

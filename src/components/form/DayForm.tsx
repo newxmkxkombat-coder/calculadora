@@ -27,8 +27,8 @@ export const DayForm: React.FC<DayFormProps> = ({ formData, fuelInputRef, isEdit
       <div className="space-y-3 mt-4">
         <InputControl label="Número de pasajeros" name="numPassengers" value={formData.numPassengers} onChange={onChange} onFocus={onFocus} icon={<UsersIcon />} />
         <div className="grid grid-cols-2 gap-3">
-          <InputControl label="Valor pasaje" name="fareValue" value={formData.fareValue} onChange={onChange} onFocus={onFocus} icon={<MoneyIcon />} tone="good" unit="$" />
-          <InputControl label="Comisión fija" name="fixedCommission" value={formData.fixedCommission} onChange={onChange} onFocus={onFocus} icon={<PercentageIcon />} tone="info" unit="%" />
+          <InputControl label="Valor pasaje" name="fareValue" value={formData.fareValue} onChange={onChange} onFocus={onFocus} icon={<MoneyIcon />} tone="good" unit="$" compact />
+          <InputControl label="Comisión fija" name="fixedCommission" value={formData.fixedCommission} onChange={onChange} onFocus={onFocus} icon={<PercentageIcon />} tone="info" unit="%" compact />
         </div>
         <InputControl label="Comisión por pasajero" name="commissionPerPassenger" value={formData.commissionPerPassenger} onChange={onChange} onFocus={onFocus} icon={<MoneyIcon />} tone="good" unit="$" />
         {SHOW_ROUTE_SELECTOR && <RouteSelector label="Ruta actual" value={formData.route} onChange={route => onChange({ target: { name: 'route', value: route } })} icon={<RouteIcon />} options={['60', '29']} />}

@@ -45,7 +45,7 @@ export const PeriodSummary: React.FC<{ history: HistoryEntry[] }> = ({ history }
         <p className="text-center text-sm text-faint py-6">Guarda tu primer día para ver aquí tus totales.</p>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 min-[360px]:grid-cols-2 gap-3">
             <Metric label="Ganancia" value={formatCurrency(totals.earnings)} tone="text-good" big />
             <Metric label="Pasajeros" value={totals.passengers.toLocaleString('es-CO')} tone="text-brand" big />
             <Metric label="Gastos" value={formatCurrency(totals.expenses)} tone="text-warn" />
@@ -78,9 +78,16 @@ export const PeriodSummary: React.FC<{ history: HistoryEntry[] }> = ({ history }
   );
 };
 
+/** El tamaño de la cifra baja un poco si es muy larga, para que nunca se corte. */
+const sizeFor = (value: string, big?: boolean) => {
+  if (value.length > 12) return 'text-sm';
+  if (value.length > 10) return 'text-base';
+  return big ? 'text-xl' : 'text-base';
+};
+
 const Metric: React.FC<{ label: string; value: string; tone: string; big?: boolean }> = ({ label, value, tone, big }) => (
-  <div className="p-3 rounded-xl bg-field/50 border border-line/40">
+  <div className="p-3 rounded-xl bg-field/50 border border-line/40 min-w-0">
     <p className="text-[11px] text-muted">{label}</p>
-    <p className={`tabular font-extrabold truncate ${big ? 'text-xl' : 'text-base'} ${tone}`}>{value}</p>
+    <p className={`tabular font-extrabold whitespace-nowrap ${sizeFor(value, big)} ${tone}`}>{value}</p>
   </div>
 );
