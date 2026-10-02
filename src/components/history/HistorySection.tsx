@@ -88,6 +88,11 @@ export const HistorySection: React.FC<HistorySectionProps> = ({ history, passeng
                 <EmptyState icon={<ClipboardCheckIcon />}>Aún no hay cálculos guardados. Llena el día y toca “Guardar registro”.</EmptyState>
               ) : (
                 <>
+                  {/* Arriba del buscador para que se vea sin bajar hasta el final de la lista */}
+                  <div className="flex justify-end">
+                    <Button variant="danger" small onClick={onClearAll}><TrashIcon /> Borrar todo el historial</Button>
+                  </div>
+
                   <div className="relative">
                     <span className="absolute inset-y-0 left-0 flex items-center pl-3"><SearchIcon /></span>
                     <input
@@ -114,9 +119,6 @@ export const HistorySection: React.FC<HistorySectionProps> = ({ history, passeng
                     </>
                   )}
 
-                  <div className="pt-2 flex justify-end">
-                    <Button variant="danger" small onClick={onClearAll}><TrashIcon /> Borrar todo el historial</Button>
-                  </div>
                 </>
               )}
             </div>
