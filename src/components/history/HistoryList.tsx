@@ -7,6 +7,10 @@ import { IconButton } from '../ui';
 
 interface HistoryListProps {
   history: HistoryEntry[];
+  /** Total de registros guardados (la lista puede mostrar solo una parte). */
+  totalCount: number;
+  /** Si es false (por ejemplo al buscar) se ocultan las flechas de mover. */
+  canReorder: boolean;
   onLoad: (id: string) => void;
   onDelete: (id: string) => void;
   onCopy: (entry: HistoryEntry) => void;
@@ -22,7 +26,7 @@ const toLocalInputValue = (timestamp: string): string => {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
 
-export const HistoryList: React.FC<HistoryListProps> = ({ history, onLoad, onDelete, onCopy, onMoveUp, onMoveDown, onChangeTimestamp }) => {
+export const HistoryList: React.FC<HistoryListProps> = ({ history, totalCount, canReorder, onLoad, onDelete, onCopy, onMoveUp, onMoveDown, onChangeTimestamp }) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [tempTimestamp, setTempTimestamp] = useState('');
@@ -60,8 +64,8 @@ export const HistoryList: React.FC<HistoryListProps> = ({ history, onLoad, onDel
   const actions = (entry: HistoryEntry, index: number) => (
     <div className="flex items-center gap-1.5">
       <IconButton title="Copiar para WhatsApp" tone="good" onClick={() => onCopy(entry)}><CopyIcon /></IconButton>
-      <IconButton title="Mover hacia arriba" tone="info" onClick={() => onMoveUp(entry.id)} disabled={index === 0}><ArrowUpIcon /></IconButton>
-      <IconButton title="Mover hacia abajo" tone="info" onClick={() => onMoveDown(entry.id)} disabled={index === history.length - 1}><ArrowDownIcon /></IconButton>
+      {canReorder && <IconButton title="Mover hacia arriba" tone="info" onClick={() => onMoveUp(entry.id)} disabled={index === 0}><ArrowUpIcon /></IconButton>}
+      {canReorder && <IconButton title="Mover hacia abajo" tone="info" onClick={() => onMoveDown(entry.id)} disabled={index === totalCount - 1}><ArrowDownIcon /></IconButton>}
       <IconButton title="Cargar este cálculo" tone="brand" onClick={() => onLoad(entry.id)}><LoadIcon /></IconButton>
       <IconButton title="Borrar este cálculo" tone="bad" onClick={() => onDelete(entry.id)}><TrashIcon /></IconButton>
     </div>

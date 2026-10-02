@@ -65,6 +65,7 @@ const App: React.FC = () => {
   const [usedPhrases, setUsedPhrases] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isRobotModalOpen, setIsRobotModalOpen] = useState(false);
+  const [isRecordsOpen, setIsRecordsOpen] = useState(false);
 
   const fuelInputRef = useRef<HTMLInputElement>(null);
 
@@ -249,6 +250,12 @@ const App: React.FC = () => {
     setToastMessage('Pasajeros actualizados desde el GPS');
   };
 
+  // El botón "Registros" del encabezado abre la lista y baja hasta ella.
+  const goToRecords = () => {
+    setIsRecordsOpen(true);
+    setTimeout(() => document.getElementById('registros')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+  };
+
   // Al tocar un espacio vacío se cierra el teclado.
   const handleBackgroundClick = (event: React.MouseEvent<HTMLDivElement>) => {
     if ((event.target as HTMLElement).closest('input, button, a, label, select')) return;
@@ -261,13 +268,15 @@ const App: React.FC = () => {
       <DocumentAlerts documents={documents} />
 
       <div className="max-w-4xl mx-auto">
-        <Header results={results} gpsStatus={gps.status} theme={theme} onToggleTheme={toggleTheme} onOpenRobot={openRobot} />
+        <Header results={results} gpsStatus={gps.status} theme={theme} onToggleTheme={toggleTheme} onOpenRobot={openRobot} onGoToRecords={goToRecords} />
 
         <DayForm formData={formData} fuelInputRef={fuelInputRef} isEditing={!!editingId} onChange={handleChange} onFocus={onFocus} />
 
         <HistorySection
           history={history}
           passengerGoal={passengerGoal}
+          isOpen={isRecordsOpen}
+          onToggle={() => setIsRecordsOpen(open => !open)}
           onGoalChange={setPassengerGoal}
           onClearAll={handleClearAllHistory}
           onLoad={handleLoadEntry}

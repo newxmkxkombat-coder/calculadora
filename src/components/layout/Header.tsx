@@ -13,13 +13,14 @@ interface HeaderProps {
   theme: Theme;
   onToggleTheme: () => void;
   onOpenRobot: () => void;
+  onGoToRecords: () => void;
 }
 
 const chipClass =
   'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold transition-all active:scale-95';
 
 /** Barra superior + tarjeta principal con la Entrega y el resumen del día. */
-export const Header: React.FC<HeaderProps> = ({ results, gpsStatus, theme, onToggleTheme, onOpenRobot }) => {
+export const Header: React.FC<HeaderProps> = ({ results, gpsStatus, theme, onToggleTheme, onOpenRobot, onGoToRecords }) => {
   const isNegative = results.amountToSettle < 0;
   const today = new Date().toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' });
 
@@ -44,7 +45,7 @@ export const Header: React.FC<HeaderProps> = ({ results, gpsStatus, theme, onTog
           {gpsStatus === 'loading' ? 'Sincronizando...' : 'Pasajeros GPS'}
         </button>
         <button
-          onClick={() => document.getElementById('registros')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+          onClick={onGoToRecords}
           className={`${chipClass} text-info bg-info/10 border-info/30 hover:bg-info/20`}
         >
           <ClipboardCheckIcon />
