@@ -1,0 +1,85 @@
+import React from 'react';
+import { GpsStatus } from '../../types';
+import { formatCurrency } from '../../utils/format';
+import { CalculationResults } from '../../types';
+import { CalendarIcon, ClipboardCheckIcon, MoonIcon, RobotIcon, SunIcon } from '../icons';
+import { Theme } from '../../hooks/useTheme';
+import { Card, IconButton } from '../ui';
+import { DigitalClock } from './DigitalClock';
+
+interface HeaderProps {
+  results: CalculationResults;
+  gpsStatus: GpsStatus;
+  theme: Theme;
+  onToggleTheme: () => void;
+  onOpenRobot: () => void;
+}
+
+const chipClass =
+  'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold transition-all active:scale-95';
+
+/** Barra superior + tarjeta principal con la Entrega y el resumen del día. */
+export const Header: React.FC<HeaderProps> = ({ results, gpsStatus, theme, onToggleTheme, onOpenRobot }) => {
+  const isNegative = results.amountToSettle < 0;
+  const today = new Date().toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' });
+
+  return (
+    <header className="mb-6">
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="min-w-0">
+          <h1 className="text-lg font-extrabold tracking-tight text-main leading-tight">Mi Ganancia</h1>
+          <p className="text-xs text-muted first-letter:uppercase truncate">{today}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <DigitalClock />
+          <IconButton title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'} onClick={onToggleTheme}>
+            {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+          </IconButton>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2 mb-4">
+        <button onClick={onOpenRobot} className={`${chipClass} text-violet bg-violet/10 border-violet/30 hover:bg-violet/20`}>
+          <RobotIcon />
+          {gpsStatus === 'loading' ? 'Sincronizando...' : 'Pasajeros GPS'}
+        </button>
+        <a
+          href="https://newxmkxkombat-coder.github.io/calendario/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`${chipClass} text-brand bg-brand/10 border-brand/30 hover:bg-brand/20`}
+        >
+          <CalendarIcon />
+          Calendario
+        </a>
+      </div>
+
+      <Card className="overflow-hidden">
+        <div className={`px-5 pt-5 pb-4 text-center bg-gradient-to-b ${isNegative ? 'from-bad/10' : 'from-brand/10'} to-transparent`}>
+          <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted mb-1">
+            <ClipboardCheckIcon />
+            Entrega
+          </div>
+          <p className={`tabular text-4xl sm:text-5xl font-extrabold tracking-tight transition-colors ${isNegative ? 'text-bad' : 'text-brand'}`}>
+            {formatCurrency(results.amountToSettle)}
+          </p>
+          <p className="text-xs text-faint mt-1">
+            {isNegative ? 'Los gastos superan lo recaudado' : 'Lo que entregas al propietario'}
+          </p>
+        </div>
+        <div className="grid grid-cols-3 divide-x divide-line/50 border-t border-line/50">
+          <Stat label="Mi sueldo" value={formatCurrency(results.myEarnings)} className="text-good" />
+          <Stat label="Gastos" value={formatCurrency(results.totalExpenses)} className="text-warn" />
+          <Stat label="Recaudado" value={formatCurrency(results.totalRevenue)} className="text-info" />
+        </div>
+      </Card>
+    </header>
+  );
+};
+
+const Stat: React.FC<{ label: string; value: string; className: string }> = ({ label, value, className }) => (
+  <div className="py-3 px-2 text-center">
+    <p className="text-[11px] font-medium text-muted">{label}</p>
+    <p className={`tabular font-bold text-base sm:text-lg ${className}`}>{value}</p>
+  </div>
+);

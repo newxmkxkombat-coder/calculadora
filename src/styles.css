@@ -1,0 +1,128 @@
+/* Paleta semántica (canales RGB para que Tailwind pueda aplicar opacidad). */
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --c-app: 8 12 24;
+  --c-card: 17 24 39;
+  --c-field: 30 41 59;
+  --c-raised: 51 65 85;
+  --c-line: 51 65 85;
+  --c-main: 241 245 249;
+  --c-muted: 148 163 184;
+  --c-faint: 100 116 139;
+  --c-brand: 45 212 191;
+  --c-on-brand: 4 20 24;
+  --c-good: 52 211 153;
+  --c-bad: 251 113 133;
+  --c-warn: 251 191 36;
+  --c-info: 56 189 248;
+  --c-violet: 167 139 250;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --c-app: 241 245 249;
+  --c-card: 255 255 255;
+  --c-field: 241 245 249;
+  --c-raised: 226 232 240;
+  --c-line: 203 213 225;
+  --c-main: 15 23 42;
+  --c-muted: 71 85 105;
+  --c-faint: 100 116 139;
+  --c-brand: 13 148 136;
+  --c-on-brand: 255 255 255;
+  --c-good: 5 150 105;
+  --c-bad: 225 29 72;
+  --c-warn: 180 83 9;
+  --c-info: 2 132 199;
+  --c-violet: 109 40 217;
+}
+
+body {
+  background-color: rgb(var(--c-app));
+  background-image:
+    radial-gradient(ellipse 80% 40% at 50% -10%, rgb(var(--c-brand) / 0.14), transparent),
+    radial-gradient(ellipse 50% 30% at 100% 0%, rgb(var(--c-violet) / 0.07), transparent);
+  background-attachment: fixed;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Números con ancho fijo: las cifras no "bailan" al cambiar. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+input,
+select,
+textarea {
+  color-scheme: inherit;
+}
+
+/* Selector de ruta: el elegido brilla suavemente */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(var(--c-brand) / 0.35); }
+  50% { box-shadow: 0 0 18px 2px rgb(var(--c-brand) / 0.35); }
+}
+.route-checkbox:checked + label {
+  animation: pulse-glow 2.6s infinite ease-in-out;
+}
+
+@keyframes fade-in-backdrop {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes fade-in-scale {
+  from { opacity: 0; transform: scale(0.96) translateY(6px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes fade-in-down {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse-bell {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
+.animate-fade-in-backdrop { animation: fade-in-backdrop 0.25s ease-out forwards; }
+.animate-fade-in-scale { animation: fade-in-scale 0.28s ease-out forwards; }
+.animate-fade-in-down { animation: fade-in-down 0.3s ease-out forwards; }
+.animate-slide-up { animation: slide-up 0.3s ease-out forwards; }
+.animate-pulse-bell { animation: pulse-bell 2s infinite ease-in-out; }
+
+/* Secciones plegables sin alturas fijas */
+.collapsible {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.35s ease;
+}
+.collapsible[data-open='true'] {
+  grid-template-rows: 1fr;
+}
+.collapsible > div {
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* Editor de notas de mantenimiento */
+.rich-editor[contenteditable]:empty:before {
+  content: attr(placeholder);
+  color: rgb(var(--c-faint));
+  pointer-events: none;
+  display: block;
+}
+
+.custom-scrollbar::-webkit-scrollbar { width: 6px; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: rgb(var(--c-line)); border-radius: 9999px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
