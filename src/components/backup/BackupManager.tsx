@@ -19,6 +19,13 @@ const ARRAY_KEYS: string[] = [STORAGE_KEYS.history, STORAGE_KEYS.documents, STOR
 
 const BACKUP_APP_ID = 'mi-ganancia';
 
+/**
+ * Tipos que acepta Restaurar. Sin esto, Android muestra el selector de fotos/cámara y el .json
+ * no aparece; con los tipos indicados abre directo el explorador de archivos.
+ * application/octet-stream cubre celulares que no reconocen la extensión .json.
+ */
+const BACKUP_FILE_ACCEPT = '.json,application/json,.txt,text/plain,application/octet-stream';
+
 const readLastBackup = (): string | null => {
   try {
     return localStorage.getItem(STORAGE_KEYS.lastBackup);
@@ -173,8 +180,13 @@ export const BackupManager: React.FC = () => {
         <Button variant="primary" onClick={handleExport}><DownloadIcon /> Descargar</Button>
         {canShareFiles && <Button onClick={handleShare}>Compartir</Button>}
         <Button onClick={() => fileInputRef.current?.click()}><LoadIcon /> Restaurar</Button>
-        <input ref={fileInputRef} type="file" className="hidden" onChange={handleImport} />
+        <input ref={fileInputRef} type="file" accept={BACKUP_FILE_ACCEPT} className="hidden" onChange={handleImport} />
       </div>
+
+      <p className="mt-3 text-xs text-muted">
+        Para restaurar, elige el archivo <span className="font-semibold">mi-ganancia-respaldo-....json</span> (o .txt) que
+        guardaste; normalmente está en la carpeta Descargas.
+      </p>
 
       {message && (
         <p role="status" className={`mt-4 text-sm font-medium ${message.ok ? 'text-good' : 'text-bad'}`}>{message.text}</p>
