@@ -15,11 +15,18 @@ interface RobotModalProps {
   onUpdate: () => void;
 }
 
-/** Enlace a Google Maps: con coordenadas exactas si las hay; si no, buscando la dirección en Neiva. */
+/**
+ * Enlace que abre la app de Google Maps. En Android se usa "geo:", que abre la app directamente
+ * (no el navegador); en otros equipos, el enlace universal de Google Maps.
+ * Con coordenadas exactas si la página del GPS las trae; si no, busca la dirección en Neiva.
+ */
+const isAndroid = typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent);
 const mapsUrl = (v: GpsVehicle) => {
-  if (v.lat != null && v.lng != null) return `https://www.google.com/maps/search/?api=1&query=${v.lat},${v.lng}`;
+  const hasCoords = v.lat != null && v.lng != null;
   const place = /neiva/i.test(v.localizacion || '') ? v.localizacion! : `${v.localizacion}, Neiva, Huila`;
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place)}`;
+  const query = hasCoords ? `${v.lat},${v.lng}` : place;
+  if (isAndroid) return hasCoords ? `geo:${v.lat},${v.lng}?q=${v.lat},${v.lng}` : `geo:0,0?q=${encodeURIComponent(query)}`;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
 };
 
 const toNumber = (passengers: string) => parseInt(passengers.replace(/\./g, ''), 10);
