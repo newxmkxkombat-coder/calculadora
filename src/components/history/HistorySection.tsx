@@ -143,8 +143,15 @@ export const HistorySection: React.FC<HistorySectionProps> = ({ history, passeng
               <Total label="Pasajeros" value={totals.passengers.toLocaleString('es-CO')} tone="text-brand" />
               <div>
                 <Total label="Ganancia" value={formatCurrency(totals.earnings)} tone="text-good" />
-                <p className="tabular text-[11px] text-info mt-1">{formatCurrency(totals.fixed)} · {rates.fixed}% fijo</p>
-                <p className="tabular text-[11px] text-brand">{formatCurrency(totals.perPassenger)} · {rates.perPassenger} por pasajero</p>
+                {/* Cada parte en dos renglones (valor y de dónde sale) para que quepa en pantallas angostas. */}
+                <p className="tabular text-[11px] text-info mt-1 leading-tight">
+                  {formatCurrency(totals.fixed)}
+                  <span className="block text-[10px] text-muted">{rates.fixed}% fijo</span>
+                </p>
+                <p className="tabular text-[11px] text-brand mt-1 leading-tight">
+                  {formatCurrency(totals.perPassenger)}
+                  <span className="block text-[10px] text-muted">{rates.perPassenger} por pasajero</span>
+                </p>
               </div>
               <Total label="Gastos" value={formatCurrency(totals.expenses)} tone="text-warn" />
               <Total label="Recaudado" value={formatCurrency(totals.delivered)} tone="text-info" />
