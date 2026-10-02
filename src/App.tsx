@@ -19,7 +19,6 @@ import { ActionBar } from './components/layout/ActionBar';
 import { Header } from './components/layout/Header';
 import { Toast } from './components/layout/Toast';
 import { VehicleMaintenanceManager } from './components/maintenance/VehicleMaintenanceManager';
-import { LiveStatusBar } from './components/robot/LiveStatusBar';
 import { RobotModal } from './components/robot/RobotModal';
 import { PeriodSummary } from './components/summary/PeriodSummary';
 
@@ -285,7 +284,6 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen px-4 sm:px-6 pt-6 pb-32" onClick={handleBackgroundClick}>
-      <LiveStatusBar status={gps.status} vehicles={gps.vehicles} onClick={openRobot} />
       <DocumentAlerts documents={documents} />
 
       <div className="max-w-4xl mx-auto">
