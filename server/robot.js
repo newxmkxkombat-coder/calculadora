@@ -343,6 +343,8 @@ app.post('/api/scrape-passengers', async (req, res) => {
 
                 let targetColInterno = -1;
                 let targetColTotal = -1;
+                let targetColLoc = -1;
+                let targetColFecha = -1;
                 let headerFound = false;
 
                 // 2 Barridos: Primero encontrar headers, luego extraer
@@ -360,6 +362,10 @@ app.post('/api/scrape-passengers', async (req, res) => {
                     if (idxInt !== -1 && idxTot !== -1) {
                         targetColInterno = idxInt;
                         targetColTotal = idxTot;
+                        // Columnas opcionales: ubicación y hora del último reporte GPS
+                        targetColLoc = texts.findIndex(t => t.includes('localizaci') || t.includes('ubicaci') || t.includes('direcci'));
+                        targetColFecha = texts.findIndex(t => t.includes('fecha gps'));
+                        if (targetColFecha === -1) targetColFecha = texts.findIndex(t => t.includes('fecha') || t.includes('hora'));
                         headerFound = true;
                         break; // Dejar de buscar headers en este doc, ya los tenemos
                     }
@@ -383,7 +389,16 @@ app.post('/api/scrape-passengers', async (req, res) => {
                             // valInterno < 10 chars para evitar leer el header mismo o pies de pagina
                             if (id && pax !== '' && !isNaN(pax) && valInterno.length < 10) {
                                 if (!results.find(v => v.identifier === id)) {
-                                    results.push({ identifier: id, pasajeros: pax });
+                                    const locCell = targetColLoc !== -1 ? cells[targetColLoc] : null;
+                                    const fechaCell = targetColFecha !== -1 ? cells[targetColFecha] : null;
+                                    const link = locCell?.querySelector('a')?.href || '';
+                                    results.push({
+                                        identifier: id,
+                                        pasajeros: pax,
+                                        localizacion: locCell ? locCell.innerText.replace(/\s+/g, ' ').trim() : '',
+                                        fechaGps: fechaCell ? fechaCell.innerText.replace(/\s+/g, ' ').trim() : '',
+                                        mapaUrl: /^https?:/i.test(link) ? link : '',
+                                    });
                                 }
                             }
                         }

@@ -35,7 +35,7 @@ export const DEFAULT_MAINTENANCE_TYPES = ["Cambio de Aceite", "Frenos", "Llantas
 export const DOCUMENT_COMMON_NAMES = ["Licencia de Conducir", "SOAT", "Revisión Técnico-Mecánica"];
 
 // Robot GPS desplegado en Render
-export const API_URL = 'https://exemplary-joy.onrender.com';
+export const API_URL = 'https://calculadora-y7oh.onrender.com';
 export const GPS_TIMEOUT_MS = 90000;
 
 // Muestra u oculta el selector "Ruta actual" en el formulario. La ruta se sigue calculando sola por fecha.

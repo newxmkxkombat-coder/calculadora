@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { GpsStatus, GpsVehicle } from '../../types';
-import { RobotIcon, TrashIcon } from '../icons';
+import { ClockIcon, MapPinIcon, RobotIcon, TrashIcon } from '../icons';
 import { Button, ModalShell } from '../ui';
 
 interface RobotModalProps {
@@ -16,6 +16,23 @@ interface RobotModalProps {
 }
 
 const toNumber = (passengers: string) => parseInt(passengers.replace(/\./g, ''), 10);
+
+/** Separa "2026-10-02 07:51:10" (o "02/10/2026 07:51") en hora, fecha y "hace X min". */
+const splitGpsDate = (raw: string) => {
+  const time = raw.match(/\d{1,2}:\d{2}(:\d{2})?(\s?[ap]\.?\s?m\.?)?/i)?.[0] ?? '';
+  const date = raw.replace(time, '').trim();
+  let ago = '';
+  const iso = raw.match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{1,2}):(\d{2})/);
+  const dmy = raw.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})/);
+  const parts = iso ? [iso[1], iso[2], iso[3], iso[4], iso[5]] : dmy ? [dmy[3], dmy[2], dmy[1], dmy[4], dmy[5]] : null;
+  if (parts) {
+    const [y, mo, d, h, mi] = parts.map(Number);
+    const minutes = Math.round((Date.now() - new Date(y, mo - 1, d, h, mi).getTime()) / 60000);
+    if (minutes >= 0 && minutes < 60) ago = minutes === 0 ? 'ahora' : `hace ${minutes} min`;
+    else if (minutes >= 60 && minutes < 24 * 60) ago = `hace ${Math.floor(minutes / 60)} h`;
+  }
+  return { time: time || raw, date: time ? date : '', ago };
+};
 
 export const RobotModal: React.FC<RobotModalProps> = ({ isOpen, onClose, vehicles, status, errorMessage, deduction, onDeductionChange, onSelectPassengers, onUpdate }) => {
   const [timer, setTimer] = useState(0);
@@ -84,27 +101,63 @@ export const RobotModal: React.FC<RobotModalProps> = ({ isOpen, onClose, vehicle
         <>
           <p className="text-xs text-center text-violet mb-3 font-medium">Toca un vehículo para cargar sus pasajeros</p>
           <div className="space-y-3">
-            {vehicles.map((v, i) => (
-              <button
-                key={i}
-                onClick={() => handleVehicleClick(v.pasajeros)}
-                className="w-full bg-field/50 border border-line/60 hover:border-violet hover:bg-violet/10 p-4 rounded-2xl flex items-center justify-between transition-all active:scale-[0.99]"
-              >
-                <div className="text-left">
-                  <p className="text-[11px] text-muted font-bold uppercase tracking-wider">Vehículo</p>
-                  <p className="text-2xl font-black text-main">{v.identifier}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[11px] text-muted font-bold uppercase tracking-wider">Pasajeros</p>
-                  <p className="tabular text-3xl font-black text-brand">{v.pasajeros}</p>
-                  {deductionValue !== 0 && (
-                    <span className="tabular text-xs text-faint font-mono">
-                      {deductionValue > 0 ? '+' : ''}{deductionValue} = <span className="text-violet font-bold">{Math.max(0, (toNumber(v.pasajeros) || 0) + deductionValue)}</span>
-                    </span>
+            {vehicles.map((v, i) => {
+              const gps = v.fechaGps ? splitGpsDate(v.fechaGps) : null;
+              return (
+                <div key={i} className="bg-field/50 border border-line/60 rounded-2xl overflow-hidden hover:border-violet/70 transition-colors">
+                  <button
+                    onClick={() => handleVehicleClick(v.pasajeros)}
+                    className="w-full hover:bg-violet/10 px-4 py-3.5 flex items-center justify-between gap-3 transition-all active:scale-[0.99]"
+                  >
+                    <div className="flex items-center gap-3 text-left">
+                      <span className="tabular w-12 h-12 shrink-0 rounded-xl bg-violet/15 border border-violet/30 text-violet font-black text-lg flex items-center justify-center">
+                        {v.identifier.padStart(3, '0')}
+                      </span>
+                      <div>
+                        <p className="text-[11px] text-muted font-bold uppercase tracking-wider">Vehículo</p>
+                        <p className="text-sm font-semibold text-main">Móvil {v.identifier.padStart(3, '0')}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[11px] text-muted font-bold uppercase tracking-wider">Pasajeros</p>
+                      <p className="tabular text-3xl font-black text-brand leading-tight">{v.pasajeros}</p>
+                      {deductionValue !== 0 && (
+                        <span className="tabular text-xs text-faint font-mono">
+                          {deductionValue > 0 ? '+' : ''}{deductionValue} = <span className="text-violet font-bold">{Math.max(0, (toNumber(v.pasajeros) || 0) + deductionValue)}</span>
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                  {(gps || v.localizacion) && (
+                    <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] border-t border-line/50 divide-x divide-line/50">
+                      <div className="px-3 py-2.5 min-w-0">
+                        <p className="flex items-center gap-1 text-[10px] text-faint font-bold uppercase tracking-wider"><ClockIcon /> Último reporte</p>
+                        {gps ? (
+                          <>
+                            <p className="tabular text-base font-bold text-main mt-0.5">{gps.time}</p>
+                            <p className="tabular text-[11px] text-muted truncate">{[gps.date, gps.ago].filter(Boolean).join(' · ')}</p>
+                          </>
+                        ) : (
+                          <p className="text-xs text-faint mt-0.5">Sin dato</p>
+                        )}
+                      </div>
+                      <div className="px-3 py-2.5 min-w-0">
+                        <p className="flex items-center gap-1 text-[10px] text-faint font-bold uppercase tracking-wider"><MapPinIcon /> Ubicación</p>
+                        {v.localizacion ? (
+                          v.mapaUrl ? (
+                            <a href={v.mapaUrl} target="_blank" rel="noopener noreferrer" className="block text-sm font-semibold text-violet leading-snug mt-0.5 break-words">{v.localizacion}</a>
+                          ) : (
+                            <p className="text-sm font-semibold text-main leading-snug mt-0.5 break-words">{v.localizacion}</p>
+                          )
+                        ) : (
+                          <p className="text-xs text-faint mt-0.5">Sin dato</p>
+                        )}
+                      </div>
+                    </div>
                   )}
                 </div>
-              </button>
-            ))}
+              );
+            })}
           </div>
           <p className="mt-3 pt-3 border-t border-line/40 text-center text-[11px] text-faint font-mono">
             Tiempo transcurrido: <span className="text-violet font-bold">{timer} s</span>
