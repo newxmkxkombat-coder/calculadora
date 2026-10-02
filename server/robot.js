@@ -519,13 +519,23 @@ const geocode = (address) => {
     });
 };
 
+// Última posición conocida de cada móvil: mientras se ubica una dirección nueva (o si no se encuentra),
+// el bus se sigue mostrando donde estaba en vez de desaparecer del mapa.
+const lastPosition = new Map(); // identificador -> { lat, lng }
+
 const withCoords = (vehicles) => vehicles.map(v => {
-    if (v.lat != null && v.lng != null) return v;
-    if (!v.localizacion) return v;
-    const known = geoCache.get(v.localizacion);
-    if (known) return { ...v, lat: known.lat, lng: known.lng, aproximada: true };
-    geocode(v.localizacion);
-    return v;
+    if (v.lat != null && v.lng != null) {
+        lastPosition.set(v.identifier, { lat: v.lat, lng: v.lng });
+        return v;
+    }
+    const known = v.localizacion ? geoCache.get(v.localizacion) : null;
+    if (known) {
+        lastPosition.set(v.identifier, known);
+        return { ...v, lat: known.lat, lng: known.lng, aproximada: true };
+    }
+    if (v.localizacion) geocode(v.localizacion);
+    const prev = lastPosition.get(v.identifier);
+    return prev ? { ...v, lat: prev.lat, lng: prev.lng, aproximada: true } : v;
 });
 
 const refreshCache = (username, password) => {
