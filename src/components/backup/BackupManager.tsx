@@ -67,9 +67,13 @@ export const BackupManager: React.FC = () => {
     setLastBackup(now);
   };
 
-  const makeFile = () => {
-    const fileName = `mi-ganancia-respaldo-${getLocalDateString()}.json`;
-    const file = new File([JSON.stringify(buildBackup(), null, 2)], fileName, { type: 'application/json' });
+  /**
+   * Para descargar se usa .json. Para compartir se usa .txt: es el tipo que todos los celulares y apps
+   * (WhatsApp, correo...) aceptan sin problema. El contenido es idéntico y Restaurar lee ambos.
+   */
+  const makeFile = (forSharing = false) => {
+    const fileName = `mi-ganancia-respaldo-${getLocalDateString()}.${forSharing ? 'txt' : 'json'}`;
+    const file = new File([JSON.stringify(buildBackup(), null, 2)], fileName, { type: forSharing ? 'text/plain' : 'application/json' });
     return { file, fileName };
   };
 
@@ -90,7 +94,7 @@ export const BackupManager: React.FC = () => {
   const canShareFiles = typeof navigator.canShare === 'function' && typeof navigator.share === 'function';
 
   const handleShare = async () => {
-    const { file } = makeFile();
+    const { file } = makeFile(true);
     if (!navigator.canShare?.({ files: [file] })) {
       handleExport();
       return;
