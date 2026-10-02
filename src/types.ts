@@ -63,4 +63,7 @@ export interface GpsVehicle {
   fechaGps?: string;
   /** Enlace al mapa de esa ubicación, si la página del GPS lo trae. */
   mapaUrl?: string;
+  /** Coordenadas del último reporte, si la página del GPS las trae. */
+  lat?: number | null;
+  lng?: number | null;
 }

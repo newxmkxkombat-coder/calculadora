@@ -15,6 +15,20 @@ interface RobotModalProps {
   onUpdate: () => void;
 }
 
+/**
+ * Enlace que abre la app de Google Maps. En Android se usa "geo:", que abre la app directamente
+ * (no el navegador); en otros equipos, el enlace universal de Google Maps.
+ * Con coordenadas exactas si la página del GPS las trae; si no, busca la dirección en Neiva.
+ */
+const isAndroid = typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent);
+const mapsUrl = (v: GpsVehicle) => {
+  const hasCoords = v.lat != null && v.lng != null;
+  const place = /neiva/i.test(v.localizacion || '') ? v.localizacion! : `${v.localizacion}, Neiva, Huila`;
+  const query = hasCoords ? `${v.lat},${v.lng}` : place;
+  if (isAndroid) return hasCoords ? `geo:${v.lat},${v.lng}?q=${v.lat},${v.lng}` : `geo:0,0?q=${encodeURIComponent(query)}`;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+};
+
 const toNumber = (passengers: string) => parseInt(passengers.replace(/\./g, ''), 10);
 
 /** Saca la hora de "2026-10-02 08:15:45" y la deja como "8:15 AM". */
@@ -137,11 +151,10 @@ export const RobotModal: React.FC<RobotModalProps> = ({ isOpen, onClose, vehicle
                       <div className="px-3 py-2.5 min-w-0">
                         <p className="flex items-center gap-1 text-[10px] text-faint font-bold uppercase tracking-wider"><MapPinIcon /> Ubicación</p>
                         {v.localizacion ? (
-                          v.mapaUrl ? (
-                            <a href={v.mapaUrl} target="_blank" rel="noopener noreferrer" className="block text-sm font-semibold text-violet leading-snug mt-0.5 break-words">{v.localizacion}</a>
-                          ) : (
-                            <p className="text-sm font-semibold text-main leading-snug mt-0.5 break-words">{v.localizacion}</p>
-                          )
+                          <a href={mapsUrl(v)} target="_blank" rel="noopener noreferrer" className="group block mt-0.5">
+                            <span className="block text-sm font-semibold text-main leading-snug break-words">{v.localizacion}</span>
+                            <span className="inline-flex items-center gap-1 mt-1 text-[11px] font-semibold text-violet group-hover:underline">Ver en Google Maps ↗</span>
+                          </a>
                         ) : (
                           <p className="text-xs text-faint mt-0.5">Sin dato</p>
                         )}
