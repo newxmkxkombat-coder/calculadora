@@ -1,10 +1,7 @@
-import React, { Suspense, lazy, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { GpsStatus, GpsVehicle } from '../../types';
 import { ClockIcon, MapPinIcon, RobotIcon, TrashIcon } from '../icons';
 import { Button, ModalShell } from '../ui';
-
-// El mapa se carga solo cuando se abre la pestaña "Mapa", para que la app siga abriendo rápido
-const GpsMap = lazy(() => import('./GpsMap'));
 
 interface RobotModalProps {
   isOpen: boolean;
@@ -32,9 +29,6 @@ const mapsUrl = (v: GpsVehicle) => {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
 };
 
-/** Fotos de la calle (Street View) en la app de Google Maps. */
-const streetViewUrl = (v: GpsVehicle) => `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${v.lat},${v.lng}`;
-
 const toNumber = (passengers: string) => parseInt(passengers.replace(/\./g, ''), 10);
 
 /** Saca la hora de "2026-10-02 08:15:45" y la deja como "8:15 AM". */
@@ -49,7 +43,6 @@ const gpsTime = (raw: string) => {
 
 export const RobotModal: React.FC<RobotModalProps> = ({ isOpen, onClose, vehicles, status, errorMessage, deduction, onDeductionChange, onSelectPassengers, onUpdate }) => {
   const [timer, setTimer] = useState(0);
-  const [view, setView] = useState<'lista' | 'mapa'>('lista');
 
   useEffect(() => {
     if (!isOpen || status !== 'loading') return;
@@ -113,52 +106,6 @@ export const RobotModal: React.FC<RobotModalProps> = ({ isOpen, onClose, vehicle
         </div>
       ) : vehicles.length > 0 ? (
         <>
-          <div className="mb-3 p-1 rounded-xl bg-field/60 border border-line/50 grid grid-cols-2 gap-1" role="tablist">
-            {(['lista', 'mapa'] as const).map(t => (
-              <button
-                key={t}
-                role="tab"
-                aria-selected={view === t}
-                onClick={() => setView(t)}
-                className={`py-2 rounded-lg text-sm font-bold transition-colors ${view === t ? 'bg-violet text-white' : 'text-muted hover:text-main'}`}
-              >
-                {t === 'lista' ? 'Lista' : 'Mapa'}
-              </button>
-            ))}
-          </div>
-          {view === 'mapa' ? (
-            <div className="space-y-3">
-              <Suspense fallback={<div className="h-72 rounded-2xl bg-field/50 border border-line/60 flex items-center justify-center text-sm text-muted">Cargando mapa...</div>}>
-                <GpsMap vehicles={vehicles} />
-              </Suspense>
-              {!vehicles.some(v => v.lat != null && v.lng != null) && (
-                <p className="text-xs text-center text-muted">Ubicando los vehículos en el mapa... toca “Actualizar” en unos segundos.</p>
-              )}
-              <div className="grid grid-cols-2 gap-2">
-                {vehicles.map((v, i) => {
-                  const gps = v.fechaGps ? gpsTime(v.fechaGps) : null;
-                  const located = v.lat != null && v.lng != null;
-                  return (
-                    <div key={i} className="bg-field/50 border border-line/60 rounded-xl p-2.5 min-w-0">
-                      <button onClick={() => handleVehicleClick(v.pasajeros)} className="w-full text-left">
-                        <p className="flex items-center gap-1.5 text-sm font-bold text-main">
-                          <span className="w-2.5 h-2.5 rounded-sm bg-[#d93025]" /> Móvil {v.identifier.padStart(3, '0')}
-                        </p>
-                        <p className="tabular text-xl font-black text-brand leading-tight">{v.pasajeros} <span className="text-[11px] font-semibold text-muted">pasajeros</span></p>
-                        {gps && <p className="tabular text-[11px] text-muted">GPS {gps}</p>}
-                      </button>
-                      {located && (
-                        <a href={streetViewUrl(v)} target="_blank" rel="noopener noreferrer" className="inline-block mt-1.5 text-[11px] font-semibold text-violet hover:underline">
-                          Ver fotos de la calle ↗
-                        </a>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ) : (
-          <>
           <p className="text-xs text-center text-violet mb-3 font-medium">Toca un vehículo para cargar sus pasajeros</p>
           <div className="space-y-3">
             {vehicles.map((v, i) => {
@@ -218,8 +165,6 @@ export const RobotModal: React.FC<RobotModalProps> = ({ isOpen, onClose, vehicle
               );
             })}
           </div>
-          </>
-          )}
           <p className="mt-3 pt-3 border-t border-line/40 text-center text-[11px] text-faint font-mono">
             Tiempo transcurrido: <span className="text-violet font-bold">{timer} s</span>
           </p>

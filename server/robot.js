@@ -481,67 +481,10 @@ let inFlight = null;         // Promesa de la lectura en curso (para no leer dos
 let lastCredentials = null;
 let lastClientRequest = 0;
 
-// --- COORDENADAS PARA EL MAPA DE LA APP ---
-// Si la página del GPS no trae coordenadas, se buscan a partir de la dirección con OpenStreetMap (Nominatim,
-// gratis, máximo 1 consulta por segundo) y se guardan para no volver a preguntar por la misma dirección.
-const geoCache = new Map(); // dirección -> { lat, lng } | null (no encontrada)
-let geoQueue = Promise.resolve();
-
-const geoQuery = async (q) => {
-    const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=co&q=' + encodeURIComponent(q);
-    const resp = await fetch(url, { headers: { 'User-Agent': 'MiGanancia-GPS/1.0 (github.com/newxmkxkombat-coder/calculadora)' } });
-    const data = await resp.json();
-    return data[0] ? { lat: Number(data[0].lat), lng: Number(data[0].lon) } : null;
-};
-
-const geocode = (address) => {
-    if (geoCache.has(address)) return;
-    geoCache.set(address, null); // Reservado mientras se busca
-    geoQueue = geoQueue.then(async () => {
-        try {
-            const clean = address.replace(/\s+/g, ' ').trim();
-            const place = /neiva/i.test(clean) ? clean : `${clean}, Neiva, Huila`;
-            // "Calle 10 # 5-20" no siempre se encuentra completo: se prueba también solo la vía ("Calle 10, Neiva")
-            const street = clean.split('#')[0].trim();
-            let found = await geoQuery(place.replace('#', ' '));
-            if (!found && street && street !== clean) {
-                await new Promise(r => setTimeout(r, 1100));
-                found = await geoQuery(`${street}, Neiva, Huila`);
-            }
-            geoCache.set(address, found);
-            console.log(found ? `📍 Ubicada: "${address}" -> ${found.lat},${found.lng}` : `📍 No se encontró en el mapa: "${address}"`);
-            if (geoCache.size > 500) geoCache.delete(geoCache.keys().next().value);
-        } catch (e) {
-            console.log('No se pudo ubicar la dirección:', e.message);
-            geoCache.delete(address); // Reintentar en la próxima lectura
-        }
-        await new Promise(r => setTimeout(r, 1100));
-    });
-};
-
-// Última posición conocida de cada móvil: mientras se ubica una dirección nueva (o si no se encuentra),
-// el bus se sigue mostrando donde estaba en vez de desaparecer del mapa.
-const lastPosition = new Map(); // identificador -> { lat, lng }
-
-const withCoords = (vehicles) => vehicles.map(v => {
-    if (v.lat != null && v.lng != null) {
-        lastPosition.set(v.identifier, { lat: v.lat, lng: v.lng });
-        return v;
-    }
-    const known = v.localizacion ? geoCache.get(v.localizacion) : null;
-    if (known) {
-        lastPosition.set(v.identifier, known);
-        return { ...v, lat: known.lat, lng: known.lng, aproximada: true };
-    }
-    if (v.localizacion) geocode(v.localizacion);
-    const prev = lastPosition.get(v.identifier);
-    return prev ? { ...v, lat: prev.lat, lng: prev.lng, aproximada: true } : v;
-});
-
 const refreshCache = (username, password) => {
     if (!inFlight) {
         inFlight = scrapeVehicles(username, password)
-            .then(vehicles => { cache = { vehicles: withCoords(vehicles), at: Date.now(), username }; return cache; })
+            .then(vehicles => { cache = { vehicles, at: Date.now(), username }; return cache; })
             .finally(() => { inFlight = null; });
     }
     return inFlight;
