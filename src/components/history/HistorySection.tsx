@@ -64,6 +64,15 @@ export const HistorySection: React.FC<HistorySectionProps> = ({ history, passeng
     return acc;
   }, { earnings: 0, expenses: 0, settled: 0, delivered: 0, passengers: 0, fixed: 0, perPassenger: 0 }), [history]);
 
+  // Porcentaje fijo y valor por pasajero del registro más reciente, para saber de dónde sale cada parte.
+  const rates = useMemo(() => {
+    const latest = history[0]?.formData;
+    return {
+      fixed: latest?.fixedCommission || '0',
+      perPassenger: formatCurrency(Number(parseFormattedNumber(latest?.commissionPerPassenger || '0'))),
+    };
+  }, [history]);
+
   return (
     <>
       <Card className="mt-6">
@@ -134,8 +143,8 @@ export const HistorySection: React.FC<HistorySectionProps> = ({ history, passeng
               <Total label="Pasajeros" value={totals.passengers.toLocaleString('es-CO')} tone="text-brand" />
               <div>
                 <Total label="Ganancia" value={formatCurrency(totals.earnings)} tone="text-good" />
-                <p className="tabular text-[11px] text-info mt-1">{formatCurrency(totals.fixed)} fija</p>
-                <p className="tabular text-[11px] text-brand">{formatCurrency(totals.perPassenger)} por pasajero</p>
+                <p className="tabular text-[11px] text-info mt-1">{formatCurrency(totals.fixed)} · {rates.fixed}% fijo</p>
+                <p className="tabular text-[11px] text-brand">{formatCurrency(totals.perPassenger)} · {rates.perPassenger} por pasajero</p>
               </div>
               <Total label="Gastos" value={formatCurrency(totals.expenses)} tone="text-warn" />
               <Total label="Recaudado" value={formatCurrency(totals.delivered)} tone="text-info" />
