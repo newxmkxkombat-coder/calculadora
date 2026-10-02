@@ -19,10 +19,30 @@ let lastInteraction = 0;
 const TARGET_URL = 'https://gps3regisdataweb.com/opita/index.jsp';
 
 // --- INICIALIZACIÓN DEL NAVEGADOR (Solo una vez) ---
+let launchPromise = null; // Evita lanzar dos navegadores a la vez (Render gratis tiene poca memoria)
+
+const resetBrowser = () => {
+    globalBrowser = null;
+    globalPage = null;
+    sessionActive = false;
+};
+
 const initBrowser = async () => {
-    if (!globalBrowser) {
+    // Si Chrome se cayó (falta de memoria, crash) o la pestaña se cerró, volver a lanzarlo
+    if (globalBrowser && (!globalBrowser.connected || !globalPage || globalPage.isClosed())) {
+        console.log('⚠️ Navegador caído o pestaña cerrada. Relanzando...');
+        try { await globalBrowser.close(); } catch (e) { }
+        resetBrowser();
+    }
+    if (globalBrowser) return globalPage;
+    if (!launchPromise) launchPromise = launchBrowser().finally(() => { launchPromise = null; });
+    return launchPromise;
+};
+
+const launchBrowser = async () => {
+    {
         console.log('Lanzando navegador global...');
-        globalBrowser = await puppeteer.launch({
+        const browser = await puppeteer.launch({
             headless: 'new',
             args: [
                 '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
@@ -30,13 +50,17 @@ const initBrowser = async () => {
                 '--single-process', '--disable-gpu', '--disable-extensions'
             ]
         });
+        browser.on('disconnected', () => {
+            console.log('⚠️ Navegador desconectado.');
+            if (globalBrowser === browser) resetBrowser();
+        });
 
-        globalPage = await globalBrowser.newPage();
-        await globalPage.setViewport({ width: 1366, height: 768 });
+        const page = await browser.newPage();
+        await page.setViewport({ width: 1366, height: 768 });
 
         // Bloqueo de recursos para velocidad + MODO ESPÍA (Ingeniería Inversa)
-        await globalPage.setRequestInterception(true);
-        globalPage.on('request', (req) => {
+        await page.setRequestInterception(true);
+        page.on('request', (req) => {
             const type = req.resourceType();
 
             // Espiar peticiones de datos (AJAX/Fetch)
@@ -53,7 +77,7 @@ const initBrowser = async () => {
         });
 
         // Espiar respuestas también (para ver si es JSON)
-        globalPage.on('response', async (resp) => {
+        page.on('response', async (resp) => {
             try {
                 const type = resp.request().resourceType();
                 if (['xhr', 'fetch'].includes(type)) {
@@ -66,6 +90,8 @@ const initBrowser = async () => {
             } catch (e) { }
         });
 
+        globalBrowser = browser;
+        globalPage = page;
         console.log('Navegador listo.');
     }
     return globalPage;
@@ -210,6 +236,11 @@ const ensureLoggedIn = async (page, username, password) => {
         throw e;
     }
 };
+
+// --- CHEQUEO DE VIDA (para despertar el servidor y comprobar que responde) ---
+app.get(['/', '/health'], (req, res) => {
+    res.json({ ok: true, browser: !!globalBrowser, sessionActive });
+});
 
 // --- ROUTA PRINCIPAL ---
 app.post('/api/scrape-passengers', async (req, res) => {
@@ -374,6 +405,11 @@ app.post('/api/scrape-passengers', async (req, res) => {
 
     } catch (error) {
         console.error('Error Robot:', error);
+        // Si el error viene de un navegador roto, forzar relanzamiento en el próximo intento
+        if (/Target closed|Session closed|detached|Protocol error|Connection closed/i.test(error.message || '')) {
+            try { await globalBrowser?.close(); } catch (e) { }
+            resetBrowser();
+        }
         res.status(500).json({ success: false, message: error.message });
     }
 });
@@ -389,5 +425,5 @@ setInterval(() => {
 
 app.listen(PORT, () => {
     console.log(`Robot Persistente V3.2 (Hybrid) escuchando en ${PORT}`);
-    initBrowser(); // Arrancar browser al inicio
+    initBrowser().catch(e => console.error('No se pudo lanzar el navegador al inicio:', e.message)); // Arrancar browser al inicio
 });

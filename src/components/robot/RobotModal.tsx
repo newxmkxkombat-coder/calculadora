@@ -8,6 +8,7 @@ interface RobotModalProps {
   onClose: () => void;
   vehicles: GpsVehicle[];
   status: GpsStatus;
+  errorMessage?: string;
   deduction: string;
   onDeductionChange: (val: string) => void;
   onSelectPassengers: (total: string) => void;
@@ -16,7 +17,7 @@ interface RobotModalProps {
 
 const toNumber = (passengers: string) => parseInt(passengers.replace(/\./g, ''), 10);
 
-export const RobotModal: React.FC<RobotModalProps> = ({ isOpen, onClose, vehicles, status, deduction, onDeductionChange, onSelectPassengers, onUpdate }) => {
+export const RobotModal: React.FC<RobotModalProps> = ({ isOpen, onClose, vehicles, status, errorMessage, deduction, onDeductionChange, onSelectPassengers, onUpdate }) => {
   const [timer, setTimer] = useState(0);
 
   useEffect(() => {
@@ -111,7 +112,12 @@ export const RobotModal: React.FC<RobotModalProps> = ({ isOpen, onClose, vehicle
         </>
       ) : (
         <div className="text-center py-10 text-muted italic bg-field/30 rounded-xl border border-line/40">
-          {status === 'error' ? 'No se pudo conectar. Toca “Actualizar” para reintentar.' : 'No se encontraron vehículos operando hoy.'}
+          {status === 'error' ? (
+            <>
+              <p>No se pudo conectar. Toca “Actualizar” para reintentar.</p>
+              {errorMessage && <p className="mt-2 px-4 text-xs not-italic text-faint">{errorMessage}</p>}
+            </>
+          ) : 'No se encontraron vehículos operando hoy.'}
         </div>
       )}
     </ModalShell>

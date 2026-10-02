@@ -306,6 +306,7 @@ const App: React.FC = () => {
         onClose={() => setIsRobotModalOpen(false)}
         vehicles={gps.vehicles}
         status={gps.status}
+        errorMessage={gps.errorMessage}
         deduction={passengerDeduction}
         onDeductionChange={setPassengerDeduction}
         onUpdate={gps.refresh}
