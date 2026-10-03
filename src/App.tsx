@@ -11,6 +11,7 @@ import { useKeyboardOpen } from './hooks/useKeyboardOpen';
 import { useTheme } from './hooks/useTheme';
 import { sendPreoperacional } from './services/preoperacional';
 import { BackupManager } from './components/backup/BackupManager';
+import { CalendarModal } from './components/calendar/CalendarModal';
 import { DocumentAlerts } from './components/documents/DocumentAlerts';
 import { DocumentManager } from './components/documents/DocumentManager';
 import { DayForm } from './components/form/DayForm';
@@ -66,6 +67,7 @@ const App: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isRobotModalOpen, setIsRobotModalOpen] = useState(false);
   const [isRecordsOpen, setIsRecordsOpen] = useState(false);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
   const fuelInputRef = useRef<HTMLInputElement>(null);
 
@@ -276,7 +278,7 @@ const App: React.FC = () => {
       <DocumentAlerts documents={documents} />
 
       <div className="max-w-4xl mx-auto">
-        <Header results={results} gpsStatus={gps.status} theme={theme} onToggleTheme={toggleTheme} onOpenRobot={openRobot} onGoToRecords={goToRecords} onSendPreop={handleSendPreoperacional} />
+        <Header results={results} gpsStatus={gps.status} theme={theme} onToggleTheme={toggleTheme} onOpenRobot={openRobot} onGoToRecords={goToRecords} onSendPreop={handleSendPreoperacional} onOpenCalendar={() => setIsCalendarOpen(true)} />
 
         <DayForm formData={formData} fuelInputRef={fuelInputRef} isEditing={!!editingId} onChange={handleChange} onFocus={onFocus} />
 
@@ -320,6 +322,8 @@ const App: React.FC = () => {
         onUpdate={gps.refresh}
         onSelectPassengers={handleSelectPassengers}
       />
+
+      {isCalendarOpen && <CalendarModal onClose={() => setIsCalendarOpen(false)} />}
 
       <Toast message={toastMessage} show={!!toastMessage} onClose={() => setToastMessage('')} />
 

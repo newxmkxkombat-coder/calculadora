@@ -15,13 +15,14 @@ interface HeaderProps {
   onOpenRobot: () => void;
   onGoToRecords: () => void;
   onSendPreop: () => void;
+  onOpenCalendar: () => void;
 }
 
 const chipClass =
   'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold transition-all active:scale-95';
 
 /** Barra superior + tarjeta principal con la Entrega y el resumen del día. */
-export const Header: React.FC<HeaderProps> = ({ results, gpsStatus, theme, onToggleTheme, onOpenRobot, onGoToRecords, onSendPreop }) => {
+export const Header: React.FC<HeaderProps> = ({ results, gpsStatus, theme, onToggleTheme, onOpenRobot, onGoToRecords, onSendPreop, onOpenCalendar }) => {
   const isNegative = results.amountToSettle < 0;
   const entregaText = formatCurrency(results.amountToSettle);
   // Las cifras largas bajan de tamaño para que siempre quepan en pantallas angostas.
@@ -55,15 +56,13 @@ export const Header: React.FC<HeaderProps> = ({ results, gpsStatus, theme, onTog
           <ClipboardCheckIcon />
           Registros
         </button>
-        <a
-          href="https://newxmkxkombat-coder.github.io/calendario/"
-          target="_blank"
-          rel="noopener noreferrer"
+        <button
+          onClick={onOpenCalendar}
           className={`${chipClass} text-brand bg-brand/10 border-brand/30 hover:bg-brand/20`}
         >
           <CalendarIcon />
           Calendario
-        </a>
+        </button>
         <button
           onClick={onSendPreop}
           className={`${chipClass} text-good bg-good/10 border-good/30 hover:bg-good/20`}
