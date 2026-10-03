@@ -3,6 +3,8 @@
 export interface Holiday {
   date: Date;
   name: string;
+  /** Fecha original cuando el festivo se corrió al lunes (Ley Emiliani). */
+  movedFrom?: Date;
 }
 
 /** Domingo de Pascua (algoritmo de Meeus/Butcher). */
@@ -32,11 +34,13 @@ const nextMonday = (date: Date) => addDays(date, (8 - date.getDay()) % 7);
 export const getColombianHolidays = (year: number): Holiday[] => {
   const easter = easterSunday(year);
   const fixed = (month: number, day: number, name: string): Holiday => ({ date: new Date(year, month - 1, day), name });
-  const moved = (month: number, day: number, name: string): Holiday => ({ date: nextMonday(new Date(year, month - 1, day)), name });
-  const fromEaster = (days: number, name: string, move = false): Holiday => {
-    const date = addDays(easter, days);
-    return { date: move ? nextMonday(date) : date, name };
+  const shift = (original: Date, name: string): Holiday => {
+    const date = nextMonday(original);
+    return date.getTime() === original.getTime() ? { date, name } : { date, name, movedFrom: original };
   };
+  const moved = (month: number, day: number, name: string) => shift(new Date(year, month - 1, day), name);
+  const fromEaster = (days: number, name: string, move = false): Holiday =>
+    move ? shift(addDays(easter, days), name) : { date: addDays(easter, days), name };
 
   return [
     fixed(1, 1, 'Año Nuevo'),
