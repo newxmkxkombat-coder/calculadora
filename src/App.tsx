@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CalculationResults, FormData, HistoryEntry, ManagedDocument, MaintenanceRecord, PocketMove } from './types';
+import { LearnedWords, learnKey } from './utils/categories';
 import { MOTIVATIONAL_PHRASES, STORAGE_KEYS } from './constants';
 import { calculateResults, getRawData } from './utils/calc';
 import { formatCurrency, formatNumberWithDots, getLocalDateString, parseFormattedNumber } from './utils/format';
@@ -62,6 +63,8 @@ const App: React.FC = () => {
   const [documents, setDocuments] = usePersistentState<ManagedDocument[]>(STORAGE_KEYS.documents, () => loadJSON(STORAGE_KEYS.documents, []));
   const [maintenanceRecords, setMaintenanceRecords] = usePersistentState<MaintenanceRecord[]>(STORAGE_KEYS.maintenance, () => loadJSON(STORAGE_KEYS.maintenance, []));
   const [pocketMoves, setPocketMoves] = usePersistentState<PocketMove[]>(STORAGE_KEYS.pocket, () => loadJSON(STORAGE_KEYS.pocket, []));
+  const [pocketWords, setPocketWords] = usePersistentState<LearnedWords>(STORAGE_KEYS.pocketWords, () => loadJSON(STORAGE_KEYS.pocketWords, {}));
+  const [pocketCategories, setPocketCategories] = usePersistentState<string[]>(STORAGE_KEYS.pocketCategories, () => loadJSON(STORAGE_KEYS.pocketCategories, []));
   const [customMaintenanceTypes, setCustomMaintenanceTypes] = usePersistentState<string[]>(STORAGE_KEYS.customTypes, () => loadJSON(STORAGE_KEYS.customTypes, []));
   const [passengerGoal, setPassengerGoal] = useState<number>(() => loadConfig().passengerGoal);
   const [passengerDeduction, setPassengerDeduction] = useState<string>(() => localStorage.getItem(STORAGE_KEYS.passengerDeduction) || '');
@@ -260,6 +263,18 @@ const App: React.FC = () => {
     setPocketMoves(prev => [...newMoves, ...prev]);
   };
 
+  // Al corregir un gasto: se guarda el cambio y, si le cambiaste el grupo, la app aprende ese nombre.
+  const handleUpdatePocketMove = (updated: PocketMove, groupChanged: boolean) => {
+    setPocketMoves(prev => prev.map(move => (move.id === updated.id ? updated : move)));
+    if (groupChanged && updated.category) {
+      setPocketWords(prev => ({ ...prev, [learnKey(updated.concept)]: updated.category! }));
+    }
+  };
+
+  const handleAddPocketCategory = (name: string) => {
+    setPocketCategories(prev => (prev.includes(name) ? prev : [...prev, name]));
+  };
+
   const handleDeletePocketMove = (id: string) => {
     if (!window.confirm('¿Borrar este movimiento de Mi Bolsillo?')) return;
     setPocketMoves(prev => prev.filter(move => move.id !== id));
@@ -351,7 +366,16 @@ const App: React.FC = () => {
       {isCalendarOpen && <CalendarModal onClose={() => setIsCalendarOpen(false)} />}
 
       {isPocketOpen && (
-        <PocketModal moves={pocketMoves} onAdd={handleAddPocketMoves} onDelete={handleDeletePocketMove} onClose={() => setIsPocketOpen(false)} />
+        <PocketModal
+          moves={pocketMoves}
+          learnedWords={pocketWords}
+          customCategories={pocketCategories}
+          onAdd={handleAddPocketMoves}
+          onUpdate={handleUpdatePocketMove}
+          onDelete={handleDeletePocketMove}
+          onAddCategory={handleAddPocketCategory}
+          onClose={() => setIsPocketOpen(false)}
+        />
       )}
 
       <Toast message={toastMessage} show={!!toastMessage} onClose={() => setToastMessage('')} />

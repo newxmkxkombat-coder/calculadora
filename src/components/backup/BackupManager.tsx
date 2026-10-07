@@ -13,10 +13,12 @@ const BACKUP_KEYS = [
   STORAGE_KEYS.customTypes,
   STORAGE_KEYS.passengerDeduction,
   STORAGE_KEYS.pocket,
+  STORAGE_KEYS.pocketWords,
+  STORAGE_KEYS.pocketCategories,
 ];
 
 /** Claves que deben contener una lista; el resto es un objeto o un texto. */
-const ARRAY_KEYS: string[] = [STORAGE_KEYS.history, STORAGE_KEYS.documents, STORAGE_KEYS.maintenance, STORAGE_KEYS.customTypes, STORAGE_KEYS.pocket];
+const ARRAY_KEYS: string[] = [STORAGE_KEYS.history, STORAGE_KEYS.documents, STORAGE_KEYS.maintenance, STORAGE_KEYS.customTypes, STORAGE_KEYS.pocket, STORAGE_KEYS.pocketCategories];
 
 const BACKUP_APP_ID = 'mi-ganancia';
 
