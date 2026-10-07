@@ -13,6 +13,8 @@ export const STORAGE_KEYS = {
   lastBackup: 'driverAppLastBackup',
   preopLastSent: 'driverAppPreopLastSent',
   pocket: 'driverAppPocket',
+  pocketWords: 'driverAppPocketWords',
+  pocketCategories: 'driverAppPocketCategories',
 } as const;
 
 export const MOTIVATIONAL_PHRASES = [

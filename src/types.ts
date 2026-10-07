@@ -34,6 +34,8 @@ export interface PocketMove {
   amount: number;
   /** Si vino de guardar un día, el id de ese registro (para actualizarlo o quitarlo junto con él). */
   historyId?: string;
+  /** Grupo elegido a mano (Comida, Aseo...). Si no hay, la app lo adivina por el nombre. */
+  category?: string;
 }
 
 export interface ManagedDocument {

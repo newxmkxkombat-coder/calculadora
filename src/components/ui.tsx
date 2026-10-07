@@ -147,6 +147,13 @@ export const ModalShell: React.FC<ModalShellProps> = ({ title, onClose, tone = '
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [onClose]);
 
+  // Mientras la ventana está abierta, el fondo no se mueve: solo se desliza la ventana.
+  useEffect(() => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = previous; };
+  }, []);
+
   return (
     <div
       className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in-backdrop"
@@ -167,7 +174,7 @@ export const ModalShell: React.FC<ModalShellProps> = ({ title, onClose, tone = '
           {headerExtra}
           <IconButton title="Cerrar" onClick={onClose}><XIcon /></IconButton>
         </div>
-        <div className="overflow-y-auto p-4 sm:p-5 custom-scrollbar">{children}</div>
+        <div className="overflow-y-auto overscroll-contain p-4 sm:p-5 custom-scrollbar">{children}</div>
       </div>
     </div>
   );

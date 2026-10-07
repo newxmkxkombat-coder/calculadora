@@ -1,4 +1,5 @@
 import { PocketMove } from '../types';
+import { LearnedWords, categoryEmoji, totalsByCategory } from './categories';
 import { formatCurrency } from './format';
 
 export interface ParsedExpense {
@@ -124,7 +125,7 @@ export const monthName = (now = new Date()) => {
 };
 
 /** Texto del mes listo para pegar en WhatsApp. */
-export const pocketToWhatsappText = (moves: PocketMove[], now = new Date()): string => {
+export const pocketToWhatsappText = (moves: PocketMove[], learned: LearnedWords, now = new Date()): string => {
   const { income, spent, moves: monthMoves } = getMonthTotals(moves, now);
   const total = moves.reduce((s, m) => s + m.amount, 0);
   // La lista va de la más nueva a la más vieja: se voltea para que el mensaje quede en orden.
@@ -136,11 +137,14 @@ export const pocketToWhatsappText = (moves: PocketMove[], now = new Date()): str
       return `${m.amount < 0 ? '🔴' : '🟢'} ${day} ${m.concept}: ${m.amount < 0 ? '-' : '+'}${formatCurrency(Math.abs(m.amount))}`;
     });
 
+  const groups = totalsByCategory(monthMoves, learned).map(([name, value]) => `${categoryEmoji(name)} ${name}: ${formatCurrency(value)}`);
+
   return [
     `*Mi Bolsillo - ${monthName(now)}*`,
     `*Entró:* ${formatCurrency(income)}`,
     `*Gastado:* ${formatCurrency(spent)}`,
     `*Me queda:* ${formatCurrency(total)}`,
+    ...(groups.length ? ['', '*Gastos por grupo:*', ...groups] : []),
     ...(lines.length ? ['', '*Movimientos:*', ...lines] : []),
   ].join('\n');
 };
