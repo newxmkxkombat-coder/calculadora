@@ -11,7 +11,7 @@ interface PocketModalProps {
   moves: PocketMove[];
   learnedWords: LearnedWords;
   customCategories: string[];
-  onAdd: (items: { concept: string; amount: number }[]) => void;
+  onAdd: (items: { concept: string; amount: number; category?: string }[]) => void;
   onUpdate: (updated: PocketMove, groupChanged: boolean) => void;
   onDelete: (id: string) => void;
   onAddCategory: (name: string) => void;
@@ -27,6 +27,8 @@ interface PocketModalProps {
 export const PocketModal: React.FC<PocketModalProps> = ({ moves, learnedWords, customCategories, onAdd, onUpdate, onDelete, onAddCategory, onClose }) => {
   const [amount, setAmount] = useState('');
   const [concept, setConcept] = useState('');
+  // Grupo elegido a mano para el gasto que estás escribiendo (si no, la app lo adivina por el nombre).
+  const [pickedCategory, setPickedCategory] = useState<string | null>(null);
   const [isPasteOpen, setIsPasteOpen] = useState(false);
   const [message, setMessage] = useState('');
   const [found, setFound] = useState<ParsedExpense[] | null>(null);
@@ -38,6 +40,7 @@ export const PocketModal: React.FC<PocketModalProps> = ({ moves, learnedWords, c
   const month = getMonthTotals(moves);
   const foundTotal = (found || []).reduce((sum, item) => sum + item.amount, 0);
   const groups = totalsByCategory(month.moves, learnedWords);
+  const typedCategory = pickedCategory || (concept.trim() ? categorize(concept, learnedWords) : null);
   // "Otros" siempre de último en la lista de grupos.
   const allCategories = [
     ...DEFAULT_CATEGORIES.map(c => c.name).filter(name => name !== 'Otros'),
@@ -47,9 +50,14 @@ export const PocketModal: React.FC<PocketModalProps> = ({ moves, learnedWords, c
 
   const add = (sign: 1 | -1) => {
     if (amountValue <= 0) return;
-    onAdd([{ concept: concept.trim() || (sign === 1 ? 'Ingreso' : 'Gasto'), amount: sign * amountValue }]);
+    onAdd([{
+      concept: concept.trim() || (sign === 1 ? 'Ingreso' : 'Gasto'),
+      amount: sign * amountValue,
+      category: sign === -1 && pickedCategory ? pickedCategory : undefined,
+    }]);
     setAmount('');
     setConcept('');
+    setPickedCategory(null);
   };
 
   const share = () => {
@@ -100,12 +108,12 @@ export const PocketModal: React.FC<PocketModalProps> = ({ moves, learnedWords, c
           <p className="text-[11px] font-bold uppercase tracking-wider text-muted text-center py-1.5 bg-raised/30">{monthName()}</p>
           <div className="grid grid-cols-2 divide-x divide-line/50">
             <div className="py-2.5 text-center">
-              <p className="text-[11px] font-medium text-muted">Entró</p>
-              <p className="tabular font-bold text-good">{formatCurrency(month.income)}</p>
-            </div>
-            <div className="py-2.5 text-center">
               <p className="text-[11px] font-medium text-muted">Gastaste</p>
               <p className="tabular font-bold text-bad">{formatCurrency(month.spent)}</p>
+            </div>
+            <div className="py-2.5 text-center">
+              <p className="text-[11px] font-medium text-muted">Entró</p>
+              <p className="tabular font-bold text-good">{formatCurrency(month.income)}</p>
             </div>
           </div>
           {groups.length > 0 && (
@@ -140,6 +148,20 @@ export const PocketModal: React.FC<PocketModalProps> = ({ moves, learnedWords, c
             aria-label="Concepto"
             maxLength={40}
           />
+          <div>
+            <p className="text-[11px] text-muted mb-1.5">Grupo del gasto {!pickedCategory && concept.trim() && '(la app lo eligió sola)'}</p>
+            <div className="flex flex-wrap gap-1.5">
+              {allCategories.map(name => (
+                <button
+                  key={name}
+                  onClick={() => setPickedCategory(name)}
+                  className={`px-2.5 py-1.5 rounded-full border text-xs font-semibold transition-all active:scale-95 ${name === typedCategory ? 'bg-good/20 text-good border-good/50' : 'bg-raised/40 text-muted border-line/50'}`}
+                >
+                  {categoryEmoji(name)} {name}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => add(-1)}
@@ -220,12 +242,13 @@ export const PocketModal: React.FC<PocketModalProps> = ({ moves, learnedWords, c
           <ul className="space-y-2">
             {moves.map(move => (
               <li key={move.id} className="flex items-center gap-2 p-3 rounded-xl bg-raised/30 border border-line/40">
+                <span className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center text-xl ${move.amount < 0 ? 'bg-bad/10' : 'bg-good/10'}`} aria-hidden="true">
+                  {move.amount < 0 ? categoryEmoji(moveCategory(move, learnedWords)!) : '💰'}
+                </span>
                 <button onClick={() => setEditing(move)} className="flex-grow min-w-0 text-left" aria-label={`Corregir ${move.concept}`}>
                   <p className="text-sm font-semibold text-main truncate">{move.concept}</p>
-                  <p className="text-[11px] text-faint">
-                    {moveCategory(move, learnedWords) && <span className="text-muted">{categoryEmoji(moveCategory(move, learnedWords)!)} {moveCategory(move, learnedWords)} · </span>}
-                    {formatTimestamp(move.timestamp)}
-                  </p>
+                  {move.amount < 0 && <p className="text-xs font-semibold text-muted">{moveCategory(move, learnedWords)}</p>}
+                  <p className="text-[11px] text-faint">{formatTimestamp(move.timestamp)}</p>
                 </button>
                 <p className={`tabular font-bold whitespace-nowrap ${move.amount < 0 ? 'text-bad' : 'text-good'}`}>
                   {move.amount < 0 ? '−' : '+'}{formatCurrency(Math.abs(move.amount))}
