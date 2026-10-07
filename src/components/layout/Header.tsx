@@ -2,7 +2,7 @@ import React from 'react';
 import { GpsStatus } from '../../types';
 import { formatCurrency } from '../../utils/format';
 import { CalculationResults } from '../../types';
-import { CalendarIcon, ClipboardCheckIcon, MoonIcon, RobotIcon, ShieldIcon, SunIcon } from '../icons';
+import { CalendarIcon, ClipboardCheckIcon, MoonIcon, RobotIcon, ShieldIcon, SunIcon, WalletIcon } from '../icons';
 import { Theme } from '../../hooks/useTheme';
 import { Card, IconButton } from '../ui';
 import { DigitalClock } from './DigitalClock';
@@ -16,13 +16,14 @@ interface HeaderProps {
   onGoToRecords: () => void;
   onSendPreop: () => void;
   onOpenCalendar: () => void;
+  onOpenPocket: () => void;
 }
 
 const chipClass =
   'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold transition-all active:scale-95';
 
 /** Barra superior + tarjeta principal con la Entrega y el resumen del día. */
-export const Header: React.FC<HeaderProps> = ({ results, gpsStatus, theme, onToggleTheme, onOpenRobot, onGoToRecords, onSendPreop, onOpenCalendar }) => {
+export const Header: React.FC<HeaderProps> = ({ results, gpsStatus, theme, onToggleTheme, onOpenRobot, onGoToRecords, onSendPreop, onOpenCalendar, onOpenPocket }) => {
   const isNegative = results.amountToSettle < 0;
   const entregaText = formatCurrency(results.amountToSettle);
   // Las cifras largas bajan de tamaño para que siempre quepan en pantallas angostas.
@@ -69,6 +70,13 @@ export const Header: React.FC<HeaderProps> = ({ results, gpsStatus, theme, onTog
         >
           <ShieldIcon />
           Preoperacional
+        </button>
+        <button
+          onClick={onOpenPocket}
+          className={`${chipClass} text-warn bg-warn/10 border-warn/30 hover:bg-warn/20`}
+        >
+          <WalletIcon />
+          Mi Bolsillo
         </button>
       </div>
 

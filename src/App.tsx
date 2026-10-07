@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CalculationResults, FormData, HistoryEntry, ManagedDocument, MaintenanceRecord } from './types';
+import { CalculationResults, FormData, HistoryEntry, ManagedDocument, MaintenanceRecord, PocketMove } from './types';
 import { MOTIVATIONAL_PHRASES, STORAGE_KEYS } from './constants';
 import { calculateResults, getRawData } from './utils/calc';
 import { formatCurrency, formatNumberWithDots, getLocalDateString, parseFormattedNumber } from './utils/format';
@@ -20,11 +20,16 @@ import { ActionBar } from './components/layout/ActionBar';
 import { Header } from './components/layout/Header';
 import { Toast } from './components/layout/Toast';
 import { VehicleMaintenanceManager } from './components/maintenance/VehicleMaintenanceManager';
+import { PocketModal } from './components/pocket/PocketModal';
 import { RobotModal } from './components/robot/RobotModal';
 import { PeriodSummary } from './components/summary/PeriodSummary';
 
 const FUEL_MAX_DIGITS = 6;
 const PASSENGERS_MAX_DIGITS = 3;
+
+/** Texto del movimiento que entra a Mi Bolsillo al guardar un día. */
+const dayPocketConcept = (isoTimestamp: string) =>
+  `Sueldo del día ${new Date(isoTimestamp).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' })}`;
 
 const getInitialFormData = (): FormData => {
   const config = loadConfig();
@@ -56,6 +61,7 @@ const App: React.FC = () => {
   const [history, setHistory] = usePersistentState<HistoryEntry[]>(STORAGE_KEYS.history, loadHistory);
   const [documents, setDocuments] = usePersistentState<ManagedDocument[]>(STORAGE_KEYS.documents, () => loadJSON(STORAGE_KEYS.documents, []));
   const [maintenanceRecords, setMaintenanceRecords] = usePersistentState<MaintenanceRecord[]>(STORAGE_KEYS.maintenance, () => loadJSON(STORAGE_KEYS.maintenance, []));
+  const [pocketMoves, setPocketMoves] = usePersistentState<PocketMove[]>(STORAGE_KEYS.pocket, () => loadJSON(STORAGE_KEYS.pocket, []));
   const [customMaintenanceTypes, setCustomMaintenanceTypes] = usePersistentState<string[]>(STORAGE_KEYS.customTypes, () => loadJSON(STORAGE_KEYS.customTypes, []));
   const [passengerGoal, setPassengerGoal] = useState<number>(() => loadConfig().passengerGoal);
   const [passengerDeduction, setPassengerDeduction] = useState<string>(() => localStorage.getItem(STORAGE_KEYS.passengerDeduction) || '');
@@ -68,6 +74,7 @@ const App: React.FC = () => {
   const [isRobotModalOpen, setIsRobotModalOpen] = useState(false);
   const [isRecordsOpen, setIsRecordsOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [isPocketOpen, setIsPocketOpen] = useState(false);
 
   const fuelInputRef = useRef<HTMLInputElement>(null);
 
@@ -169,11 +176,14 @@ const App: React.FC = () => {
       totalDeliveredAmount: grossAmountToSettle,
     };
 
+    // Tu sueldo del día (15% + $100 por pasajero) también va a Mi Bolsillo.
     if (editingId) {
       setHistory(prev => prev.map(entry => (entry.id === editingId ? { ...entry, formData, results: resultsForHistory } : entry)));
+      setPocketMoves(prev => prev.map(move => (move.historyId === editingId ? { ...move, amount: results.myEarnings } : move)));
     } else {
       const now = new Date().toISOString();
       setHistory(prev => [{ id: now, timestamp: now, formData, results: resultsForHistory }, ...prev]);
+      setPocketMoves(prev => [{ id: now, timestamp: now, concept: dayPocketConcept(now), amount: results.myEarnings, historyId: now }, ...prev]);
     }
 
     setIsSaving(true);
@@ -192,6 +202,7 @@ const App: React.FC = () => {
         ? { ...entry, timestamp: isoTimestamp, formData: { ...entry.formData, route: calculateRouteForDate(isoTimestamp) } }
         : entry))
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
+    setPocketMoves(prev => prev.map(move => (move.historyId === id ? { ...move, concept: dayPocketConcept(isoTimestamp) } : move)));
   };
 
   const handleLoadEntry = (id: string) => {
@@ -206,6 +217,8 @@ const App: React.FC = () => {
     if (!window.confirm('¿Estás seguro de que quieres borrar este registro?')) return;
     if (editingId === id) resetForm();
     setHistory(prev => prev.filter(entry => entry.id !== id));
+    // Si borras un día, su sueldo también sale de Mi Bolsillo.
+    setPocketMoves(prev => prev.filter(move => move.historyId !== id));
   };
 
   const handleCopyEntry = (entry: HistoryEntry) => {
@@ -238,6 +251,17 @@ const App: React.FC = () => {
       [next[index], next[target]] = [next[target], next[index]];
       return next;
     });
+  };
+
+  // --- Mi Bolsillo ---
+  const handleAddPocketMove = (concept: string, amount: number) => {
+    const now = new Date().toISOString();
+    setPocketMoves(prev => [{ id: now, timestamp: now, concept, amount }, ...prev]);
+  };
+
+  const handleDeletePocketMove = (id: string) => {
+    if (!window.confirm('¿Borrar este movimiento de Mi Bolsillo?')) return;
+    setPocketMoves(prev => prev.filter(move => move.id !== id));
   };
 
   // --- Robot GPS ---
@@ -278,7 +302,7 @@ const App: React.FC = () => {
       <DocumentAlerts documents={documents} />
 
       <div className="max-w-4xl mx-auto">
-        <Header results={results} gpsStatus={gps.status} theme={theme} onToggleTheme={toggleTheme} onOpenRobot={openRobot} onGoToRecords={goToRecords} onSendPreop={handleSendPreoperacional} onOpenCalendar={() => setIsCalendarOpen(true)} />
+        <Header results={results} gpsStatus={gps.status} theme={theme} onToggleTheme={toggleTheme} onOpenRobot={openRobot} onGoToRecords={goToRecords} onSendPreop={handleSendPreoperacional} onOpenCalendar={() => setIsCalendarOpen(true)} onOpenPocket={() => setIsPocketOpen(true)} />
 
         <DayForm formData={formData} fuelInputRef={fuelInputRef} isEditing={!!editingId} onChange={handleChange} onFocus={onFocus} />
 
@@ -324,6 +348,10 @@ const App: React.FC = () => {
       />
 
       {isCalendarOpen && <CalendarModal onClose={() => setIsCalendarOpen(false)} />}
+
+      {isPocketOpen && (
+        <PocketModal moves={pocketMoves} onAdd={handleAddPocketMove} onDelete={handleDeletePocketMove} onClose={() => setIsPocketOpen(false)} />
+      )}
 
       <Toast message={toastMessage} show={!!toastMessage} onClose={() => setToastMessage('')} />
 

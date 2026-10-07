@@ -26,6 +26,16 @@ export interface HistoryEntry {
   results: CalculationResults;
 }
 
+/** Un movimiento de "Mi Bolsillo": lo que entra (positivo) o lo que sale (negativo). */
+export interface PocketMove {
+  id: string;
+  timestamp: string;
+  concept: string;
+  amount: number;
+  /** Si vino de guardar un día, el id de ese registro (para actualizarlo o quitarlo junto con él). */
+  historyId?: string;
+}
+
 export interface ManagedDocument {
   id: string;
   name: string;
