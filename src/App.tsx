@@ -254,9 +254,10 @@ const App: React.FC = () => {
   };
 
   // --- Mi Bolsillo ---
-  const handleAddPocketMove = (concept: string, amount: number) => {
+  const handleAddPocketMoves = (items: { concept: string; amount: number }[]) => {
     const now = new Date().toISOString();
-    setPocketMoves(prev => [{ id: now, timestamp: now, concept, amount }, ...prev]);
+    const newMoves = items.map((item, i) => ({ id: `${now}-${i}`, timestamp: now, ...item })).reverse();
+    setPocketMoves(prev => [...newMoves, ...prev]);
   };
 
   const handleDeletePocketMove = (id: string) => {
@@ -350,7 +351,7 @@ const App: React.FC = () => {
       {isCalendarOpen && <CalendarModal onClose={() => setIsCalendarOpen(false)} />}
 
       {isPocketOpen && (
-        <PocketModal moves={pocketMoves} onAdd={handleAddPocketMove} onDelete={handleDeletePocketMove} onClose={() => setIsPocketOpen(false)} />
+        <PocketModal moves={pocketMoves} onAdd={handleAddPocketMoves} onDelete={handleDeletePocketMove} onClose={() => setIsPocketOpen(false)} />
       )}
 
       <Toast message={toastMessage} show={!!toastMessage} onClose={() => setToastMessage('')} />
