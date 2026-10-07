@@ -257,10 +257,15 @@ const App: React.FC = () => {
   };
 
   // --- Mi Bolsillo ---
-  const handleAddPocketMoves = (items: { concept: string; amount: number }[]) => {
+  const handleAddPocketMoves = (items: { concept: string; amount: number; category?: string }[]) => {
     const now = new Date().toISOString();
     const newMoves = items.map((item, i) => ({ id: `${now}-${i}`, timestamp: now, ...item })).reverse();
     setPocketMoves(prev => [...newMoves, ...prev]);
+    // Si elegiste el grupo a mano, la app lo recuerda para la próxima vez.
+    const learned = items.filter(item => item.category);
+    if (learned.length) {
+      setPocketWords(prev => ({ ...prev, ...Object.fromEntries(learned.map(item => [learnKey(item.concept), item.category!])) }));
+    }
   };
 
   // Al corregir un gasto: se guarda el cambio y, si le cambiaste el grupo, la app aprende ese nombre.
