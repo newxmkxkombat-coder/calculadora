@@ -12,6 +12,7 @@ export const STORAGE_KEYS = {
   theme: 'driverAppTheme',
   lastBackup: 'driverAppLastBackup',
   preopLastSent: 'driverAppPreopLastSent',
+  pocket: 'driverAppPocket',
 } as const;
 
 export const MOTIVATIONAL_PHRASES = [
