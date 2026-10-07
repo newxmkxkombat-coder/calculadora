@@ -3,7 +3,7 @@ import { PocketMove } from '../../types';
 import { formatCurrency, formatNumberWithDots, formatTimestamp, parseFormattedNumber } from '../../utils/format';
 import { ParsedExpense, getMonthTotals, monthName, parseExpensesMessage, pocketToWhatsappText } from '../../utils/pocket';
 import { DEFAULT_CATEGORIES, LearnedWords, categorize, categoryEmoji, moveCategory, totalsByCategory } from '../../utils/categories';
-import { CopyIcon, TrashIcon, WalletIcon, XIcon } from '../icons';
+import { CopyIcon, EditIcon, TrashIcon, WalletIcon, XIcon } from '../icons';
 import { Button, EmptyState, ModalShell, inputClass } from '../ui';
 import { EditMoveModal } from './EditMoveModal';
 
@@ -219,7 +219,7 @@ export const PocketModal: React.FC<PocketModalProps> = ({ moves, learnedWords, c
         ) : (
           <ul className="space-y-2">
             {moves.map(move => (
-              <li key={move.id} className="flex items-center gap-3 p-3 rounded-xl bg-raised/30 border border-line/40">
+              <li key={move.id} className="flex items-center gap-2 p-3 rounded-xl bg-raised/30 border border-line/40">
                 <button onClick={() => setEditing(move)} className="flex-grow min-w-0 text-left" aria-label={`Corregir ${move.concept}`}>
                   <p className="text-sm font-semibold text-main truncate">{move.concept}</p>
                   <p className="text-[11px] text-faint">
@@ -231,6 +231,13 @@ export const PocketModal: React.FC<PocketModalProps> = ({ moves, learnedWords, c
                   {move.amount < 0 ? '−' : '+'}{formatCurrency(Math.abs(move.amount))}
                 </p>
                 <button
+                  onClick={() => setEditing(move)}
+                  className="p-2 rounded-lg text-info hover:bg-info/15 transition-colors"
+                  aria-label={`Editar ${move.concept}`}
+                >
+                  <EditIcon className="h-5 w-5" />
+                </button>
+                <button
                   onClick={() => onDelete(move.id)}
                   className="p-2 rounded-lg text-faint hover:text-bad hover:bg-bad/15 transition-colors"
                   aria-label={`Borrar ${move.concept}`}
@@ -241,7 +248,7 @@ export const PocketModal: React.FC<PocketModalProps> = ({ moves, learnedWords, c
             ))}
           </ul>
         )}
-        {moves.length > 0 && <p className="text-[11px] text-faint text-center mt-3">Toca un movimiento para corregirlo.</p>}
+        {moves.length > 0 && <p className="text-[11px] text-faint text-center mt-3">Toca ✏️ para corregir un movimiento.</p>}
       </ModalShell>
 
       {editing && (
