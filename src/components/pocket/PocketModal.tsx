@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { PocketMove } from '../../types';
 import { formatCurrency, formatNumberWithDots, formatTimestamp, parseFormattedNumber } from '../../utils/format';
 import { ParsedExpense, getMonthTotals, monthName, parseExpensesMessage, pocketToWhatsappText } from '../../utils/pocket';
@@ -73,7 +73,27 @@ export const PocketModal: React.FC<PocketModalProps> = ({ moves, learnedWords, c
       .catch(() => alert('Mantén presionado el cuadro y toca "Pegar".'));
   };
 
-  const readMessage = () => setFound(parseExpensesMessage(message));
+  const readMessage = () => {
+    // Se cierra el teclado para que se vea bien lo que encontró.
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    setFound(parseExpensesMessage(message));
+  };
+
+  // Al abrir "Pegar mensaje de gastos", la ventanita baja sola hasta el cuadro para pegar.
+  const pastePanelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!isPasteOpen) return;
+    const timer = setTimeout(() => pastePanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+    return () => clearTimeout(timer);
+  }, [isPasteOpen]);
+
+  // Después de leer el mensaje, la ventanita baja sola hasta "Descontar todo" (o hasta el aviso si no encontró nada).
+  const foundEndRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!found) return;
+    const timer = setTimeout(() => foundEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }), 150);
+    return () => clearTimeout(timer);
+  }, [found]);
 
   const closePaste = () => {
     setIsPasteOpen(false);
@@ -188,7 +208,7 @@ export const PocketModal: React.FC<PocketModalProps> = ({ moves, learnedWords, c
             📋 Pegar mensaje de gastos
           </button>
         ) : (
-          <div className="p-3 rounded-xl bg-info/5 border border-info/30 space-y-2 mb-5">
+          <div ref={pastePanelRef} className="p-3 rounded-xl bg-info/5 border border-info/30 space-y-2 mb-5">
             <div className="flex items-center justify-between gap-2">
               <p className="text-xs font-semibold text-info">Pega aquí el mensaje de WhatsApp</p>
               <button onClick={closePaste} className="p-1 rounded-lg text-faint hover:text-main" aria-label="Cerrar"><XIcon /></button>
@@ -233,6 +253,7 @@ export const PocketModal: React.FC<PocketModalProps> = ({ moves, learnedWords, c
                 </button>
               </div>
             )}
+            {found && <div ref={foundEndRef} />}
           </div>
         )}
 
