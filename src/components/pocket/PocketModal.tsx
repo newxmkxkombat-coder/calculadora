@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { PocketMove } from '../../types';
 import { formatCurrency, formatNumberWithDots, formatTimestamp, parseFormattedNumber } from '../../utils/format';
 import { ParsedExpense, getMonthTotals, monthName, parseExpensesMessage, pocketToWhatsappText } from '../../utils/pocket';
@@ -73,7 +73,19 @@ export const PocketModal: React.FC<PocketModalProps> = ({ moves, learnedWords, c
       .catch(() => alert('Mantén presionado el cuadro y toca "Pegar".'));
   };
 
-  const readMessage = () => setFound(parseExpensesMessage(message));
+  const readMessage = () => {
+    // Se cierra el teclado para que se vea bien lo que encontró.
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    setFound(parseExpensesMessage(message));
+  };
+
+  // Después de leer el mensaje, la ventanita baja sola hasta "Descontar todo" (o hasta el aviso si no encontró nada).
+  const foundEndRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!found) return;
+    const timer = setTimeout(() => foundEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }), 150);
+    return () => clearTimeout(timer);
+  }, [found]);
 
   const closePaste = () => {
     setIsPasteOpen(false);
@@ -233,6 +245,7 @@ export const PocketModal: React.FC<PocketModalProps> = ({ moves, learnedWords, c
                 </button>
               </div>
             )}
+            {found && <div ref={foundEndRef} />}
           </div>
         )}
 
