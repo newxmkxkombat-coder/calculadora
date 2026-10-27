@@ -10,6 +10,7 @@ import { usePersistentState } from './hooks/usePersistentState';
 import { useGpsRobot } from './hooks/useGpsRobot';
 import { useKeyboardOpen } from './hooks/useKeyboardOpen';
 import { useTheme } from './hooks/useTheme';
+import { useZoom } from './hooks/useZoom';
 import { sendPreoperacional } from './services/preoperacional';
 import { BackupManager } from './components/backup/BackupManager';
 import { CalendarModal } from './components/calendar/CalendarModal';
@@ -56,6 +57,7 @@ const getStartingFormData = (): FormData => {
 
 const App: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
+  const zoom = useZoom();
   const { isKeyboardOpen, onFocus } = useKeyboardOpen();
   const gps = useGpsRobot();
 
@@ -319,11 +321,11 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen px-4 sm:px-6 pt-6 pb-32" onClick={handleBackgroundClick}>
+    <div className="min-h-[calc(100vh/var(--app-zoom,1))] px-4 sm:px-6 pt-6 pb-32" onClick={handleBackgroundClick}>
       <DocumentAlerts documents={documents} />
 
       <div className="max-w-4xl mx-auto">
-        <Header results={results} gpsStatus={gps.status} theme={theme} onToggleTheme={toggleTheme} onOpenRobot={openRobot} onGoToRecords={goToRecords} onSendPreop={handleSendPreoperacional} onOpenCalendar={() => setIsCalendarOpen(true)} onOpenPocket={() => setIsPocketOpen(true)} />
+        <Header results={results} gpsStatus={gps.status} theme={theme} onToggleTheme={toggleTheme} zoom={zoom} onOpenRobot={openRobot} onGoToRecords={goToRecords} onSendPreop={handleSendPreoperacional} onOpenCalendar={() => setIsCalendarOpen(true)} onOpenPocket={() => setIsPocketOpen(true)} />
 
         <DayForm formData={formData} fuelInputRef={fuelInputRef} isEditing={!!editingId} onChange={handleChange} onFocus={onFocus} />
 

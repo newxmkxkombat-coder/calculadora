@@ -110,7 +110,7 @@ export const VehicleMaintenanceManager: React.FC<VehicleMaintenanceManagerProps>
           <Button variant="primary" onClick={() => openModal(null)} className="shrink-0"><PlusCircleIcon /> Añadir</Button>
         </div>
 
-        <div className="max-h-[60vh] overflow-y-auto space-y-3 custom-scrollbar">
+        <div className="max-h-[calc(60vh/var(--app-zoom,1))] overflow-y-auto space-y-3 custom-scrollbar">
           {filteredRecords.length === 0 ? (
             <EmptyState icon={<WrenchIcon className="h-8 w-8" />}>
               {searchTerm ? `No se encontraron resultados para "${searchTerm}".` : 'Aún no has registrado mantenimientos.'}

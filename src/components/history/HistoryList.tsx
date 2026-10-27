@@ -72,7 +72,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({ history, totalCount, c
   );
 
   return (
-    <div className="md:border md:border-line/50 md:rounded-2xl md:max-h-[70vh] md:overflow-y-auto md:relative custom-scrollbar">
+    <div className="md:border md:border-line/50 md:rounded-2xl md:max-h-[calc(70vh/var(--app-zoom,1))] md:overflow-y-auto md:relative custom-scrollbar">
       <div className="sticky top-0 z-10 bg-card/95 backdrop-blur-sm px-4 py-3 hidden md:grid grid-cols-9 gap-x-4 text-xs font-bold uppercase tracking-wider text-muted border-b border-line/50">
         <div className="col-span-2">Fecha</div>
         <div>Ruta</div>

@@ -18,6 +18,14 @@
     } catch (e) {
       document.documentElement.setAttribute('data-theme', 'dark');
     }
+    // Igual con el tamaño de la app (botones − y +), para que no salte al abrir.
+    try {
+      var savedZoom = Number(localStorage.getItem('driverAppZoom'));
+      if ([0.8, 0.9, 1.1, 1.2, 1.3].indexOf(savedZoom) !== -1) {
+        document.documentElement.style.zoom = savedZoom;
+        document.documentElement.style.setProperty('--app-zoom', savedZoom);
+      }
+    } catch (e) { }
   </script>
 
   <script src="https://cdn.tailwindcss.com"></script>
