@@ -54,7 +54,7 @@ export const DocumentManager: React.FC<DocumentManagerProps> = ({ documents, set
         <div className="flex justify-end mb-4">
           <Button variant="primary" small onClick={() => openModal(null)}><PlusCircleIcon /> Añadir documento</Button>
         </div>
-        <div className="max-h-[60vh] overflow-y-auto space-y-3 custom-scrollbar">
+        <div className="max-h-[calc(60vh/var(--app-zoom,1))] overflow-y-auto space-y-3 custom-scrollbar">
           {documents.length === 0 ? (
             <EmptyState icon={<IdCardIcon className="h-8 w-8" />}>Añade tu licencia, SOAT y revisión técnico-mecánica para recibir avisos de vencimiento.</EmptyState>
           ) : documents.map(doc => {

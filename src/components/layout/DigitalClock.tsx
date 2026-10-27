@@ -17,7 +17,7 @@ export const DigitalClock: React.FC = () => {
   });
 
   return (
-    <div className="flex items-center gap-1.5 text-muted">
+    <div className="flex items-center gap-1.5 text-muted shrink-0">
       <ClockIcon />
       <p className="tabular font-mono text-xs tracking-wide">{formatted}</p>
     </div>

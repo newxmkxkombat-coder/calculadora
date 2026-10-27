@@ -162,7 +162,7 @@ export const ModalShell: React.FC<ModalShellProps> = ({ title, onClose, tone = '
       role="dialog"
     >
       <div
-        className={`bg-card border border-line/60 rounded-t-3xl sm:rounded-2xl w-full ${maxWidth} max-h-[92vh] flex flex-col shadow-2xl animate-fade-in-scale`}
+        className={`bg-card border border-line/60 rounded-t-3xl sm:rounded-2xl w-full ${maxWidth} max-h-[calc(92vh/var(--app-zoom,1))] flex flex-col shadow-2xl animate-fade-in-scale`}
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center gap-3 p-4 sm:p-5 border-b border-line/50 shrink-0">

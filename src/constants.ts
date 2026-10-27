@@ -10,6 +10,7 @@ export const STORAGE_KEYS = {
   passengerDeduction: 'passengerDeduction',
   draft: 'driverAppDraft',
   theme: 'driverAppTheme',
+  zoom: 'driverAppZoom',
   lastBackup: 'driverAppLastBackup',
   preopLastSent: 'driverAppPreopLastSent',
   pocket: 'driverAppPocket',

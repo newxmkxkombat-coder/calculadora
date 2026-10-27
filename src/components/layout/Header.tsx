@@ -4,6 +4,7 @@ import { formatCurrency } from '../../utils/format';
 import { CalculationResults } from '../../types';
 import { CalendarIcon, ClipboardCheckIcon, MoonIcon, RobotIcon, ShieldIcon, SunIcon, WalletIcon } from '../icons';
 import { Theme } from '../../hooks/useTheme';
+import { useZoom } from '../../hooks/useZoom';
 import { Card, IconButton } from '../ui';
 import { DigitalClock } from './DigitalClock';
 
@@ -12,6 +13,7 @@ interface HeaderProps {
   gpsStatus: GpsStatus;
   theme: Theme;
   onToggleTheme: () => void;
+  zoom: ReturnType<typeof useZoom>;
   onOpenRobot: () => void;
   onGoToRecords: () => void;
   onSendPreop: () => void;
@@ -23,7 +25,7 @@ const chipClass =
   'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold transition-all active:scale-95';
 
 /** Barra superior + tarjeta principal con la Entrega y el resumen del día. */
-export const Header: React.FC<HeaderProps> = ({ results, gpsStatus, theme, onToggleTheme, onOpenRobot, onGoToRecords, onSendPreop, onOpenCalendar, onOpenPocket }) => {
+export const Header: React.FC<HeaderProps> = ({ results, gpsStatus, theme, onToggleTheme, zoom, onOpenRobot, onGoToRecords, onSendPreop, onOpenCalendar, onOpenPocket }) => {
   const isNegative = results.amountToSettle < 0;
   const entregaText = formatCurrency(results.amountToSettle);
   // Las cifras largas bajan de tamaño para que siempre quepan en pantallas angostas.
@@ -32,17 +34,18 @@ export const Header: React.FC<HeaderProps> = ({ results, gpsStatus, theme, onTog
 
   return (
     <header className="mb-6">
-      <div className="flex items-center justify-between gap-3 mb-4">
-        <div className="min-w-0">
-          <h1 className="text-lg font-extrabold tracking-tight text-main leading-tight">Mi Ganancia</h1>
-          <p className="text-xs text-muted first-letter:uppercase truncate">{today}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <DigitalClock />
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-lg font-extrabold tracking-tight text-main leading-tight truncate">Mi Ganancia</h1>
+        <div className="flex items-center gap-2 shrink-0">
+          <ZoomControl {...zoom} />
           <IconButton title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'} onClick={onToggleTheme}>
             {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
           </IconButton>
         </div>
+      </div>
+      <div className="flex items-center justify-between gap-3 mt-1 mb-4">
+        <p className="text-xs text-muted first-letter:uppercase truncate">{today}</p>
+        <DigitalClock />
       </div>
 
       <div className="flex flex-wrap gap-2 mb-4">
@@ -109,5 +112,28 @@ const Stat: React.FC<{ label: string; value: string; className: string }> = ({ l
   <div className="py-3 px-1 text-center min-w-0">
     <p className="text-[11px] font-medium text-muted">{label}</p>
     <p className={`tabular font-bold whitespace-nowrap ${statSize(value)} ${className}`}>{value}</p>
+  </div>
+);
+
+const zoomButtonClass =
+  'w-8 h-9 flex items-center justify-center text-lg font-bold leading-none transition-colors active:scale-90 hover:text-main disabled:opacity-30 disabled:cursor-not-allowed';
+
+/** Botones − y + para achicar o agrandar toda la app. Tocar el porcentaje la deja normal. */
+const ZoomControl: React.FC<ReturnType<typeof useZoom>> = ({ zoom, zoomIn, zoomOut, resetZoom, canZoomIn, canZoomOut }) => (
+  <div className="flex items-center rounded-lg bg-raised/40 text-muted">
+    <button className={zoomButtonClass} onClick={zoomOut} disabled={!canZoomOut} title="Achicar la app" aria-label="Achicar la app">
+      −
+    </button>
+    <button
+      className={`tabular text-[11px] font-semibold min-w-[2.25rem] h-9 transition-colors ${zoom === 1 ? '' : 'text-brand'}`}
+      onClick={resetZoom}
+      title="Tamaño normal"
+      aria-label="Volver al tamaño normal"
+    >
+      {Math.round(zoom * 100)}%
+    </button>
+    <button className={zoomButtonClass} onClick={zoomIn} disabled={!canZoomIn} title="Agrandar la app" aria-label="Agrandar la app">
+      +
+    </button>
   </div>
 );
