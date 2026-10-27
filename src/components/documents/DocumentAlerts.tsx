@@ -9,22 +9,28 @@ const DISMISS_KEY = 'docAlertsDismissed';
 /** Ventana de aviso al abrir la app cuando algún documento está vencido o por vencer. */
 export const DocumentAlerts: React.FC<{ documents: ManagedDocument[] }> = ({ documents }) => {
   const [isDismissed, setIsDismissed] = useState(() => sessionStorage.getItem(DISMISS_KEY) === 'true');
+  // El aviso sale un momento después de abrir, cuando la app ya se dibujó, para no trabar el arranque.
+  const [isReady, setIsReady] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setIsReady(true), 800);
+    return () => window.clearTimeout(t);
+  }, []);
 
   const alerts = useMemo(() => documents
     .map(doc => ({ ...doc, statusInfo: getDocumentStatus(doc.expiryDate, doc.alertDateTime) }))
     .filter(doc => doc.statusInfo.status === 'expired' || doc.statusInfo.status === 'expiring'), [documents]);
 
   useEffect(() => {
-    if (alerts.length > 0 && !isDismissed) {
+    if (isReady && alerts.length > 0 && !isDismissed) {
       try {
         playNotificationSound();
       } catch (e) {
         console.warn('Could not play notification sound due to browser policy:', e);
       }
     }
-  }, [alerts, isDismissed]);
+  }, [alerts, isDismissed, isReady]);
 
-  if (isDismissed || alerts.length === 0) return null;
+  if (!isReady || isDismissed || alerts.length === 0) return null;
 
   const handleDismiss = () => {
     setIsDismissed(true);
@@ -32,7 +38,7 @@ export const DocumentAlerts: React.FC<{ documents: ManagedDocument[] }> = ({ doc
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in-backdrop" aria-modal="true" role="dialog">
+    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 animate-fade-in-backdrop" aria-modal="true" role="dialog">
       <div className="bg-card border border-warn/40 rounded-3xl w-full max-w-md p-6 shadow-2xl text-center animate-fade-in-scale">
         <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-warn/15 mb-4 border border-warn/40 text-warn animate-pulse-bell">
           <BellIcon className="h-8 w-8" />

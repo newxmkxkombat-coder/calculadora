@@ -18,6 +18,9 @@
     } catch (e) {
       document.documentElement.setAttribute('data-theme', 'dark');
     }
+    // Pinta el fondo de una vez, antes de que carguen los estilos, para que nunca quede la pantalla vacía.
+    document.documentElement.style.backgroundColor =
+      document.documentElement.getAttribute('data-theme') === 'light' ? '#f1f5f9' : '#080c18';
     // Igual con el tamaño de la app (botones − y +), para que no salte al abrir.
     try {
       var savedZoom = Number(localStorage.getItem('driverAppZoom'));

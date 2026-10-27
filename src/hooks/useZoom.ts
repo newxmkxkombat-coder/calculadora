@@ -19,8 +19,14 @@ export const useZoom = () => {
 
   useEffect(() => {
     const root = document.documentElement;
-    root.style.setProperty('zoom', String(zoom));
-    root.style.setProperty('--app-zoom', String(zoom));
+    // En 100% quitamos el zoom del todo: así el celular dibuja la app de la forma normal.
+    if (zoom === 1) {
+      root.style.removeProperty('zoom');
+      root.style.removeProperty('--app-zoom');
+    } else {
+      root.style.setProperty('zoom', String(zoom));
+      root.style.setProperty('--app-zoom', String(zoom));
+    }
     try {
       localStorage.setItem(STORAGE_KEYS.zoom, String(zoom));
     } catch {

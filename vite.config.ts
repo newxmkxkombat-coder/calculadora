@@ -15,6 +15,22 @@ export default defineConfig(({ mode }) => {
         devOptions: {
           enabled: true
         },
+        workbox: {
+          // Guarda en el celular los estilos (Tailwind) y la letra (Google Fonts) que vienen de internet,
+          // para que la app abra aunque la señal esté lenta o no haya datos.
+          runtimeCaching: [
+            {
+              urlPattern: ({ url }) => url.origin === 'https://cdn.tailwindcss.com',
+              handler: 'StaleWhileRevalidate',
+              options: { cacheName: 'tailwind-cdn', cacheableResponse: { statuses: [0, 200] } }
+            },
+            {
+              urlPattern: ({ url }) => url.origin === 'https://fonts.googleapis.com' || url.origin === 'https://fonts.gstatic.com',
+              handler: 'StaleWhileRevalidate',
+              options: { cacheName: 'google-fonts', cacheableResponse: { statuses: [0, 200] } }
+            }
+          ]
+        },
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
         manifest: {
           name: 'Control Diario de Conductor',
