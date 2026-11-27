@@ -18,8 +18,8 @@ import { DocumentAlerts } from './components/documents/DocumentAlerts';
 import { DocumentManager } from './components/documents/DocumentManager';
 import { DayForm } from './components/form/DayForm';
 import { HistorySection } from './components/history/HistorySection';
-import { ActionBar } from './components/layout/ActionBar';
-import { Header } from './components/layout/Header';
+import { ActionBar, TabKey } from './components/layout/ActionBar';
+import { TabHeader, TodaySubtitle, TodayTop } from './components/layout/Header';
 import { Toast } from './components/layout/Toast';
 import { VehicleMaintenanceManager } from './components/maintenance/VehicleMaintenanceManager';
 import { PocketModal } from './components/pocket/PocketModal';
@@ -77,9 +77,9 @@ const App: React.FC = () => {
   const [usedPhrases, setUsedPhrases] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isRobotModalOpen, setIsRobotModalOpen] = useState(false);
-  const [isRecordsOpen, setIsRecordsOpen] = useState(false);
+  // Pestaña de abajo que está abierta: Hoy, Registros, Mi Bolsillo o Más.
+  const [tab, setTab] = useState<TabKey>('hoy');
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const [isPocketOpen, setIsPocketOpen] = useState(false);
 
   const fuelInputRef = useRef<HTMLInputElement>(null);
 
@@ -215,7 +215,9 @@ const App: React.FC = () => {
     if (!entry) return;
     setFormData(entry.formData);
     setEditingId(id);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Para editar un día guardado, la app te lleva a la pestaña "Hoy" con sus datos.
+    setTab('hoy');
+    window.scrollTo({ top: 0 });
   };
 
   const handleDeleteEntry = (id: string) => {
@@ -308,10 +310,11 @@ const App: React.FC = () => {
     localStorage.setItem(STORAGE_KEYS.preopLastSent, today);
   };
 
-  // El botón "Registros" del encabezado abre la lista y baja hasta ella.
-  const goToRecords = () => {
-    setIsRecordsOpen(true);
-    setTimeout(() => document.getElementById('registros')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+  // Cambiar de pestaña: siempre empieza arriba del todo.
+  const changeTab = (next: TabKey) => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    setTab(next);
+    window.scrollTo({ top: 0 });
   };
 
   // Al tocar un espacio vacío se cierra el teclado.
@@ -321,41 +324,67 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-[calc(100vh/var(--app-zoom,1))] px-4 sm:px-6 pt-6 pb-32" onClick={handleBackgroundClick}>
+    <div className={`min-h-[calc(100vh/var(--app-zoom,1))] px-4 sm:px-6 pt-6 ${tab === 'hoy' ? 'pb-48' : 'pb-28'}`} onClick={handleBackgroundClick}>
       <DocumentAlerts documents={documents} />
 
       <div className="max-w-4xl mx-auto">
-        <Header results={results} gpsStatus={gps.status} theme={theme} onToggleTheme={toggleTheme} zoom={zoom} onOpenRobot={openRobot} onGoToRecords={goToRecords} onSendPreop={handleSendPreoperacional} onOpenCalendar={() => setIsCalendarOpen(true)} onOpenPocket={() => setIsPocketOpen(true)} />
+        {tab === 'hoy' && (
+          <>
+            <TabHeader title="Hoy" subtitle={<TodaySubtitle />} theme={theme} onToggleTheme={toggleTheme} zoom={zoom} />
+            <TodayTop results={results} gpsStatus={gps.status} onOpenRobot={openRobot} onSendPreop={handleSendPreoperacional} onOpenCalendar={() => setIsCalendarOpen(true)} />
+            <DayForm formData={formData} fuelInputRef={fuelInputRef} isEditing={!!editingId} onChange={handleChange} onFocus={onFocus} />
+          </>
+        )}
 
-        <DayForm formData={formData} fuelInputRef={fuelInputRef} isEditing={!!editingId} onChange={handleChange} onFocus={onFocus} />
+        {tab === 'registros' && (
+          <>
+            <TabHeader title="Registros" subtitle="Los días que has guardado" theme={theme} onToggleTheme={toggleTheme} zoom={zoom} />
+            <HistorySection
+              history={history}
+              passengerGoal={passengerGoal}
+              onGoalChange={setPassengerGoal}
+              onClearAll={handleClearAllHistory}
+              onLoad={handleLoadEntry}
+              onDelete={handleDeleteEntry}
+              onCopy={handleCopyEntry}
+              onMoveUp={id => moveEntry(id, -1)}
+              onMoveDown={id => moveEntry(id, 1)}
+              onChangeTimestamp={handleChangeTimestamp}
+            />
+          </>
+        )}
 
-        <HistorySection
-          history={history}
-          passengerGoal={passengerGoal}
-          isOpen={isRecordsOpen}
-          onToggle={() => setIsRecordsOpen(open => !open)}
-          onGoalChange={setPassengerGoal}
-          onClearAll={handleClearAllHistory}
-          onLoad={handleLoadEntry}
-          onDelete={handleDeleteEntry}
-          onCopy={handleCopyEntry}
-          onMoveUp={id => moveEntry(id, -1)}
-          onMoveDown={id => moveEntry(id, 1)}
-          onChangeTimestamp={handleChangeTimestamp}
-        />
+        {tab === 'bolsillo' && (
+          <>
+            <TabHeader title="Mi Bolsillo" subtitle="Tu plata personal" theme={theme} onToggleTheme={toggleTheme} zoom={zoom} />
+            <PocketModal
+              asPage
+              moves={pocketMoves}
+              learnedWords={pocketWords}
+              customCategories={pocketCategories}
+              onAdd={handleAddPocketMoves}
+              onUpdate={handleUpdatePocketMove}
+              onDelete={handleDeletePocketMove}
+              onAddCategory={handleAddPocketCategory}
+              onClose={() => changeTab('hoy')}
+            />
+          </>
+        )}
 
-        <PeriodSummary history={history} />
-
-        <VehicleMaintenanceManager
-          records={maintenanceRecords}
-          setRecords={setMaintenanceRecords}
-          customTypes={customMaintenanceTypes}
-          setCustomTypes={setCustomMaintenanceTypes}
-        />
-
-        <DocumentManager documents={documents} setDocuments={setDocuments} />
-
-        <BackupManager />
+        {tab === 'mas' && (
+          <>
+            <TabHeader title="Más" subtitle="Todo lo demás, ordenado" theme={theme} onToggleTheme={toggleTheme} zoom={zoom} />
+            <PeriodSummary history={history} />
+            <VehicleMaintenanceManager
+              records={maintenanceRecords}
+              setRecords={setMaintenanceRecords}
+              customTypes={customMaintenanceTypes}
+              setCustomTypes={setCustomMaintenanceTypes}
+            />
+            <DocumentManager documents={documents} setDocuments={setDocuments} />
+            <BackupManager />
+          </>
+        )}
       </div>
 
       <RobotModal
@@ -372,22 +401,11 @@ const App: React.FC = () => {
 
       {isCalendarOpen && <CalendarModal onClose={() => setIsCalendarOpen(false)} />}
 
-      {isPocketOpen && (
-        <PocketModal
-          moves={pocketMoves}
-          learnedWords={pocketWords}
-          customCategories={pocketCategories}
-          onAdd={handleAddPocketMoves}
-          onUpdate={handleUpdatePocketMove}
-          onDelete={handleDeletePocketMove}
-          onAddCategory={handleAddPocketCategory}
-          onClose={() => setIsPocketOpen(false)}
-        />
-      )}
-
       <Toast message={toastMessage} show={!!toastMessage} onClose={() => setToastMessage('')} />
 
       <ActionBar
+        tab={tab}
+        onTabChange={changeTab}
         isEditing={!!editingId}
         isSaving={isSaving}
         hidden={isKeyboardOpen}

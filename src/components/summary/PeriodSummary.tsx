@@ -21,7 +21,7 @@ export const PeriodSummary: React.FC<{ history: HistoryEntry[] }> = ({ history }
   const average = totals.days > 0 ? totals.earnings / totals.days : 0;
 
   return (
-    <Card className="mt-6 p-4 sm:p-5">
+    <Card className="p-4 sm:p-5">
       <div className="flex items-center gap-3 mb-4">
         <IconBadge tone="good"><ChartIcon /></IconBadge>
         <h2 className="text-base sm:text-lg font-bold text-main flex-grow">Resumen</h2>

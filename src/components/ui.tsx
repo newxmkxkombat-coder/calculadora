@@ -50,14 +50,15 @@ interface SectionCardProps {
   tone?: Tone;
   badge?: React.ReactNode;
   defaultOpen?: boolean;
+  className?: string;
   children: React.ReactNode;
 }
 
 /** Tarjeta plegable (Mantenimiento, Documentos, Respaldo...). */
-export const SectionCard: React.FC<SectionCardProps> = ({ title, icon, tone = 'brand', badge, defaultOpen = false, children }) => {
+export const SectionCard: React.FC<SectionCardProps> = ({ title, icon, tone = 'brand', badge, defaultOpen = false, className = 'mt-6', children }) => {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <Card className="mt-6">
+    <Card className={className}>
       <button
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
@@ -134,11 +135,23 @@ interface ModalShellProps {
   subtitle?: string;
   headerExtra?: React.ReactNode;
   maxWidth?: string;
+  /** En vez de ventana emergente, se muestra como una página normal (para las pestañas de abajo). */
+  asPage?: boolean;
   children: React.ReactNode;
 }
 
 /** Ventana emergente común: fondo difuminado, cierre con Escape o tocando afuera. */
-export const ModalShell: React.FC<ModalShellProps> = ({ title, onClose, tone = 'brand', icon, subtitle, headerExtra, maxWidth = 'max-w-md', children }) => {
+export const ModalShell: React.FC<ModalShellProps> = props => (props.asPage ? <PageShell {...props} /> : <OverlayShell {...props} />);
+
+/** La misma ventana, pero dibujada como página dentro de una pestaña (el título ya está arriba en la pestaña). */
+const PageShell: React.FC<ModalShellProps> = ({ headerExtra, children }) => (
+  <Card className="p-4 sm:p-5">
+    {headerExtra && <div className="flex justify-end -mt-1 mb-2">{headerExtra}</div>}
+    {children}
+  </Card>
+);
+
+const OverlayShell: React.FC<ModalShellProps> = ({ title, onClose, tone = 'brand', icon, subtitle, headerExtra, maxWidth = 'max-w-md', children }) => {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();

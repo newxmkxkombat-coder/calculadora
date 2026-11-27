@@ -16,6 +16,8 @@ interface PocketModalProps {
   onDelete: (id: string) => void;
   onAddCategory: (name: string) => void;
   onClose: () => void;
+  /** true = se muestra como pestaña (página) en vez de ventana emergente. */
+  asPage?: boolean;
 }
 
 /**
@@ -24,7 +26,7 @@ interface PocketModalProps {
  * y cuánto entró y cuánto gastaste en el mes. También puedes pegar un mensaje de WhatsApp
  * ("gasté 10 mil en jabón") para que la app saque los gastos sola.
  */
-export const PocketModal: React.FC<PocketModalProps> = ({ moves, learnedWords, customCategories, onAdd, onUpdate, onDelete, onAddCategory, onClose }) => {
+export const PocketModal: React.FC<PocketModalProps> = ({ moves, learnedWords, customCategories, onAdd, onUpdate, onDelete, onAddCategory, onClose, asPage = false }) => {
   const [amount, setAmount] = useState('');
   const [concept, setConcept] = useState('');
   // Grupo elegido a mano para el gasto que estás escribiendo (si no, la app lo adivina por el nombre).
@@ -115,6 +117,7 @@ export const PocketModal: React.FC<PocketModalProps> = ({ moves, learnedWords, c
         tone="good"
         icon={<WalletIcon />}
         onClose={onClose}
+        asPage={asPage}
         headerExtra={<Button variant="secondary" small onClick={share} disabled={moves.length === 0}><CopyIcon /> Compartir</Button>}
       >
         <div className="text-center mb-4">

@@ -2,118 +2,111 @@ import React from 'react';
 import { GpsStatus } from '../../types';
 import { formatCurrency } from '../../utils/format';
 import { CalculationResults } from '../../types';
-import { CalendarIcon, ClipboardCheckIcon, MoonIcon, RobotIcon, ShieldIcon, SunIcon, WalletIcon } from '../icons';
+import { CalendarIcon, MoonIcon, RobotIcon, ShieldIcon, SunIcon } from '../icons';
 import { Theme } from '../../hooks/useTheme';
 import { useZoom } from '../../hooks/useZoom';
 import { Card, IconButton } from '../ui';
 import { DigitalClock } from './DigitalClock';
 
-interface HeaderProps {
-  results: CalculationResults;
-  gpsStatus: GpsStatus;
+interface TabHeaderProps {
+  title: string;
+  subtitle?: React.ReactNode;
   theme: Theme;
   onToggleTheme: () => void;
   zoom: ReturnType<typeof useZoom>;
-  onOpenRobot: () => void;
-  onGoToRecords: () => void;
-  onSendPreop: () => void;
-  onOpenCalendar: () => void;
-  onOpenPocket: () => void;
 }
 
-const chipClass =
-  'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold transition-all active:scale-95';
+/** Título grande de cada pestaña, con los botones de tamaño (− +) y de tema claro/oscuro. */
+export const TabHeader: React.FC<TabHeaderProps> = ({ title, subtitle, theme, onToggleTheme, zoom }) => (
+  <div className="flex items-start justify-between gap-3 mb-4">
+    <div className="min-w-0">
+      <h1 className="text-2xl font-extrabold tracking-tight text-main leading-tight truncate">{title}</h1>
+      {subtitle && <div className="text-xs text-muted mt-1">{subtitle}</div>}
+    </div>
+    <div className="flex items-center gap-2 shrink-0">
+      <ZoomControl {...zoom} />
+      <IconButton title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'} onClick={onToggleTheme}>
+        {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+      </IconButton>
+    </div>
+  </div>
+);
 
-/** Barra superior + tarjeta principal con la Entrega y el resumen del día. */
-export const Header: React.FC<HeaderProps> = ({ results, gpsStatus, theme, onToggleTheme, zoom, onOpenRobot, onGoToRecords, onSendPreop, onOpenCalendar, onOpenPocket }) => {
+/** "Viernes 27 nov": corta para que quepa junto al reloj. */
+const shortToday = () => {
+  const now = new Date();
+  const weekday = now.toLocaleDateString('es-CO', { weekday: 'long' });
+  const month = now.toLocaleDateString('es-CO', { month: 'short' }).replace('.', '');
+  return `${weekday} ${now.getDate()} ${month}`;
+};
+
+/** Fecha de hoy + reloj, debajo del título "Hoy". */
+export const TodaySubtitle: React.FC = () => (
+  <div className="flex items-center gap-2">
+    <span className="first-letter:uppercase truncate">{shortToday()}</span>
+    <DigitalClock />
+  </div>
+);
+
+interface TodayTopProps {
+  results: CalculationResults;
+  gpsStatus: GpsStatus;
+  onOpenRobot: () => void;
+  onSendPreop: () => void;
+  onOpenCalendar: () => void;
+}
+
+const quickClass =
+  'flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl border text-xs font-bold transition-all active:scale-95';
+
+/** Parte de arriba de la pestaña "Hoy": 3 botones rápidos y la tarjeta con la Entrega. */
+export const TodayTop: React.FC<TodayTopProps> = ({ results, gpsStatus, onOpenRobot, onSendPreop, onOpenCalendar }) => {
   const isNegative = results.amountToSettle < 0;
   const entregaText = formatCurrency(results.amountToSettle);
   // Las cifras largas bajan de tamaño para que siempre quepan en pantallas angostas.
-  const entregaSize = entregaText.length > 12 ? 'text-2xl sm:text-5xl' : entregaText.length > 9 ? 'text-3xl sm:text-5xl' : 'text-4xl sm:text-5xl';
-  const today = new Date().toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' });
+  const entregaSize = entregaText.length > 12 ? 'text-2xl' : entregaText.length > 10 ? 'text-3xl' : 'text-4xl';
 
   return (
-    <header className="mb-6">
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="text-lg font-extrabold tracking-tight text-main leading-tight truncate">Mi Ganancia</h1>
-        <div className="flex items-center gap-2 shrink-0">
-          <ZoomControl {...zoom} />
-          <IconButton title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'} onClick={onToggleTheme}>
-            {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
-          </IconButton>
-        </div>
-      </div>
-      <div className="flex items-center justify-between gap-3 mt-1 mb-4">
-        <p className="text-xs text-muted first-letter:uppercase truncate">{today}</p>
-        <DigitalClock />
-      </div>
-
-      <div className="flex flex-wrap gap-2 mb-4">
-        <button onClick={onOpenRobot} className={`${chipClass} text-violet bg-violet/10 border-violet/30 hover:bg-violet/20`}>
+    <div className="mb-5">
+      <div className="flex gap-2 mb-4">
+        <button onClick={onOpenRobot} className={`${quickClass} !flex-none px-4 text-violet bg-violet/10 border-violet/30`}>
           <RobotIcon />
-          {gpsStatus === 'loading' ? 'Sincronizando...' : 'Pasajeros GPS'}
+          <span className="truncate">{gpsStatus === 'loading' ? 'Buscando...' : 'GPS'}</span>
         </button>
-        <button
-          onClick={onGoToRecords}
-          className={`${chipClass} text-info bg-info/10 border-info/30 hover:bg-info/20`}
-        >
-          <ClipboardCheckIcon />
-          Registros
-        </button>
-        <button
-          onClick={onOpenCalendar}
-          className={`${chipClass} text-brand bg-brand/10 border-brand/30 hover:bg-brand/20`}
-        >
-          <CalendarIcon />
-          Calendario
-        </button>
-        <button
-          onClick={onSendPreop}
-          className={`${chipClass} text-good bg-good/10 border-good/30 hover:bg-good/20`}
-        >
+        <button onClick={onSendPreop} className={`${quickClass} !flex-[1.3] text-good bg-good/10 border-good/30`}>
           <ShieldIcon />
-          Preoperacional
+          <span className="truncate">Preoperacional</span>
         </button>
-        <button
-          onClick={onOpenPocket}
-          className={`${chipClass} text-warn bg-warn/10 border-warn/30 hover:bg-warn/20`}
-        >
-          <WalletIcon />
-          Mi Bolsillo
+        <button onClick={onOpenCalendar} className={`${quickClass} text-brand bg-brand/10 border-brand/30`}>
+          <CalendarIcon />
+          <span className="truncate">Calendario</span>
         </button>
       </div>
 
-      <Card className="overflow-hidden">
-        <div className={`px-5 pt-5 pb-4 text-center bg-gradient-to-b ${isNegative ? 'from-bad/10' : 'from-brand/10'} to-transparent`}>
-          <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted mb-1">
-            <ClipboardCheckIcon />
-            Entrega
+      <Card className="p-4">
+        <div className="flex items-end justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-muted">Entrega</p>
+            <p className={`tabular whitespace-nowrap font-extrabold tracking-tight leading-tight transition-colors ${entregaSize} ${isNegative ? 'text-bad' : 'text-brand'}`}>
+              {entregaText}
+            </p>
           </div>
-          <p className={`tabular whitespace-nowrap font-extrabold tracking-tight transition-colors ${entregaSize} ${isNegative ? 'text-bad' : 'text-brand'}`}>
-            {entregaText}
-          </p>
-          <p className="text-xs text-faint mt-1">
-            {isNegative ? 'Los gastos superan lo recaudado' : 'Lo que entregas al propietario'}
-          </p>
+          <div className="text-right shrink-0">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-muted">Mi sueldo</p>
+            <p className="tabular font-bold text-lg text-good whitespace-nowrap">{formatCurrency(results.myEarnings)}</p>
+          </div>
         </div>
-        <div className="grid grid-cols-3 divide-x divide-line/50 border-t border-line/50">
-          <Stat label="Mi sueldo" value={formatCurrency(results.myEarnings)} className="text-good" />
-          <Stat label="Gastos" value={formatCurrency(results.totalExpenses)} className="text-warn" />
-          <Stat label="Recaudado" value={formatCurrency(results.totalRevenue)} className="text-info" />
+        <p className="text-xs text-faint mt-1">
+          {isNegative ? 'Los gastos superan lo recaudado' : 'Lo que entregas al propietario'}
+        </p>
+        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 pt-3 border-t border-line/50 text-xs text-muted">
+          <span>Gastos <b className="tabular text-warn text-sm">{formatCurrency(results.totalExpenses)}</b></span>
+          <span>Recaudado <b className="tabular text-info text-sm">{formatCurrency(results.totalRevenue)}</b></span>
         </div>
       </Card>
-    </header>
+    </div>
   );
 };
-
-const statSize = (value: string) => (value.length > 11 ? 'text-xs sm:text-lg' : value.length > 9 ? 'text-sm sm:text-lg' : 'text-base sm:text-lg');
-
-const Stat: React.FC<{ label: string; value: string; className: string }> = ({ label, value, className }) => (
-  <div className="py-3 px-1 text-center min-w-0">
-    <p className="text-[11px] font-medium text-muted">{label}</p>
-    <p className={`tabular font-bold whitespace-nowrap ${statSize(value)} ${className}`}>{value}</p>
-  </div>
-);
 
 const zoomButtonClass =
   'w-8 h-9 flex items-center justify-center text-lg font-bold leading-none transition-colors active:scale-90 hover:text-main disabled:opacity-30 disabled:cursor-not-allowed';
