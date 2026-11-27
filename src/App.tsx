@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CalculationResults, FormData, HistoryEntry, ManagedDocument, MaintenanceRecord, PocketMove } from './types';
-import { LearnedWords, learnKey } from './utils/categories';
+import { CalculationResults, FormData, HistoryEntry, ManagedDocument, MaintenanceRecord } from './types';
 import { MOTIVATIONAL_PHRASES, STORAGE_KEYS } from './constants';
 import { calculateResults, getRawData } from './utils/calc';
 import { formatCurrency, formatNumberWithDots, getLocalDateString, parseFormattedNumber } from './utils/format';
@@ -22,16 +21,10 @@ import { ActionBar, TabKey } from './components/layout/ActionBar';
 import { TabHeader, TodaySubtitle, TodayTop } from './components/layout/Header';
 import { Toast } from './components/layout/Toast';
 import { VehicleMaintenanceManager } from './components/maintenance/VehicleMaintenanceManager';
-import { PocketModal } from './components/pocket/PocketModal';
 import { RobotModal } from './components/robot/RobotModal';
-import { PeriodSummary } from './components/summary/PeriodSummary';
 
 const FUEL_MAX_DIGITS = 6;
 const PASSENGERS_MAX_DIGITS = 3;
-
-/** Texto del movimiento que entra a Mi Bolsillo al guardar un día. */
-const dayPocketConcept = (isoTimestamp: string) =>
-  `Sueldo del día ${new Date(isoTimestamp).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' })}`;
 
 const getInitialFormData = (): FormData => {
   const config = loadConfig();
@@ -64,9 +57,6 @@ const App: React.FC = () => {
   const [history, setHistory] = usePersistentState<HistoryEntry[]>(STORAGE_KEYS.history, loadHistory);
   const [documents, setDocuments] = usePersistentState<ManagedDocument[]>(STORAGE_KEYS.documents, () => loadJSON(STORAGE_KEYS.documents, []));
   const [maintenanceRecords, setMaintenanceRecords] = usePersistentState<MaintenanceRecord[]>(STORAGE_KEYS.maintenance, () => loadJSON(STORAGE_KEYS.maintenance, []));
-  const [pocketMoves, setPocketMoves] = usePersistentState<PocketMove[]>(STORAGE_KEYS.pocket, () => loadJSON(STORAGE_KEYS.pocket, []));
-  const [pocketWords, setPocketWords] = usePersistentState<LearnedWords>(STORAGE_KEYS.pocketWords, () => loadJSON(STORAGE_KEYS.pocketWords, {}));
-  const [pocketCategories, setPocketCategories] = usePersistentState<string[]>(STORAGE_KEYS.pocketCategories, () => loadJSON(STORAGE_KEYS.pocketCategories, []));
   const [customMaintenanceTypes, setCustomMaintenanceTypes] = usePersistentState<string[]>(STORAGE_KEYS.customTypes, () => loadJSON(STORAGE_KEYS.customTypes, []));
   const [passengerGoal, setPassengerGoal] = useState<number>(() => loadConfig().passengerGoal);
   const [passengerDeduction, setPassengerDeduction] = useState<string>(() => localStorage.getItem(STORAGE_KEYS.passengerDeduction) || '');
@@ -77,7 +67,7 @@ const App: React.FC = () => {
   const [usedPhrases, setUsedPhrases] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isRobotModalOpen, setIsRobotModalOpen] = useState(false);
-  // Pestaña de abajo que está abierta: Hoy, Registros, Mi Bolsillo o Más.
+  // Pestaña de abajo que está abierta: Hoy, Registros o Más.
   const [tab, setTab] = useState<TabKey>('hoy');
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
@@ -181,14 +171,11 @@ const App: React.FC = () => {
       totalDeliveredAmount: grossAmountToSettle,
     };
 
-    // Tu sueldo del día (15% + $100 por pasajero) también va a Mi Bolsillo.
     if (editingId) {
       setHistory(prev => prev.map(entry => (entry.id === editingId ? { ...entry, formData, results: resultsForHistory } : entry)));
-      setPocketMoves(prev => prev.map(move => (move.historyId === editingId ? { ...move, amount: results.myEarnings } : move)));
     } else {
       const now = new Date().toISOString();
       setHistory(prev => [{ id: now, timestamp: now, formData, results: resultsForHistory }, ...prev]);
-      setPocketMoves(prev => [{ id: now, timestamp: now, concept: dayPocketConcept(now), amount: results.myEarnings, historyId: now }, ...prev]);
     }
 
     setIsSaving(true);
@@ -207,7 +194,6 @@ const App: React.FC = () => {
         ? { ...entry, timestamp: isoTimestamp, formData: { ...entry.formData, route: calculateRouteForDate(isoTimestamp) } }
         : entry))
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
-    setPocketMoves(prev => prev.map(move => (move.historyId === id ? { ...move, concept: dayPocketConcept(isoTimestamp) } : move)));
   };
 
   const handleLoadEntry = (id: string) => {
@@ -224,8 +210,6 @@ const App: React.FC = () => {
     if (!window.confirm('¿Estás seguro de que quieres borrar este registro?')) return;
     if (editingId === id) resetForm();
     setHistory(prev => prev.filter(entry => entry.id !== id));
-    // Si borras un día, su sueldo también sale de Mi Bolsillo.
-    setPocketMoves(prev => prev.filter(move => move.historyId !== id));
   };
 
   const handleCopyEntry = (entry: HistoryEntry) => {
@@ -258,35 +242,6 @@ const App: React.FC = () => {
       [next[index], next[target]] = [next[target], next[index]];
       return next;
     });
-  };
-
-  // --- Mi Bolsillo ---
-  const handleAddPocketMoves = (items: { concept: string; amount: number; category?: string }[]) => {
-    const now = new Date().toISOString();
-    const newMoves = items.map((item, i) => ({ id: `${now}-${i}`, timestamp: now, ...item })).reverse();
-    setPocketMoves(prev => [...newMoves, ...prev]);
-    // Si elegiste el grupo a mano, la app lo recuerda para la próxima vez.
-    const learned = items.filter(item => item.category);
-    if (learned.length) {
-      setPocketWords(prev => ({ ...prev, ...Object.fromEntries(learned.map(item => [learnKey(item.concept), item.category!])) }));
-    }
-  };
-
-  // Al corregir un gasto: se guarda el cambio y, si le cambiaste el grupo, la app aprende ese nombre.
-  const handleUpdatePocketMove = (updated: PocketMove, groupChanged: boolean) => {
-    setPocketMoves(prev => prev.map(move => (move.id === updated.id ? updated : move)));
-    if (groupChanged && updated.category) {
-      setPocketWords(prev => ({ ...prev, [learnKey(updated.concept)]: updated.category! }));
-    }
-  };
-
-  const handleAddPocketCategory = (name: string) => {
-    setPocketCategories(prev => (prev.includes(name) ? prev : [...prev, name]));
-  };
-
-  const handleDeletePocketMove = (id: string) => {
-    if (!window.confirm('¿Borrar este movimiento de Mi Bolsillo?')) return;
-    setPocketMoves(prev => prev.filter(move => move.id !== id));
   };
 
   // --- Robot GPS ---
@@ -354,27 +309,9 @@ const App: React.FC = () => {
           </>
         )}
 
-        {tab === 'bolsillo' && (
-          <>
-            <TabHeader title="Mi Bolsillo" subtitle="Tu plata personal" theme={theme} onToggleTheme={toggleTheme} zoom={zoom} />
-            <PocketModal
-              asPage
-              moves={pocketMoves}
-              learnedWords={pocketWords}
-              customCategories={pocketCategories}
-              onAdd={handleAddPocketMoves}
-              onUpdate={handleUpdatePocketMove}
-              onDelete={handleDeletePocketMove}
-              onAddCategory={handleAddPocketCategory}
-              onClose={() => changeTab('hoy')}
-            />
-          </>
-        )}
-
         {tab === 'mas' && (
           <>
             <TabHeader title="Más" subtitle="Todo lo demás, ordenado" theme={theme} onToggleTheme={toggleTheme} zoom={zoom} />
-            <PeriodSummary history={history} />
             <VehicleMaintenanceManager
               records={maintenanceRecords}
               setRecords={setMaintenanceRecords}
