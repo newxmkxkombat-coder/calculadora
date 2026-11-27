@@ -126,3 +126,21 @@ textarea {
     transition-duration: 0.01ms !important;
   }
 }
+
+/*
+ * La pantalla "Hoy" se acomoda al alto de cada celular (App.tsx pone data-fit en <html>):
+ * "compact" en pantallas bajitas y "tight" en las muy bajitas, para que todo quepa sin scroll.
+ */
+html[data-fit='compact'] .fit-row { padding-top: 0.4rem; padding-bottom: 0.4rem; }
+html[data-fit='compact'] .fit-badge { height: 2rem; width: 2rem; }
+html[data-fit='compact'] .fit-quick { padding-top: 0.4rem; padding-bottom: 0.4rem; }
+html[data-fit='compact'] .fit-btn { padding-top: 0.6rem; padding-bottom: 0.6rem; }
+
+html[data-fit='tight'] .fit-row { padding-top: 0.2rem; padding-bottom: 0.2rem; }
+html[data-fit='tight'] .fit-badge { height: 1.75rem; width: 1.75rem; }
+html[data-fit='tight'] .fit-badge svg { height: 1rem; width: 1rem; }
+html[data-fit='tight'] .fit-quick { padding-top: 0.3rem; padding-bottom: 0.3rem; }
+html[data-fit='tight'] .fit-btn { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+html[data-fit='tight'] .fit-title { font-size: 1.25rem; }
+html[data-fit='tight'] .fit-big { font-size: 1.75rem; }
+html[data-fit='tight'] .fit-card { padding-top: 0.5rem; padding-bottom: 0.5rem; }

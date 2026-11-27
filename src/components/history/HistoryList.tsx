@@ -17,6 +17,10 @@ interface HistoryListProps {
   onMoveUp: (id: string) => void;
   onMoveDown: (id: string) => void;
   onChangeTimestamp: (id: string, isoTimestamp: string) => void;
+  /** Modo "Seleccionar": cada registro muestra una casilla y tocarlo lo marca. */
+  isSelecting?: boolean;
+  selectedIds?: string[];
+  onToggleSelect?: (id: string) => void;
 }
 
 const toLocalInputValue = (timestamp: string): string => {
@@ -26,7 +30,7 @@ const toLocalInputValue = (timestamp: string): string => {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
 
-export const HistoryList: React.FC<HistoryListProps> = ({ history, totalCount, canReorder, onLoad, onDelete, onCopy, onMoveUp, onMoveDown, onChangeTimestamp }) => {
+export const HistoryList: React.FC<HistoryListProps> = ({ history, totalCount, canReorder, onLoad, onDelete, onCopy, onMoveUp, onMoveDown, onChangeTimestamp, isSelecting = false, selectedIds = [], onToggleSelect }) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [tempTimestamp, setTempTimestamp] = useState('');
@@ -87,21 +91,26 @@ export const HistoryList: React.FC<HistoryListProps> = ({ history, totalCount, c
       <ul className="space-y-3 md:space-y-0">
         {history.map((entry, index) => {
           const isExpanded = expandedId === entry.id;
-          const toggle = () => setExpandedId(current => (current === entry.id ? null : entry.id));
+          const isSelected = selectedIds.includes(entry.id);
+          // En modo seleccionar, tocar la tarjeta la marca o desmarca en vez de abrirla.
+          const toggle = () => (isSelecting
+            ? onToggleSelect?.(entry.id)
+            : setExpandedId(current => (current === entry.id ? null : entry.id)));
           const route = entry.formData.route || calculateRouteForDate(entry.timestamp);
           const passengers = parseFormattedNumber(entry.formData.numPassengers);
 
           return (
             <li key={entry.id} className="md:border-b md:border-line/40 last:md:border-b-0">
               {/* Celular: tarjeta que se despliega */}
-              <div className="md:hidden bg-field/50 border border-line/50 rounded-2xl overflow-hidden">
+              <div className={`md:hidden border rounded-2xl overflow-hidden transition-colors ${isSelected ? 'bg-bad/10 border-bad/50' : 'bg-field/50 border-line/50'}`}>
                 <div className="p-4">
                   <div className="flex justify-between items-start gap-2">
+                    {isSelecting && <SelectBox checked={isSelected} onClick={toggle} />}
                     <button onClick={toggle} className="flex-grow text-left">
                       <p className="font-semibold text-main">{formatTimestamp(entry.timestamp)}</p>
                       <p className="text-xs text-muted">Ruta {route} · {passengers} pasajeros</p>
                     </button>
-                    <div className="flex items-center gap-1.5 shrink-0">
+                    <div className={`flex items-center gap-1.5 shrink-0 ${isSelecting ? 'hidden' : ''}`}>
                       <IconButton title="Copiar para WhatsApp" tone="good" onClick={() => onCopy(entry)}><CopyIcon /></IconButton>
                       <IconButton title={isExpanded ? 'Ocultar detalle' : 'Ver detalle'} onClick={toggle}>
                         <ChevronDownIcon className={`!h-5 !w-5 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
@@ -120,7 +129,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({ history, totalCount, c
                   </button>
                 </div>
 
-                <div className="collapsible" data-open={isExpanded}>
+                <div className="collapsible" data-open={isExpanded && !isSelecting}>
                   <div>
                     <div className="px-4 pb-4 border-t border-line/40">
                       <div className="pt-3">
@@ -152,7 +161,8 @@ export const HistoryList: React.FC<HistoryListProps> = ({ history, totalCount, c
 
               {/* Escritorio: fila de tabla */}
               <div className="hidden md:grid md:grid-cols-9 md:gap-x-4 md:items-center px-4 py-3 even:bg-field/30 hover:bg-brand/5 transition-colors group">
-                <div className="md:col-span-2">
+                <div className="md:col-span-2 flex items-center gap-2">
+                  {isSelecting && <SelectBox checked={isSelected} onClick={toggle} />}
                   {editingId === entry.id ? timestampEditor(entry) : (
                     <div className="flex items-center gap-2">
                       <p className="font-semibold text-main text-sm">{formatTimestamp(entry.timestamp)}</p>
@@ -179,6 +189,19 @@ export const HistoryList: React.FC<HistoryListProps> = ({ history, totalCount, c
     </div>
   );
 };
+
+/** Casilla redonda para marcar un registro. */
+const SelectBox: React.FC<{ checked: boolean; onClick: () => void }> = ({ checked, onClick }) => (
+  <button
+    onClick={onClick}
+    role="checkbox"
+    aria-checked={checked}
+    aria-label={checked ? 'Quitar de la selección' : 'Seleccionar este registro'}
+    className={`shrink-0 h-7 w-7 rounded-full border-2 flex items-center justify-center transition-colors ${checked ? 'bg-bad border-bad text-white' : 'border-faint'}`}
+  >
+    {checked && <CheckIcon />}
+  </button>
+);
 
 const Detail: React.FC<{ label: string; value: string; tone?: string }> = ({ label, value, tone = 'text-main' }) => (
   <div>
