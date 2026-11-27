@@ -21,7 +21,7 @@ export const Toast: React.FC<ToastProps> = ({ message, show, onClose }) => {
     <div
       aria-live="polite"
       aria-atomic="true"
-      className="fixed inset-x-4 bottom-24 z-50 flex justify-center pointer-events-none animate-slide-up"
+      className="fixed inset-x-4 bottom-44 z-50 flex justify-center pointer-events-none animate-slide-up"
     >
       <div
         role="alert"

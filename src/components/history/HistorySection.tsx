@@ -11,8 +11,9 @@ const PAGE_SIZE = 20;
 interface HistorySectionProps {
   history: HistoryEntry[];
   passengerGoal: number;
-  isOpen: boolean;
-  onToggle: () => void;
+  /** Ahora la lista vive en su propia pestaña, así que siempre está abierta. */
+  isOpen?: boolean;
+  onToggle?: () => void;
   onGoalChange: (goal: number) => void;
   onClearAll: () => void;
   onLoad: (id: string) => void;
@@ -36,7 +37,7 @@ const searchableText = (entry: HistoryEntry): string => {
   ].join(' ').toLowerCase();
 };
 
-export const HistorySection: React.FC<HistorySectionProps> = ({ history, passengerGoal, isOpen, onToggle, onGoalChange, onClearAll, ...listHandlers }) => {
+export const HistorySection: React.FC<HistorySectionProps> = ({ history, passengerGoal, isOpen = true, onToggle, onGoalChange, onClearAll, ...listHandlers }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
@@ -75,11 +76,12 @@ export const HistorySection: React.FC<HistorySectionProps> = ({ history, passeng
 
   return (
     <>
-      <Card className="mt-6">
+      <Card>
         {/* Toda la franja es un botón: al tocarla se abre o se cierra la lista */}
         <button
           id="registros"
           onClick={onToggle}
+          disabled={!onToggle}
           aria-expanded={isOpen}
           className="w-full flex items-center gap-3 text-left p-4 sm:p-5 scroll-mt-4"
         >
@@ -87,7 +89,7 @@ export const HistorySection: React.FC<HistorySectionProps> = ({ history, passeng
           <h2 className="text-base sm:text-lg font-bold text-main">Registros diarios</h2>
           {history.length > 0 && <span className="text-xs bg-raised/70 text-muted font-semibold px-2 py-0.5 rounded-full">{history.length}</span>}
           <span className="flex-grow" />
-          <ChevronDownIcon className={`text-muted transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
+          {onToggle && <ChevronDownIcon className={`text-muted transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />}
         </button>
 
         <div className="collapsible" data-open={isOpen}>
