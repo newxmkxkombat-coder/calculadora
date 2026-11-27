@@ -18,10 +18,10 @@ interface TabHeaderProps {
 
 /** Título grande de cada pestaña, con los botones de tamaño (− +) y de tema claro/oscuro. */
 export const TabHeader: React.FC<TabHeaderProps> = ({ title, subtitle, theme, onToggleTheme, zoom }) => (
-  <div className="flex items-start justify-between gap-3 mb-4">
+  <div className="flex items-start justify-between gap-3 mb-3">
     <div className="min-w-0">
-      <h1 className="text-2xl font-extrabold tracking-tight text-main leading-tight truncate">{title}</h1>
-      {subtitle && <div className="text-xs text-muted mt-1">{subtitle}</div>}
+      <h1 className="fit-title text-2xl font-extrabold tracking-tight text-main leading-tight truncate">{title}</h1>
+      {subtitle && <div className="text-xs text-muted mt-0.5">{subtitle}</div>}
     </div>
     <div className="flex items-center gap-2 shrink-0">
       <ZoomControl {...zoom} />
@@ -32,10 +32,10 @@ export const TabHeader: React.FC<TabHeaderProps> = ({ title, subtitle, theme, on
   </div>
 );
 
-/** "Viernes 27 nov": corta para que quepa junto al reloj. */
+/** "vie 27 nov": corta para que quepa junto al reloj. */
 const shortToday = () => {
   const now = new Date();
-  const weekday = now.toLocaleDateString('es-CO', { weekday: 'long' });
+  const weekday = now.toLocaleDateString('es-CO', { weekday: 'short' }).replace('.', '');
   const month = now.toLocaleDateString('es-CO', { month: 'short' }).replace('.', '');
   return `${weekday} ${now.getDate()} ${month}`;
 };
@@ -44,7 +44,8 @@ const shortToday = () => {
 export const TodaySubtitle: React.FC = () => (
   <div className="flex items-center gap-2">
     <span className="first-letter:uppercase truncate">{shortToday()}</span>
-    <DigitalClock />
+    {/* En pantallas muy angostas se esconde el reloj para que la fecha se lea completa. */}
+    <span className="max-[350px]:hidden"><DigitalClock /></span>
   </div>
 );
 
@@ -57,7 +58,7 @@ interface TodayTopProps {
 }
 
 const quickClass =
-  'flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl border text-xs font-bold transition-all active:scale-95';
+  'fit-quick max-[380px]:[&_svg]:hidden flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 px-2 py-2 rounded-xl border text-xs font-bold transition-all active:scale-95';
 
 /** Parte de arriba de la pestaña "Hoy": 3 botones rápidos y la tarjeta con la Entrega. */
 export const TodayTop: React.FC<TodayTopProps> = ({ results, gpsStatus, onOpenRobot, onSendPreop, onOpenCalendar }) => {
@@ -67,8 +68,8 @@ export const TodayTop: React.FC<TodayTopProps> = ({ results, gpsStatus, onOpenRo
   const entregaSize = entregaText.length > 12 ? 'text-2xl' : entregaText.length > 10 ? 'text-3xl' : 'text-4xl';
 
   return (
-    <div className="mb-5">
-      <div className="flex gap-2 mb-4">
+    <div className="mb-3">
+      <div className="flex gap-2 mb-3">
         <button onClick={onOpenRobot} className={`${quickClass} !flex-none px-4 text-violet bg-violet/10 border-violet/30`}>
           <RobotIcon />
           <span className="truncate">{gpsStatus === 'loading' ? 'Buscando...' : 'GPS'}</span>
@@ -83,11 +84,11 @@ export const TodayTop: React.FC<TodayTopProps> = ({ results, gpsStatus, onOpenRo
         </button>
       </div>
 
-      <Card className="p-4">
+      <Card className="fit-card px-4 py-3">
         <div className="flex items-end justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[11px] font-bold uppercase tracking-widest text-muted">Entrega</p>
-            <p className={`tabular whitespace-nowrap font-extrabold tracking-tight leading-tight transition-colors ${entregaSize} ${isNegative ? 'text-bad' : 'text-brand'}`}>
+            <p className={`fit-big tabular whitespace-nowrap font-extrabold tracking-tight leading-tight transition-colors ${entregaSize} ${isNegative ? 'text-bad' : 'text-brand'}`}>
               {entregaText}
             </p>
           </div>
@@ -96,10 +97,9 @@ export const TodayTop: React.FC<TodayTopProps> = ({ results, gpsStatus, onOpenRo
             <p className="tabular font-bold text-lg text-good whitespace-nowrap">{formatCurrency(results.myEarnings)}</p>
           </div>
         </div>
-        <p className="text-xs text-faint mt-1">
-          {isNegative ? 'Los gastos superan lo recaudado' : 'Lo que entregas al propietario'}
-        </p>
-        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 pt-3 border-t border-line/50 text-xs text-muted">
+        {/* Solo avisa cuando algo anda mal, para ahorrar espacio en la pantalla. */}
+        {isNegative && <p className="text-xs text-bad mt-1">Los gastos superan lo recaudado</p>}
+        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 pt-2 border-t border-line/50 text-xs text-muted">
           <span>Gastos <b className="tabular text-warn text-sm">{formatCurrency(results.totalExpenses)}</b></span>
           <span>Recaudado <b className="tabular text-info text-sm">{formatCurrency(results.totalRevenue)}</b></span>
         </div>

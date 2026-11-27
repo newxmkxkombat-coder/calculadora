@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { FormData } from '../../types';
 import { SHOW_ROUTE_SELECTOR } from '../../constants';
 import { BriefcaseIcon, ChevronDownIcon, FuelIcon, MoneyIcon, PercentageIcon, RouteIcon, SettingsIcon, UsersIcon, WrenchIcon } from '../icons';
-import { Card, IconBadge, SectionTitle, Tone } from '../ui';
+import { Card, IconBadge, Tone } from '../ui';
 import { RouteSelector } from './RouteSelector';
 
 interface DayFormProps {
@@ -34,8 +34,8 @@ const numberWidth = (value: string) => {
 
 /** Una fila de la lista: icono + nombre a la izquierda, el número grande a la derecha. Toda la fila se puede tocar. */
 const Row = React.forwardRef<HTMLInputElement, RowProps>(({ label, name, value, icon, tone, unit, onChange, onFocus }, ref) => (
-  <label htmlFor={name} className="flex items-center gap-3 px-4 py-3 cursor-text transition-colors focus-within:bg-brand/5">
-    <IconBadge tone={tone}>{icon}</IconBadge>
+  <label htmlFor={name} className="fit-row flex-1 flex items-center gap-3 px-4 py-2.5 cursor-text transition-colors focus-within:bg-brand/5">
+    <IconBadge tone={tone} className="fit-badge">{icon}</IconBadge>
     <span className="flex-1 min-w-0 text-sm text-muted truncate">{label}</span>
     <span className="flex items-baseline gap-1 shrink-0">
       {unit === '$' && <span className="text-sm font-semibold text-faint">$</span>}
@@ -71,16 +71,14 @@ export const DayForm: React.FC<DayFormProps> = ({ formData, fuelInputRef, isEdit
   const rowProps = { onChange, onFocus };
 
   return (
-    <main className="space-y-3">
+    <main className="flex-1 flex flex-col gap-3">
       {isEditing && (
         <div className="px-4 py-3 rounded-xl border border-warn/40 bg-warn/10 text-sm text-warn font-medium">
           Estás editando un registro guardado. Toca “Actualizar registro” para aplicar los cambios.
         </div>
       )}
 
-      <SectionTitle tone="brand">Lo de hoy</SectionTitle>
-
-      <Card className="overflow-hidden divide-y divide-line/50">
+      <Card className={`overflow-hidden divide-y divide-line/50 ${showFixed ? '' : 'flex-1 flex flex-col max-h-[19rem]'}`}>
         <Row label="Pasajeros" name="numPassengers" value={formData.numPassengers} icon={<UsersIcon />} tone="violet" {...rowProps} />
         <Row ref={fuelInputRef} label="Combustible" name="fuelExpenses" value={formData.fuelExpenses} icon={<FuelIcon />} tone="warn" unit="$" {...rowProps} />
         <Row label="Taller (lavada, engrase…)" name="variableExpenses" value={formData.variableExpenses} icon={<WrenchIcon />} tone="warn" unit="$" {...rowProps} />
@@ -89,9 +87,9 @@ export const DayForm: React.FC<DayFormProps> = ({ formData, fuelInputRef, isEdit
           type="button"
           onClick={() => setShowFixed(open => !open)}
           aria-expanded={showFixed}
-          className="w-full flex items-center gap-3 px-4 py-3 text-left"
+          className="fit-row flex-1 w-full flex items-center gap-3 px-4 py-2.5 text-left"
         >
-          <IconBadge tone="neutral"><SettingsIcon /></IconBadge>
+          <IconBadge tone="neutral" className="fit-badge"><SettingsIcon /></IconBadge>
           <span className="flex-1 min-w-0 text-sm text-muted truncate">Pasaje, comisión y admin.</span>
           <ChevronDownIcon className={`text-faint transition-transform duration-300 ${showFixed ? 'rotate-180' : ''}`} />
         </button>

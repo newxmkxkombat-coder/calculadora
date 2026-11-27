@@ -212,6 +212,12 @@ const App: React.FC = () => {
     setHistory(prev => prev.filter(entry => entry.id !== id));
   };
 
+  // Borra de una vez los días que marcaste en Registros (la confirmación se pide en HistorySection).
+  const handleDeleteMany = (ids: string[]) => {
+    if (editingId && ids.includes(editingId)) resetForm();
+    setHistory(prev => prev.filter(entry => !ids.includes(entry.id)));
+  };
+
   const handleCopyEntry = (entry: HistoryEntry) => {
     const pasajeros = parseFormattedNumber(entry.formData.numPassengers);
     const ganancias = formatCurrency(entry.results.myEarnings);
@@ -265,6 +271,18 @@ const App: React.FC = () => {
     localStorage.setItem(STORAGE_KEYS.preopLastSent, today);
   };
 
+  // La pantalla se acomoda al alto del celular: si es bajita, todo se compacta un poco (ver styles.css).
+  useEffect(() => {
+    const updateFit = () => {
+      const visibleHeight = window.innerHeight / zoom.zoom;
+      const fit = visibleHeight < 640 ? 'tight' : visibleHeight < 740 ? 'compact' : 'normal';
+      document.documentElement.setAttribute('data-fit', fit);
+    };
+    updateFit();
+    window.addEventListener('resize', updateFit);
+    return () => window.removeEventListener('resize', updateFit);
+  }, [zoom.zoom]);
+
   // Cambiar de pestaña: siempre empieza arriba del todo.
   const changeTab = (next: TabKey) => {
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
@@ -279,16 +297,22 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className={`min-h-[calc(100vh/var(--app-zoom,1))] px-4 sm:px-6 pt-6 ${tab === 'hoy' ? 'pb-48' : 'pb-28'}`} onClick={handleBackgroundClick}>
+    <div
+      className="min-h-[calc(100vh/var(--app-zoom,1))] px-4 sm:px-6 pt-4"
+      // Abajo se deja justo el espacio que ocupa la barra fija (la mide ActionBar), ni más ni menos.
+      style={{ paddingBottom: 'calc(var(--bottom-bar, 140px) + 12px)' }}
+      onClick={handleBackgroundClick}
+    >
       <DocumentAlerts documents={documents} />
 
       <div className="max-w-4xl mx-auto">
         {tab === 'hoy' && (
-          <>
+          // Ocupa justo el alto de la pantalla: en celulares altos las filas crecen para llenar el espacio.
+          <div className="flex flex-col" style={{ minHeight: 'calc(100vh / var(--app-zoom, 1) - var(--bottom-bar, 140px) - 28px)' }}>
             <TabHeader title="Hoy" subtitle={<TodaySubtitle />} theme={theme} onToggleTheme={toggleTheme} zoom={zoom} />
             <TodayTop results={results} gpsStatus={gps.status} onOpenRobot={openRobot} onSendPreop={handleSendPreoperacional} onOpenCalendar={() => setIsCalendarOpen(true)} />
             <DayForm formData={formData} fuelInputRef={fuelInputRef} isEditing={!!editingId} onChange={handleChange} onFocus={onFocus} />
-          </>
+          </div>
         )}
 
         {tab === 'registros' && (
@@ -299,6 +323,7 @@ const App: React.FC = () => {
               passengerGoal={passengerGoal}
               onGoalChange={setPassengerGoal}
               onClearAll={handleClearAllHistory}
+              onDeleteMany={handleDeleteMany}
               onLoad={handleLoadEntry}
               onDelete={handleDeleteEntry}
               onCopy={handleCopyEntry}
