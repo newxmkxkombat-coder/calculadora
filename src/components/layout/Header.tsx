@@ -5,7 +5,7 @@ import { CalculationResults } from '../../types';
 import { CalendarIcon, MoonIcon, RobotIcon, SettingsIcon, ShieldIcon, SunIcon } from '../icons';
 import { Theme } from '../../hooks/useTheme';
 import { useZoom } from '../../hooks/useZoom';
-import { Card, IconBadge } from '../ui';
+import { Card, SectionCard } from '../ui';
 
 /** Título de las pestañas Registros y Más. ("Hoy" no lleva título, para dejar más espacio.) */
 export const TabHeader: React.FC<{ title: string; subtitle?: string }> = ({ title, subtitle }) => (
@@ -21,31 +21,41 @@ interface SettingsCardProps {
   zoom: ReturnType<typeof useZoom>;
 }
 
-/** Ajustes (en la pestaña Más): tamaño de toda la app y modo claro/oscuro. */
+/**
+ * Ajustes (en la pestaña Más): tarjeta plegable con flechita, como Mantenimiento o Documentos.
+ * Cerrada muestra el tamaño y el modo actuales; abierta deja cambiarlos.
+ */
 export const SettingsCard: React.FC<SettingsCardProps> = ({ theme, onToggleTheme, zoom }) => (
-  <Card className="mt-6 divide-y divide-line/50">
-    <div className="flex items-center gap-3 p-4">
-      <IconBadge tone="neutral"><SettingsIcon /></IconBadge>
-      <h2 className="text-base sm:text-lg font-bold text-main">Ajustes</h2>
-    </div>
-    <div className="flex items-center justify-between gap-3 px-4 py-3">
-      <div className="min-w-0">
-        <p className="text-sm font-semibold text-main">Tamaño de la app</p>
-        <p className="text-xs text-muted">Toca el % para volver a lo normal</p>
-      </div>
-      <ZoomControl {...zoom} />
-    </div>
-    <button onClick={onToggleTheme} className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left">
-      <div className="min-w-0">
-        <p className="text-sm font-semibold text-main">Modo de pantalla</p>
-        <p className="text-xs text-muted">{theme === 'dark' ? 'Ahora: oscuro' : 'Ahora: claro'}</p>
-      </div>
-      <span className="inline-flex items-center gap-2 px-3 h-9 rounded-lg bg-raised/40 text-muted text-xs font-semibold">
-        {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
-        {theme === 'dark' ? 'Cambiar a claro' : 'Cambiar a oscuro'}
+  <SectionCard
+    title="Ajustes"
+    icon={<SettingsIcon />}
+    tone="neutral"
+    badge={
+      <span className="text-xs bg-raised/70 text-muted font-semibold px-2 py-0.5 rounded-full whitespace-nowrap">
+        {Math.round(zoom.zoom * 100)}% · {theme === 'dark' ? 'Oscuro' : 'Claro'}
       </span>
-    </button>
-  </Card>
+    }
+  >
+    <div className="divide-y divide-line/50 -my-2">
+      <div className="flex items-center justify-between gap-3 py-3">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-main">Tamaño de la app</p>
+          <p className="text-xs text-muted">Toca el % para volver a 100%</p>
+        </div>
+        <ZoomControl {...zoom} />
+      </div>
+      <button onClick={onToggleTheme} className="w-full flex items-center justify-between gap-3 py-3 text-left">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-main">Modo de pantalla</p>
+          <p className="text-xs text-muted">Ahora: {theme === 'dark' ? 'oscuro' : 'claro'}</p>
+        </div>
+        <span className="inline-flex items-center gap-2 px-3 h-9 rounded-lg bg-raised/40 text-muted text-xs font-semibold shrink-0">
+          {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+          {theme === 'dark' ? 'Cambiar a claro' : 'Cambiar a oscuro'}
+        </span>
+      </button>
+    </div>
+  </SectionCard>
 );
 
 interface TodayTopProps {
