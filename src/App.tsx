@@ -18,7 +18,7 @@ import { DocumentManager } from './components/documents/DocumentManager';
 import { DayForm } from './components/form/DayForm';
 import { HistorySection } from './components/history/HistorySection';
 import { ActionBar, TabKey } from './components/layout/ActionBar';
-import { TabHeader, TodaySubtitle, TodayTop } from './components/layout/Header';
+import { SettingsCard, TabHeader, TodayTop } from './components/layout/Header';
 import { Toast } from './components/layout/Toast';
 import { VehicleMaintenanceManager } from './components/maintenance/VehicleMaintenanceManager';
 import { RobotModal } from './components/robot/RobotModal';
@@ -309,7 +309,6 @@ const App: React.FC = () => {
         {tab === 'hoy' && (
           // Ocupa justo el alto de la pantalla: en celulares altos las filas crecen para llenar el espacio.
           <div className="flex flex-col" style={{ minHeight: 'calc(100vh / var(--app-zoom, 1) - var(--bottom-bar, 140px) - 28px)' }}>
-            <TabHeader title="Hoy" subtitle={<TodaySubtitle />} theme={theme} onToggleTheme={toggleTheme} zoom={zoom} />
             <TodayTop results={results} gpsStatus={gps.status} onOpenRobot={openRobot} onSendPreop={handleSendPreoperacional} onOpenCalendar={() => setIsCalendarOpen(true)} />
             <DayForm formData={formData} fuelInputRef={fuelInputRef} isEditing={!!editingId} onChange={handleChange} onFocus={onFocus} />
           </div>
@@ -317,7 +316,7 @@ const App: React.FC = () => {
 
         {tab === 'registros' && (
           <>
-            <TabHeader title="Registros" subtitle="Los días que has guardado" theme={theme} onToggleTheme={toggleTheme} zoom={zoom} />
+            <TabHeader title="Registros" subtitle="Los días que has guardado" />
             <HistorySection
               history={history}
               passengerGoal={passengerGoal}
@@ -336,7 +335,7 @@ const App: React.FC = () => {
 
         {tab === 'mas' && (
           <>
-            <TabHeader title="Más" subtitle="Todo lo demás, ordenado" theme={theme} onToggleTheme={toggleTheme} zoom={zoom} />
+            <TabHeader title="Más" subtitle="Todo lo demás, ordenado" />
             <VehicleMaintenanceManager
               records={maintenanceRecords}
               setRecords={setMaintenanceRecords}
@@ -345,6 +344,7 @@ const App: React.FC = () => {
             />
             <DocumentManager documents={documents} setDocuments={setDocuments} />
             <BackupManager />
+            <SettingsCard theme={theme} onToggleTheme={toggleTheme} zoom={zoom} />
           </>
         )}
       </div>

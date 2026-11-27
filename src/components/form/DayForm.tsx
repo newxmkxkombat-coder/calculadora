@@ -78,7 +78,7 @@ export const DayForm: React.FC<DayFormProps> = ({ formData, fuelInputRef, isEdit
         </div>
       )}
 
-      <Card className={`overflow-hidden divide-y divide-line/50 ${showFixed ? '' : 'flex-1 flex flex-col max-h-[19rem]'}`}>
+      <Card className={`overflow-hidden divide-y divide-line/50 ${showFixed ? '' : 'flex-1 flex flex-col max-h-[24rem]'}`}>
         <Row label="Pasajeros" name="numPassengers" value={formData.numPassengers} icon={<UsersIcon />} tone="violet" {...rowProps} />
         <Row ref={fuelInputRef} label="Combustible" name="fuelExpenses" value={formData.fuelExpenses} icon={<FuelIcon />} tone="warn" unit="$" {...rowProps} />
         <Row label="Taller (lavada, engrase…)" name="variableExpenses" value={formData.variableExpenses} icon={<WrenchIcon />} tone="warn" unit="$" {...rowProps} />
