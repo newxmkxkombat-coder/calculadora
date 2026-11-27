@@ -69,6 +69,8 @@ const App: React.FC = () => {
   const [isRobotModalOpen, setIsRobotModalOpen] = useState(false);
   // Pestaña de abajo que está abierta: Hoy, Registros o Más.
   const [tab, setTab] = useState<TabKey>('hoy');
+  // La lista "Registros diarios" se abre y se cierra con su flechita (empieza cerrada, como las demás tarjetas).
+  const [isRecordsOpen, setIsRecordsOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
   const fuelInputRef = useRef<HTMLInputElement>(null);
@@ -321,6 +323,8 @@ const App: React.FC = () => {
               history={history}
               passengerGoal={passengerGoal}
               onGoalChange={setPassengerGoal}
+              isOpen={isRecordsOpen}
+              onToggle={() => setIsRecordsOpen(open => !open)}
               onClearAll={handleClearAllHistory}
               onDeleteMany={handleDeleteMany}
               onLoad={handleLoadEntry}
