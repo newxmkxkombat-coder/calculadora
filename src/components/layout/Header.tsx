@@ -2,51 +2,50 @@ import React from 'react';
 import { GpsStatus } from '../../types';
 import { formatCurrency } from '../../utils/format';
 import { CalculationResults } from '../../types';
-import { CalendarIcon, MoonIcon, RobotIcon, ShieldIcon, SunIcon } from '../icons';
+import { CalendarIcon, MoonIcon, RobotIcon, SettingsIcon, ShieldIcon, SunIcon } from '../icons';
 import { Theme } from '../../hooks/useTheme';
 import { useZoom } from '../../hooks/useZoom';
-import { Card, IconButton } from '../ui';
-import { DigitalClock } from './DigitalClock';
+import { Card, IconBadge } from '../ui';
 
-interface TabHeaderProps {
-  title: string;
-  subtitle?: React.ReactNode;
+/** Título de las pestañas Registros y Más. ("Hoy" no lleva título, para dejar más espacio.) */
+export const TabHeader: React.FC<{ title: string; subtitle?: string }> = ({ title, subtitle }) => (
+  <div className="mb-3">
+    <h1 className="text-2xl font-extrabold tracking-tight text-main leading-tight truncate">{title}</h1>
+    {subtitle && <p className="text-xs text-muted mt-0.5">{subtitle}</p>}
+  </div>
+);
+
+interface SettingsCardProps {
   theme: Theme;
   onToggleTheme: () => void;
   zoom: ReturnType<typeof useZoom>;
 }
 
-/** Título grande de cada pestaña, con los botones de tamaño (− +) y de tema claro/oscuro. */
-export const TabHeader: React.FC<TabHeaderProps> = ({ title, subtitle, theme, onToggleTheme, zoom }) => (
-  <div className="flex items-start justify-between gap-3 mb-3">
-    <div className="min-w-0">
-      <h1 className="fit-title text-2xl font-extrabold tracking-tight text-main leading-tight truncate">{title}</h1>
-      {subtitle && <div className="text-xs text-muted mt-0.5">{subtitle}</div>}
+/** Ajustes (en la pestaña Más): tamaño de toda la app y modo claro/oscuro. */
+export const SettingsCard: React.FC<SettingsCardProps> = ({ theme, onToggleTheme, zoom }) => (
+  <Card className="mt-6 divide-y divide-line/50">
+    <div className="flex items-center gap-3 p-4">
+      <IconBadge tone="neutral"><SettingsIcon /></IconBadge>
+      <h2 className="text-base sm:text-lg font-bold text-main">Ajustes</h2>
     </div>
-    <div className="flex items-center gap-2 shrink-0">
+    <div className="flex items-center justify-between gap-3 px-4 py-3">
+      <div className="min-w-0">
+        <p className="text-sm font-semibold text-main">Tamaño de la app</p>
+        <p className="text-xs text-muted">Toca el % para volver a lo normal</p>
+      </div>
       <ZoomControl {...zoom} />
-      <IconButton title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'} onClick={onToggleTheme}>
-        {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
-      </IconButton>
     </div>
-  </div>
-);
-
-/** "vie 27 nov": corta para que quepa junto al reloj. */
-const shortToday = () => {
-  const now = new Date();
-  const weekday = now.toLocaleDateString('es-CO', { weekday: 'short' }).replace('.', '');
-  const month = now.toLocaleDateString('es-CO', { month: 'short' }).replace('.', '');
-  return `${weekday} ${now.getDate()} ${month}`;
-};
-
-/** Fecha de hoy + reloj, debajo del título "Hoy". */
-export const TodaySubtitle: React.FC = () => (
-  <div className="flex items-center gap-2">
-    <span className="first-letter:uppercase truncate">{shortToday()}</span>
-    {/* En pantallas muy angostas se esconde el reloj para que la fecha se lea completa. */}
-    <span className="max-[350px]:hidden"><DigitalClock /></span>
-  </div>
+    <button onClick={onToggleTheme} className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left">
+      <div className="min-w-0">
+        <p className="text-sm font-semibold text-main">Modo de pantalla</p>
+        <p className="text-xs text-muted">{theme === 'dark' ? 'Ahora: oscuro' : 'Ahora: claro'}</p>
+      </div>
+      <span className="inline-flex items-center gap-2 px-3 h-9 rounded-lg bg-raised/40 text-muted text-xs font-semibold">
+        {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+        {theme === 'dark' ? 'Cambiar a claro' : 'Cambiar a oscuro'}
+      </span>
+    </button>
+  </Card>
 );
 
 interface TodayTopProps {
