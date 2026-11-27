@@ -1,12 +1,11 @@
 import React from 'react';
-import { CheckIcon, ClipboardCheckIcon, GridIcon, HomeIcon, WalletIcon } from '../icons';
+import { CheckIcon, ClipboardCheckIcon, GridIcon, HomeIcon } from '../icons';
 
-export type TabKey = 'hoy' | 'registros' | 'bolsillo' | 'mas';
+export type TabKey = 'hoy' | 'registros' | 'mas';
 
 const TABS: Array<{ key: TabKey; label: string; icon: React.ReactNode }> = [
   { key: 'hoy', label: 'Hoy', icon: <HomeIcon /> },
   { key: 'registros', label: 'Registros', icon: <ClipboardCheckIcon /> },
-  { key: 'bolsillo', label: 'Mi Bolsillo', icon: <WalletIcon /> },
   { key: 'mas', label: 'Más', icon: <GridIcon /> },
 ];
 
@@ -52,7 +51,7 @@ export const ActionBar: React.FC<ActionBarProps> = ({ tab, onTabChange, isEditin
     )}
 
     <nav className="bg-card/95 backdrop-blur-xl border-t border-line/60" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-      <div className="max-w-4xl mx-auto grid grid-cols-4">
+      <div className="max-w-4xl mx-auto grid grid-cols-3">
         {TABS.map(t => {
           const active = t.key === tab;
           return (
